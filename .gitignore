@@ -1,0 +1,38 @@
+# =========================
+# .NET & Visual Studio
+# =========================
+.vs/
+[Bb]in/
+[Oo]bj/
+[Tt]est[Rr]esult*/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.nupkg
+*.snupkg
+
+# =========================
+# C++ & CMake
+# =========================
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+*.so
+*.dll
+*.dylib
+*.exe
+*.pdb
+*.lib
+*.exp
+
+# =========================
+# OS Generated Files
+# =========================
+.DS_Store
+Thumbs.db

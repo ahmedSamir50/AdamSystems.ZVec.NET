@@ -1,0 +1,3 @@
+[submodule "src/Native/ZVec.Native/external/zvec"]
+	path = src/Native/ZVec.Native/external/zvec
+	url = https://github.com/alibaba/zvec.git

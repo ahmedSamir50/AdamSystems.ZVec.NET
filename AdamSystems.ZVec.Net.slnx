@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="LICENSE" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Core/">
+    <Project Path="src/Core/ZVec.Core/AdamSystems.ZVec.Core.csproj" />
+  </Folder>
+  <Folder Name="/src/Native/" />
+  <Folder Name="/testing/" />
+  <Folder Name="/testing/Core/">
+    <Project Path="testing/ZVec.Core.Benchmarks/AdamSystems.ZVec.Core.Benchmarks.csproj" />
+    <Project Path="testing/ZVec.Core.Tests/AdamSystems.ZVec.Core.Tests.csproj" />
+  </Folder>
+</Solution>

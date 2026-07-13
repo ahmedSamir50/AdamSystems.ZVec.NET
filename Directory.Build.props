@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Ahmed Samir; Adam Systems</Authors>
+    <Company>Adam Systems</Company>
+  </PropertyGroup>
+  
+  
+</Project>
