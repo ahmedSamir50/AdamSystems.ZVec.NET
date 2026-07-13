@@ -16,7 +16,7 @@
 6. [P/Invoke & Marshalling Layer](#6-pinvoke--marshalling-layer)
 7. [Public SDK API Design](#7-public-sdk-api-design)
 8. [Memory & Performance Strategy](#8-memory--performance-strategy)
-9. [Cross-Platform NuGet Packaging](#9-cross-platform-nuget-packaging)
+9. [Cross-Platform NuGet Packaging](#9-cross-platform-nuget-packaging) *(incl. §9.3 Versioning & §9.4 Announcing to Upstream)*
 10. [Testing Strategy](#10-testing-strategy)
 11. [Benchmark Strategy](#11-benchmark-strategy)
 12. [Work Breakdown Structure (WBS)](#12-work-breakdown-structure-wbs)
@@ -69,7 +69,7 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 | .NET Target | `net8.0` – `net10.0` (pack `lib/net8.0` when identical) | `net8.0` is LTS; net9/10 fall back to net8.0 asset if no TFM-specific code |
 | C++ Standard | C++17 | Matches ZVec upstream |
 | License | MIT via `<PackageLicenseExpression>` | Correct NuGet metadata property (not `<License>`) |
-| Strong-naming | Yes, open signing key | Enterprise / strong-named consumer compatibility |
+| Strong-naming | Yes, open signing key (`.snk` committed to repo) | Enterprise / strong-named consumer compatibility. The `.snk` is an **identity key** (not a security secret) — like SQLitePCLRaw's approach. Generated once via `sn -k AdamSystems.ZVec.NET.snk` and placed in `build/`. It lets strong-named consumers reference our assembly |
 | Test Framework | xUnit + FluentAssertions | User decision |
 | Mock Strategy | C++ mock C-API DLL (primary); managed `SetDllImportResolver` mock optional | Unit tests without full native rebuild; integration uses real binaries |
 | NuGet Layout | Single `.nupkg` with `runtimes/{rid}/native/` | Runtime resolves RID natives; no custom `build/*.props` for RID packing |
@@ -1230,16 +1230,22 @@ No `build/*.props` for RID native packing — the .NET runtime resolves `runtime
     <PackageId>AdamSystems.ZVec.NET</PackageId>
     <AssemblyName>AdamSystems.ZVec.NET</AssemblyName>
     <RootNamespace>AdamSystems.ZVec.NET</RootNamespace>
-    <!-- managed SemVer + pinned upstream native: e.g. 1.0.0-alpha.1+zvec.1.2.3 -->
-    <Version>1.0.0-alpha.1</Version>
+    <!-- Version = our SemVer + build metadata for pinned native ZVec release.
+         Example: 1.0.0-alpha.1+zvec.1.2.3 means our SDK 1.0.0-alpha.1 wrapping ZVec C++ 1.2.3.
+         The .NET target is NOT in the version — it lives in TargetFrameworks + lib/ folder.
+         NuGet already shows "net8.0" as the dependency framework. -->
+    <Version>1.0.0-alpha.1+zvec.1.2.3</Version>
     <Authors>Adam Systems</Authors>
-    <Description>High-performance .NET SDK for Alibaba ZVec vector database</Description>
+    <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (win/linux/mac, x64/arm64).</Description>
+    <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Wraps ZVec C++ 1.2.3; targets .NET 8.0+ (LTS baseline)</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <RepositoryUrl>https://github.com/AdamSystems/ZVec.NET</RepositoryUrl>
     <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)AdamSystems.ZVec.NET.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -1249,15 +1255,32 @@ No `build/*.props` for RID native packing — the .NET runtime resolves `runtime
 </Project>
 ```
 
-### 9.3 Versioning (managed vs native)
+### 9.3 Versioning (managed vs native vs .NET target)
 
-| Layer | Scheme |
-|-------|--------|
-| Managed package | SemVer (`1.2.0`) |
-| Native pin | Upstream zvec release; compile-time constants + `zvec_check_version` on init |
-| NuGet metadata | `<Version>1.2.0+zvec.1.2.0</Version>` (or equivalent informational version) |
+The version encodes **three** pieces of information across different NuGet metadata fields:
+
+| What | Where it goes | Format | Example |
+|------|--------------|--------|---------|
+| **Our SDK version** | `<Version>` (SemVer prefix) | `major.minor.patch[-prerelease]` | `1.0.0-alpha.1` |
+| **Pinned ZVec native version** | `<Version>` build metadata (after `+`) | `+zvec.{major}.{minor}.{patch}` | `+zvec.1.2.3` |
+| **Supported .NET target** | `<TargetFrameworks>` + `lib/net8.0/` folder | TFM | `net8.0` (LTS baseline) |
+
+**Combined NuGet version:** `<Version>1.0.0-alpha.1+zvec.1.2.3</Version>`
+
+**Why .NET target is NOT in the version string:** Per SemVer and NuGet conventions, the target framework is expressed via the TFM and the `lib/` folder structure, not the version. NuGet already displays "net8.0" as a dependency framework in the package listing. Putting it in the version would be non-standard and break tooling.
+
+**`<PackageReleaseNotes>`** carries a human-readable summary: `"Wraps ZVec C++ 1.2.3; targets .NET 8.0+ (LTS baseline)"`
 
 If managed adds P/Invoke for new APIs before native ships those symbols, bump the required native pin and fail the version gate clearly.
+
+### 9.4 Announcing to Upstream (Alibaba ZVec)
+
+Once the alpha NuGet package is published:
+
+1. **GitHub Issue** — Open a "Community SDK" issue on `alibaba/zvec` announcing the .NET wrapper with a link to the NuGet package and repo
+2. **Docs PR** — Submit a PR to ZVec's docs adding `AdamSystems.ZVec.NET` to their SDK list (alongside Python/Node)
+3. **Community channels** — Announce in ZVec's Discord/Slack channels
+4. **NuGet discoverability** — `<PackageTags>` with `zvec`, `vector-database`, `alibaba` ensures developers searching NuGet for vector DBs find it
 
 ---
 
