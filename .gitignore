@@ -42,3 +42,4 @@ build.ninja
 # =========================
 .DS_Store
 Thumbs.db
+/docs/llms-full.txt
