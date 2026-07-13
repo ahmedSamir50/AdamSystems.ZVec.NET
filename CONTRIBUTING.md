@@ -8,6 +8,8 @@ This repository contains two main components:
 1. **ZVec.Core (C#):** The managed .NET SDK exposing an idiomatic, zero-allocation API.
 2. **ZVec.Native (C++):** A thin `extern "C"` bridge connecting the .NET environment to Alibaba's core C++ engine.
 
+Native code lives at `src/Native/ZVec.Native`. The wrapper CMake builds Alibaba's official fat C API (`zvec_c_api`) from the `external/zvec` submodule (header: `external/zvec/src/include/zvec/c_api.h`). Full Windows build steps: [`src/Native/ZVec.Native/steps.md`](src/Native/ZVec.Native/steps.md).
+
 ## Local Development Setup
 
 Because this project relies on a native C++ engine, you cannot simply press "Run" in Visual Studio immediately. You must initialize the C++ submodules first.
@@ -15,10 +17,18 @@ Because this project relies on a native C++ engine, you cannot simply press "Run
 1. **Clone the repository with submodules:**
    If you already cloned the repo normally, run:
    `git submodule update --init --recursive`
-   *(This downloads the upstream Alibaba C++ code into `src/ZVec.Native/external/zvec`).*
+   *(This downloads the upstream Alibaba C++ code into `src/Native/ZVec.Native/external/zvec`.)*
 
 2. **C++ Compilation:**
-   Ensure you have CMake and a C++ compiler (Visual Studio 2026 with C++ Desktop Development workload, or GCC/Clang on Linux/macOS) installed. Visual Studio should automatically detect the `CMakeLists.txt` file in `src/ZVec.Native`.
+   Ensure you have CMake and a C++ compiler (Visual Studio 2026 with C++ Desktop Development workload, or GCC/Clang on Linux/macOS) installed. On Windows, follow [`src/Native/ZVec.Native/steps.md`](src/Native/ZVec.Native/steps.md) (Ninja + Scoop tools: `ninja`, `make`, `mingw`, `perl`). Quick path from Developer PowerShell for VS 2026:
+
+   ```powershell
+   cd src\Native\ZVec.Native
+   .\_configure_ninja.bat
+   .\_build_ninja.bat
+   ```
+
+   The DLL is written under `src/Native/ZVec.Native/build\` (e.g. `build\external\zvec\bin\zvec_c_api.dll`).
 
 ## How to Contribute
 
