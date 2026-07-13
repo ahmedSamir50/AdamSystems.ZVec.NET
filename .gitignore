@@ -30,6 +30,12 @@ compile_commands.json
 *.pdb
 *.lib
 *.exp
+.ninja_deps
+.ninja_log
+build.ninja
+
+# Native out-of-tree CMake build (entire tree; keep CMakeLists.txt / scripts tracked)
+/src/Native/ZVec.Native/build/
 
 # =========================
 # OS Generated Files
