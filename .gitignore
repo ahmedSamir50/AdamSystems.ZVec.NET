@@ -42,3 +42,5 @@ build.ninja
 # =========================
 .DS_Store
 Thumbs.db
+/docs/llms-full.txt
+/AdamSystems.ZVec.NET-ProjectImplementation-Plan.md

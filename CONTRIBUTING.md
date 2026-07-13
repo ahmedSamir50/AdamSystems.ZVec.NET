@@ -5,10 +5,12 @@ First off, thank you for considering contributing to AdamSystems.ZVec.NET! Our g
 ## Repository Architecture
 
 This repository contains two main components:
-1. **ZVec.Core (C#):** The managed .NET SDK exposing an idiomatic, zero-allocation API.
-2. **ZVec.Native (C++):** A thin `extern "C"` bridge connecting the .NET environment to Alibaba's core C++ engine.
+1. **ZVec.Core (C#):** The managed .NET SDK — DI-first (`IZvecFactory` / `IZvecCollection`), async APIs, zero-allocation vector paths.
+2. **ZVec.Native (C++):** CMake wrapper that builds Alibaba's official fat C API (`zvec_c_api`) from the `external/zvec` submodule.
 
-Native code lives at `src/Native/ZVec.Native`. The wrapper CMake builds Alibaba's official fat C API (`zvec_c_api`) from the `external/zvec` submodule (header: `external/zvec/src/include/zvec/c_api.h`). Full Windows build steps: [`src/Native/ZVec.Native/steps.md`](src/Native/ZVec.Native/steps.md).
+Native code lives at `src/Native/ZVec.Native` (header: `external/zvec/src/include/zvec/c_api.h`). Windows build steps: [`src/Native/ZVec.Native/steps.md`](src/Native/ZVec.Native/steps.md).
+
+Design details (Factory/Builder, DI, LINQ-on-results, concurrency gates): [`AdamSystems.ZVec.NET-Project-Plan.md`](AdamSystems.ZVec.NET-Project-Plan.md) §§3, 7, 8.4.
 
 ## Local Development Setup
 
@@ -34,7 +36,12 @@ Because this project relies on a native C++ engine, you cannot simply press "Run
 
 1. **Branching:** Never work directly on `main`. Create a feature branch off the `dev` branch (e.g., `feature/add-hybrid-search`).
 2. **Pull Requests:** Submit all Pull Requests against the `dev` branch.
-3. **Zero Allocation:** When modifying the hot paths (like `Query` or `Insert`), you must use `ReadOnlySpan<float>` and `MemoryHandle`. Do not introduce new heap allocations (`new float[]`) on the vector passing paths.
-4. **Testing:** Run the `ZVec.Core.Tests` project. We use a mock native library for unit testing to ensure tests run fast without requiring full native recompilation on every change.
+3. **API shape:** Prefer interfaces + `AddZVec*` DI registration over new static entry points. Use `ZVecCollectionSchemaBuilder` and fluent `ZVecFilterBuilder` for schemas/filters. Implement **complete** `type.h` enums and **all** index-param types (Hnsw, HnswRabitq, Ivf, Flat, DiskAnn, Vamana, Invert, Fts) — do not defer indexes.
+4. **Coverage target:** Wrap the **Vector Database** C++ / `zvec_c_api` surface and match DB sections of [llms-full](https://zvec.org/llms-full.txt) (see plan §2.0). Do **not** implement AI Integration (embeddings, MCP, skills, model rerankers) in this package. Snapshot used for audits: `docs/llms-full.txt`.
+5. **Async & concurrency:** Public surface is async-first. P/Invoke is sync — always go through collection read/write gates; never add unbounded `Task.Run` around native calls. Honor `CancellationToken` while waiting on gates.
+6. **Zero allocation:** On hot paths (`Query` / `Insert`), use `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` and `MemoryHandle`. Do not introduce `new float[]` copies on vector passing paths.
+7. **Enums / ABI:** Match numeric values to upstream `zvec/db/type.h` and `c_api.h`. If the C header omits a define (e.g. `HNSW_RABITQ = 4`), use the `type.h` value — do not invent new numbers. Document every enum in the project plan Appendix A.
+8. **LINQ:** Apply LINQ to **results** only. Do not add a custom `IQueryable` provider over the engine.
+9. **Testing:** Run the `ZVec.Core.Tests` project. We use a mock native library for unit testing so tests stay fast without a full native rebuild on every change.
 
 If you are unsure where to start, check the Issues tab for "good first issue" tags!
