@@ -272,11 +272,14 @@ AdamSystems.ZVec.NET/
 │   │   ├── Query/                    # ZVecQuery, ZVecFtsQuery, ZVecReranker
 │   │   ├── ZVecFactory.cs
 │   │   └── ZVecCollection.cs
-│   └── ZVec.Native.Mock/            # Mock native library for unit testing
+│   └── Mock/ZVec.Native.Mock/       # Mock native library (outside main Core code)
 ├── testing/
 │   ├── AdamSystems.ZVec.NET.Tests/  # xUnit + FluentAssertions
 │   └── AdamSystems.ZVec.NET.Benchmarks/  # BenchmarkDotNet
-└── build/                           # Solution, props, CI
+├── build/                           # .snk + CI scripts
+├── AdamSystems.ZVec.NET.slnx        # Solution (VS .slnx)
+├── Directory.Build.props
+└── Directory.Packages.props
 ```
 
 ---
@@ -304,5 +307,5 @@ We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - **ZVec (upstream):** [github.com/alibaba/zvec](https://github.com/alibaba/zvec)
 - **ZVec docs:** [zvec.org](https://zvec.org)
 - **Project Plan:** [AdamSystems.ZVec.NET-Project-Plan.md](AdamSystems.ZVec.NET-Project-Plan.md)
-- **Implementation Epics:** [AdamSystems.ZVec.NET-ProjectImplementation-Plan.md](AdamSystems.ZVec.NET-ProjectImplementation-Plan.md)
+- **Implementation Epics:** [AdamSystems.ZVecNET-Implementation-Plan.md](AdamSystems.ZVecNET-Implementation-Plan.md)
 - **NuGet:** [nuget.org/packages/AdamSystems.ZVec.NET](https://www.nuget.org/packages/AdamSystems.ZVec.NET/)

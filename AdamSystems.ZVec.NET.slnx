@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="AdamSystems.ZVec.NET-Project-Plan.md" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="LICENSE" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Core/">
+    <Project Path="src/Core/AdamSystems.ZVec.NET/AdamSystems.ZVec.NET.csproj" />
+  </Folder>
+  <Folder Name="/src/Mock/">
+    <Project Path="src/Mock/ZVec.Native.Mock/ZVec.Native.Mock.csproj" Id="63cd9570-c725-4067-936c-63753badda13" />
+  </Folder>
+  <Folder Name="/src/Native/" />
+  <Folder Name="/testing/">
+    <Project Path="testing/AdamSystems.ZVec.NET.Benchmarks/AdamSystems.ZVec.NET.Benchmarks.csproj" />
+    <Project Path="testing/AdamSystems.ZVec.NET.Tests/AdamSystems.ZVec.NET.Tests.csproj" />
+  </Folder>
+</Solution>
