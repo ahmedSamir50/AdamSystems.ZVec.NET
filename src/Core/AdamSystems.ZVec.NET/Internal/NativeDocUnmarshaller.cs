@@ -78,63 +78,67 @@ internal static class NativeDocUnmarshaller
         Dictionary<string, ReadOnlyMemory<float>> denseVectors,
         Dictionary<string, IReadOnlyDictionary<int, float>> sparseVectors)
     {
-        // zvec_doc_get_field_value_pointer provides zero-copy access
-        var rc = NativeMethods.zvec_doc_get_field_value_pointer(docPtr, fieldName, (int)dataType, out nint valuePtr);
-        if (rc != 0 || valuePtr == IntPtr.Zero) return;
+        // The real C API returns a raw pointer into document memory + the byte size of the value.
+        // For sparse vectors we use the dedicated sparse API instead.
+        if (dataType == ZVecDataType.SparseVectorFp32)
+        {
+            int rcSparse = NativeMethods.zvec_doc_get_sparse_vector_field(docPtr, fieldName, out nint indicesPtr, out nint valuesPtr, out nuint sparseCount);
+            if (rcSparse == 0 && sparseCount > 0)
+            {
+                var dict = new Dictionary<int, float>((int)sparseCount);
+                int* indices = (int*)indicesPtr;
+                float* values = (float*)valuesPtr;
+                for (int i = 0; i < (int)sparseCount; i++)
+                {
+                    dict[indices[i]] = values[i];
+                }
+                sparseVectors[fieldName] = dict;
+            }
+            return;
+        }
 
-        var val = Marshal.PtrToStructure<ZVecFieldValue>(valuePtr);
+        // zvec_doc_get_field_value_pointer returns (const void** value, size_t* value_size)
+        var rc = NativeMethods.zvec_doc_get_field_value_pointer(docPtr, fieldName, (int)dataType, out nint valuePtr, out nuint valueSize);
+        if (rc != 0 || valuePtr == IntPtr.Zero) return;
 
         switch (dataType)
         {
             case ZVecDataType.Bool:
-                fields[fieldName] = val.BoolValue;
+                fields[fieldName] = *(bool*)valuePtr;
                 break;
             case ZVecDataType.Int32:
-                fields[fieldName] = val.Int32Value;
+                fields[fieldName] = *(int*)valuePtr;
                 break;
             case ZVecDataType.Int64:
-                fields[fieldName] = val.Int64Value;
+                fields[fieldName] = *(long*)valuePtr;
                 break;
             case ZVecDataType.UInt32:
-                fields[fieldName] = val.Uint32Value;
+                fields[fieldName] = *(uint*)valuePtr;
                 break;
             case ZVecDataType.UInt64:
-                fields[fieldName] = val.Uint64Value;
+                fields[fieldName] = *(ulong*)valuePtr;
                 break;
             case ZVecDataType.Float:
-                fields[fieldName] = val.FloatValue;
+                fields[fieldName] = *(float*)valuePtr;
                 break;
             case ZVecDataType.Double:
-                fields[fieldName] = val.DoubleValue;
+                fields[fieldName] = *(double*)valuePtr;
                 break;
             case ZVecDataType.String:
-                if (val.StringValue.Str != IntPtr.Zero)
-                {
-                    // Convert UTF-8 bytes back to C# string
-                    fields[fieldName] = Marshal.PtrToStringUTF8(val.StringValue.Str, (int)val.StringValue.Len) ?? string.Empty;
-                }
+                // valuePtr points to the UTF-8 string data, valueSize is its byte length
+                if (valueSize > 0)
+                    fields[fieldName] = Marshal.PtrToStringUTF8(valuePtr, (int)valueSize) ?? string.Empty;
+                else
+                    fields[fieldName] = string.Empty;
                 break;
             case ZVecDataType.VectorFp32:
-                if (val.VectorValue.Data != IntPtr.Zero)
+                // valuePtr is float*, valueSize is byte count → element count = valueSize / 4
+                if (valuePtr != IntPtr.Zero && valueSize > 0)
                 {
-                    // Use AllocateUninitializedArray to skip zeroing the float array
-                    float[] floatArray = GC.AllocateUninitializedArray<float>((int)val.VectorValue.Len);
-                    Marshal.Copy(val.VectorValue.Data, floatArray, 0, (int)val.VectorValue.Len);
+                    int floatCount = (int)(valueSize / sizeof(float));
+                    float[] floatArray = GC.AllocateUninitializedArray<float>(floatCount);
+                    Marshal.Copy(valuePtr, floatArray, 0, floatCount);
                     denseVectors[fieldName] = floatArray;
-                }
-                break;
-            case ZVecDataType.SparseVectorFp32:
-                int rcSparse = NativeMethods.zvec_doc_get_sparse_vector_field(docPtr, fieldName, out nint indicesPtr, out nint valuesPtr, out nuint sparseCount);
-                if (rcSparse == 0 && sparseCount > 0)
-                {
-                    var dict = new Dictionary<int, float>((int)sparseCount);
-                    int* indices = (int*)indicesPtr;
-                    float* values = (float*)valuesPtr;
-                    for (int i = 0; i < (int)sparseCount; i++)
-                    {
-                        dict[indices[i]] = values[i];
-                    }
-                    sparseVectors[fieldName] = dict;
                 }
                 break;
             // Additional types can be implemented as needed

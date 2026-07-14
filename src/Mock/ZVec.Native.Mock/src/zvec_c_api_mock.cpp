@@ -483,30 +483,31 @@ union zvec_field_value_union {
     zvec_byte_array_t bin_val;
 };
 
-EXPORT int zvec_doc_add_field_by_value(void* doc, const char* fieldName, int dataType, void* value) {
+EXPORT int zvec_doc_add_field_by_value(void* doc, const char* fieldName, int dataType, const void* value, size_t value_size) {
     if (!doc || !fieldName || !value) return -1;
     auto* d = static_cast<zvec_doc_t*>(doc);
-    auto* val = static_cast<zvec_field_value_union*>(value);
     
     zvec_doc_t::Value mv;
     mv.type = dataType;
     
     switch (dataType) {
-        case 3: mv.b_val = val->b_val; break;
-        case 4: mv.i32_val = val->i32_val; break;
-        case 5: mv.i64_val = val->i64_val; break;
-        case 6: mv.ui32_val = val->ui32_val; break;
-        case 7: mv.ui64_val = val->ui64_val; break;
-        case 8: mv.f_val = val->f_val; break;
-        case 9: mv.d_val = val->d_val; break;
-        case 2: 
-            if (val->s_val.str) {
-                mv.s_val = std::string(val->s_val.str, val->s_val.len);
-            }
+        case 3: mv.b_val = *(const bool*)value; break;
+        case 4: mv.i32_val = *(const int32_t*)value; break;
+        case 5: mv.i64_val = *(const int64_t*)value; break;
+        case 6: mv.ui32_val = *(const uint32_t*)value; break;
+        case 7: mv.ui64_val = *(const uint64_t*)value; break;
+        case 8: mv.f_val = *(const float*)value; break;
+        case 9: mv.d_val = *(const double*)value; break;
+        case 2:
+            // String: value is a UTF-8 char*, value_size is byte length
+            mv.s_val = std::string((const char*)value, value_size);
             break;
-        case 23: 
-            if (val->vec_val.data) {
-                mv.vec_val = std::vector<float>(val->vec_val.data, val->vec_val.data + val->vec_val.len);
+        case 23:
+            // VectorFp32: value is float*, value_size is byte count
+            if (value_size % sizeof(float) == 0) {
+                size_t float_count = value_size / sizeof(float);
+                const float* fptr = (const float*)value;
+                mv.vec_val = std::vector<float>(fptr, fptr + float_count);
             }
             break;
     }
@@ -551,35 +552,36 @@ EXPORT int zvec_doc_get_field_names(void* doc, char*** names, size_t* count) {
     return 0;
 }
 
-EXPORT int zvec_doc_get_field_value_pointer(void* doc, const char* fieldName, int dataType, void** value) {
-    if (!doc || !fieldName || !value) return -1;
+EXPORT int zvec_doc_get_field_value_pointer(void* doc, const char* fieldName, int dataType, void** value, size_t* value_size) {
+    if (!doc || !fieldName || !value || !value_size) return -1;
     auto* d = static_cast<zvec_doc_t*>(doc);
     auto it = d->fields.find(fieldName);
     if (it == d->fields.end()) return -1;
     
-    auto* ret_val = (zvec_field_value_union*)malloc(sizeof(zvec_field_value_union));
-    memset(ret_val, 0, sizeof(zvec_field_value_union));
-    
     auto& mv = it->second;
+    *value_size = 0;
+
     switch (dataType) {
-        case 3: ret_val->b_val = mv.b_val; break;
-        case 4: ret_val->i32_val = mv.i32_val; break;
-        case 5: ret_val->i64_val = mv.i64_val; break;
-        case 6: ret_val->ui32_val = mv.ui32_val; break;
-        case 7: ret_val->ui64_val = mv.ui64_val; break;
-        case 8: ret_val->f_val = mv.f_val; break;
-        case 9: ret_val->d_val = mv.d_val; break;
+        case 3: { static bool bv; bv = mv.b_val; *value = &bv; *value_size = sizeof(bool); break; }
+        case 4: { static int32_t iv; iv = mv.i32_val; *value = &iv; *value_size = sizeof(int32_t); break; }
+        case 5: { static int64_t lv; lv = mv.i64_val; *value = &lv; *value_size = sizeof(int64_t); break; }
+        case 6: { static uint32_t uiv; uiv = mv.ui32_val; *value = &uiv; *value_size = sizeof(uint32_t); break; }
+        case 7: { static uint64_t ulv; ulv = mv.ui64_val; *value = &ulv; *value_size = sizeof(uint64_t); break; }
+        case 8: { static float fv; fv = mv.f_val; *value = &fv; *value_size = sizeof(float); break; }
+        case 9: { static double dv; dv = mv.d_val; *value = &dv; *value_size = sizeof(double); break; }
         case 2:
-            ret_val->s_val.str = strdup(mv.s_val.c_str());
-            ret_val->s_val.len = mv.s_val.length();
+            // Return pointer into the string data
+            *value = (void*)mv.s_val.data();
+            *value_size = mv.s_val.size();
             break;
         case 23:
-            ret_val->vec_val.len = mv.vec_val.size();
-            ret_val->vec_val.data = (float*)malloc(sizeof(float) * mv.vec_val.size());
-            memcpy(ret_val->vec_val.data, mv.vec_val.data(), sizeof(float) * mv.vec_val.size());
+            // Return pointer to vector data
+            *value = (void*)mv.vec_val.data();
+            *value_size = mv.vec_val.size() * sizeof(float);
             break;
+        default:
+            return -1;
     }
-    *value = ret_val;
     return 0;
 }
 

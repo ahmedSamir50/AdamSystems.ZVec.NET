@@ -15,6 +15,13 @@ internal sealed class SafeZvecSchemaHandle : SafeZvecHandleBase
 
     protected override bool ReleaseHandle()
     {
+        // If the factory is not initialized (or already shut down), the native library
+        // resources are no longer valid, so calling destroy would cause an Access Violation.
+        if (!ZVecFactory.IsInitialized)
+        {
+            return true;
+        }
+
         // US-E5.2: Destroy collection schema on release
         if (!IsInvalid)
         {
