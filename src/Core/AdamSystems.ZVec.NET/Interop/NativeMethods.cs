@@ -9,7 +9,7 @@ namespace AdamSystems.ZVec.NET.Interop;
 /// </summary>
 internal static partial class NativeMethods
 {
-    private const string LibraryName = "zvec_c_api";
+    internal const string LibraryName = "zvec_c_api";
 
     // Expected native SemVer pinned at build time (also embedded in NuGet +zvec metadata)
     internal const int ExpectedMajor = 1;
@@ -58,6 +58,9 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial int zvec_get_last_error_details(IntPtr errorDetails);
 
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_free(IntPtr ptr);
+
     // =========================================================================
     // Collection Lifecycle & Options
     // =========================================================================
@@ -80,6 +83,9 @@ internal static partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_destroy(IntPtr collection);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_collection_schema_destroy(IntPtr schema);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_options_set_read_only(
@@ -150,6 +156,9 @@ internal static partial class NativeMethods
         IntPtr query,
         out IntPtr results,
         out nuint resultCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_multi_query_destroy(IntPtr query);
 
     // =========================================================================
     // DDL Operations
