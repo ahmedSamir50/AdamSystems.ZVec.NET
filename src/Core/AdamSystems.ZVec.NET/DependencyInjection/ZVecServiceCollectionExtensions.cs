@@ -43,7 +43,7 @@ public static class ZVecServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(serviceKey);
         ArgumentNullException.ThrowIfNull(configure);
 
-        services.AddKeyedSingleton<IZvecCollection>(serviceKey, (sp, key) =>
+        services.AddKeyedSingleton(serviceKey, (sp, key) =>
         {
             var factory = sp.GetRequiredService<IZvecFactory>();
             

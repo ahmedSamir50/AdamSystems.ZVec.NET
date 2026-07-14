@@ -260,7 +260,7 @@ internal static partial class NativeMethods
     internal static partial int zvec_collection_add_column(
         IntPtr collection,
         IntPtr fieldSchema,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string expression);
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? expression);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_drop_column(
