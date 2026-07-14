@@ -22,7 +22,10 @@
     <Folder Include="Builders\" />
     <Folder Include="Interop\" />
     <Folder Include="Abstractions\" />
-    <Folder Include="runtimes\win-x64\native\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="runtimes\**\*" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes" />
   </ItemGroup>
 
   <ItemGroup>

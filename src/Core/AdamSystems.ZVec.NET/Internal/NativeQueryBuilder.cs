@@ -45,6 +45,10 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
                     (ZVecErrorCode)NativeMethods.zvec_vector_query_set_query_vector(_handle, new IntPtr(memHandle.Pointer), size), 
                     nameof(NativeMethods.zvec_vector_query_set_query_vector));
             }
+
+            ZVecError.ThrowIfFailed(
+                (ZVecErrorCode)NativeMethods.zvec_vector_query_set_include_vector(_handle, true), 
+                nameof(NativeMethods.zvec_vector_query_set_include_vector));
         }
         catch
         {

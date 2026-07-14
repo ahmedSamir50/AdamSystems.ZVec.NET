@@ -113,7 +113,8 @@ internal static partial class NativeMethods
     internal static partial void zvec_collection_schema_destroy(IntPtr schema);
 
     [LibraryImport(LibraryName)]
-    internal static partial IntPtr zvec_collection_schema_create();
+    internal static partial IntPtr zvec_collection_schema_create(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_schema_add_field(IntPtr schema, IntPtr fieldSchema);
@@ -229,7 +230,6 @@ internal static partial class NativeMethods
     internal static partial int zvec_collection_query(
         IntPtr collection,
         IntPtr query, // zvec_vector_query_t*
-        [MarshalAs(UnmanagedType.U1)] bool includeVector,
         out IntPtr results, // zvec_doc_t***
         out nuint resultCount);
 

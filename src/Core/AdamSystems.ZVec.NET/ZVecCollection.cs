@@ -475,7 +475,6 @@ public sealed class ZVecCollection : IZvecCollection
         int rc = NativeMethods.zvec_collection_query(
             _handle, 
             builder.Handle, 
-            true, // include vectors
             out nint resultsPtr, 
             out nuint resultCount);
 

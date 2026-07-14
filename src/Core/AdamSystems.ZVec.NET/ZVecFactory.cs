@@ -109,7 +109,9 @@ public sealed class ZVecFactory : IZvecFactory
 
         NativeMethods.zvec_shutdown();
 
-        // State goes to ShutDown and stays there. No re-initialization allowed.
+        // State goes back to Uninitialized so it can be re-initialized if needed (especially for tests)
+        _shutdownCts = new CancellationTokenSource();
+        Interlocked.Exchange(ref _state, FactoryState.Uninitialized);
     }
 
     /// <inheritdoc/>

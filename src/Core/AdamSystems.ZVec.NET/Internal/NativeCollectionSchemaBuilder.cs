@@ -15,7 +15,7 @@ internal sealed class NativeCollectionSchemaBuilder : IDisposable
     {
         if (schema == null) throw new ArgumentNullException(nameof(schema));
 
-        _handle = NativeMethods.zvec_collection_schema_create();
+        _handle = NativeMethods.zvec_collection_schema_create(schema.Name);
         if (_handle == IntPtr.Zero)
             throw new InvalidOperationException(ZVecDefaults.Errors.NativeCollectionSchemaCreateFailed);
 

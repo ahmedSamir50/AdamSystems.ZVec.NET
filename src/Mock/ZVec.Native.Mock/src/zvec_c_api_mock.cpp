@@ -49,7 +49,7 @@ EXPORT void* zvec_config_log_create_console(int level) {
 }
 
 // Collections
-EXPORT void* zvec_collection_schema_create() {
+EXPORT void* zvec_collection_schema_create(const char* name) {
     return new zvec_collection_schema_t();
 }
 
