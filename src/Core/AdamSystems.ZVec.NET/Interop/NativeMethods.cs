@@ -10,10 +10,7 @@ internal static partial class NativeMethods
 {
     internal const string LibraryName = "zvec_c_api";
 
-    // Expected native SemVer pinned at build time (also embedded in NuGet +zvec metadata)
-    internal const int ExpectedMajor = 1;
-    internal const int ExpectedMinor = 0;
-    internal const int ExpectedPatch = 0;
+
 
     // =========================================================================
     // Version APIs
@@ -114,6 +111,18 @@ internal static partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial void zvec_collection_schema_destroy(IntPtr schema);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_collection_schema_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_schema_add_field(IntPtr schema, IntPtr fieldSchema);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_collection_options_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_stats(IntPtr collection, out IntPtr statsJson);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_options_set_read_only(
@@ -235,6 +244,12 @@ internal static partial class NativeMethods
     internal static partial void zvec_multi_query_destroy(IntPtr query);
 
     [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_multi_query_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_multi_query_add_query(IntPtr multiQuery, IntPtr query);
+
+    [LibraryImport(LibraryName)]
     internal static partial void zvec_docs_free(IntPtr documents, nuint count);
 
     // =========================================================================
@@ -256,8 +271,14 @@ internal static partial class NativeMethods
     internal static partial int zvec_collection_alter_column(
         IntPtr collection,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string oldName,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string newName,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? newName,
         IntPtr newSchema);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_alter_column_rename(
+        IntPtr collection,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string oldName,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string newName);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_create_index(
@@ -300,6 +321,14 @@ internal static partial class NativeMethods
         IntPtr value); // zvec_field_value_t*
 
     [LibraryImport(LibraryName)]
+    internal static partial int zvec_doc_add_sparse_vector_field(
+        IntPtr doc,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
+        IntPtr indices,
+        IntPtr values,
+        nuint count);
+
+    [LibraryImport(LibraryName)]
     internal static partial int zvec_doc_get_field_value_copy(
         IntPtr doc,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
@@ -317,6 +346,14 @@ internal static partial class NativeMethods
     internal static partial int zvec_doc_get_field_names(
         IntPtr doc,
         out IntPtr fieldNames, // char***
+        out nuint count);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_doc_get_sparse_vector_field(
+        IntPtr doc,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
+        out IntPtr indices,
+        out IntPtr values,
         out nuint count);
 
     // =========================================================================
@@ -352,6 +389,16 @@ internal static partial class NativeMethods
     internal static partial int zvec_vector_query_set_include_vector(
         IntPtr query,
         [MarshalAs(UnmanagedType.U1)] bool include);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_sparse_vector(
+        IntPtr query,
+        IntPtr indices,
+        IntPtr values,
+        nuint count);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_query_params(IntPtr query, IntPtr queryParams);
 
 
 

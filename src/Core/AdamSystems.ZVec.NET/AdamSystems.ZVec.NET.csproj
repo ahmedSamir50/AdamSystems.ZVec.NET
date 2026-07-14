@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>AdamSystems.ZVec.NET</PackageId>
@@ -28,14 +28,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AdamSystems.ZVec.NET.Tests" PublicKey="0024000004800000940000000602000000240000525341310004000001000100d97e343515a4c49fbd66b659d23cd78eb1a47c90f759737b9ba65bba2a7dbb51976bc24656aa2d7273a5ae8686bfc54f520b6a69134021cbb6fe9fd50e917cdd21243081c56df4820812160a11243c972b9c22517769c9255cf146d96302f99bfbb45c9c274bb71e841ff2820ba02816916329f7402a05d2f485a94e9aaea1c7" />
   </ItemGroup>
-
   <ItemGroup>
-    <PackageReference Include="coverlet.collector">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
-
-
 </Project>
 

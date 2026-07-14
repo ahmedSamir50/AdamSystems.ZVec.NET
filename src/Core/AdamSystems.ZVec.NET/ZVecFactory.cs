@@ -44,7 +44,7 @@ public sealed class ZVecFactory : IZvecFactory
     // collections independently if the user forgets to dispose them.
     // ConcurrentDictionary provides lock-free reads; write locks are per-slot.
     // =========================================================================
-    private static readonly ConcurrentDictionary<nint, WeakReference<ZVecCollection>> _openCollections
+    internal static readonly ConcurrentDictionary<nint, ZVecCollection> OpenCollections
         = new();
 
     // Shutdown cancellation — signalled when Shutdown() is called.
@@ -105,13 +105,11 @@ public sealed class ZVecFactory : IZvecFactory
 
         // Signal all tracked collections that the factory is shutting down.
         _shutdownCts.Cancel();
-        _openCollections.Clear();
+        OpenCollections.Clear();
 
         NativeMethods.zvec_shutdown();
 
-        // Prepare a fresh CTS for a potential re-initialization scenario.
-        _shutdownCts = new CancellationTokenSource();
-        Interlocked.Exchange(ref _state, FactoryState.Uninitialized);
+        // State goes to ShutDown and stays there. No re-initialization allowed.
     }
 
     /// <inheritdoc/>
@@ -133,8 +131,11 @@ public sealed class ZVecFactory : IZvecFactory
         ArgumentException.ThrowIfNullOrEmpty(path);
         ArgumentNullException.ThrowIfNull(schema);
 
+        using var nativeSchema = new Internal.NativeCollectionSchemaBuilder(schema);
+        using var nativeOptions = options != null ? new Internal.NativeCollectionOptionsBuilder(options) : null;
+
         var rc = NativeMethods.zvec_collection_create_and_open(
-            path, IntPtr.Zero, IntPtr.Zero, out IntPtr handle);
+            path, nativeSchema.Handle, nativeOptions?.Handle ?? IntPtr.Zero, out IntPtr handle);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(CreateAndOpen));
 
         var collection = new ZVecCollection(handle, path, schema, _shutdownCts.Token);
@@ -159,7 +160,9 @@ public sealed class ZVecFactory : IZvecFactory
         ThrowIfNotInitialized();
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        var rc = NativeMethods.zvec_collection_open(path, IntPtr.Zero, out IntPtr handle);
+        using var nativeOptions = options != null ? new Internal.NativeCollectionOptionsBuilder(options) : null;
+
+        var rc = NativeMethods.zvec_collection_open(path, nativeOptions?.Handle ?? IntPtr.Zero, out IntPtr handle);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Open));
 
         var collection = new ZVecCollection(handle, path, schema: null, _shutdownCts.Token);
@@ -197,15 +200,18 @@ public sealed class ZVecFactory : IZvecFactory
 
     private static void CheckAbiVersion()
     {
+        if (ZVecDefaults.Version.BypassAbiCheck)
+            return;
+
         bool compatible = NativeMethods.zvec_check_version(
-            NativeMethods.ExpectedMajor,
-            NativeMethods.ExpectedMinor,
-            NativeMethods.ExpectedPatch);
+            ZVecDefaults.Version.ExpectedMajor,
+            ZVecDefaults.Version.ExpectedMinor,
+            ZVecDefaults.Version.ExpectedPatch);
 
         if (!compatible)
         {
             string found = NativeMethods.GetVersionString();
-            string expected = $"{NativeMethods.ExpectedMajor}.{NativeMethods.ExpectedMinor}.{NativeMethods.ExpectedPatch}";
+            string expected = $"{ZVecDefaults.Version.ExpectedMajor}.{ZVecDefaults.Version.ExpectedMinor}.{ZVecDefaults.Version.ExpectedPatch}";
             throw new ZVecAbiMismatchException(expected, found);
         }
     }
@@ -257,7 +263,7 @@ public sealed class ZVecFactory : IZvecFactory
 
     private static void TrackCollection(ZVecCollection col, nint handle)
     {
-        _openCollections.TryAdd(handle, new WeakReference<ZVecCollection>(col));
+        OpenCollections.TryAdd(handle, col);
     }
 
     private static void ThrowIfNotInitialized()

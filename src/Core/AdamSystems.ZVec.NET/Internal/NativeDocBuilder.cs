@@ -49,8 +49,11 @@ internal sealed class NativeDocBuilder : IDisposable
                 builder.AddScalarField(kvp.Key, kvp.Value);
             }
             
-            // Note: Sparse vectors are not implemented yet in the native builder per current headers,
-            // or if they are, they require a specific struct. We will skip sparse for now or add if needed.
+            // Add sparse vectors
+            foreach (var kvp in doc.SparseVectors)
+            {
+                builder.AddSparseVectorField(kvp.Key, kvp.Value);
+            }
             
             return builder;
         }
@@ -82,6 +85,35 @@ internal sealed class NativeDocBuilder : IDisposable
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddDenseVectorField));
     }
 
+    private unsafe void AddSparseVectorField(string name, IReadOnlyDictionary<int, float> vector)
+    {
+        var count = vector.Count;
+        var indicesPtr = Marshal.AllocHGlobal(count * sizeof(int));
+        var valuesPtr = Marshal.AllocHGlobal(count * sizeof(float));
+        _unmanagedAllocations.Add(indicesPtr);
+        _unmanagedAllocations.Add(valuesPtr);
+
+        var indices = new Span<int>((void*)indicesPtr, count);
+        var values = new Span<float>((void*)valuesPtr, count);
+
+        int i = 0;
+        foreach (var kvp in vector)
+        {
+            indices[i] = kvp.Key;
+            values[i] = kvp.Value;
+            i++;
+        }
+
+        int rc = NativeMethods.zvec_doc_add_sparse_vector_field(
+            _handle,
+            name,
+            indicesPtr,
+            valuesPtr,
+            (nuint)count);
+
+        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddSparseVectorField));
+    }
+
     private unsafe void AddScalarField(string name, object value)
     {
         ZVecFieldValue fieldValue = default;
@@ -100,6 +132,14 @@ internal sealed class NativeDocBuilder : IDisposable
             case long l:
                 fieldValue.Int64Value = l;
                 dataType = ZVecDataType.Int64;
+                break;
+            case uint ui:
+                fieldValue.Uint32Value = ui;
+                dataType = ZVecDataType.UInt32;
+                break;
+            case ulong ul:
+                fieldValue.Uint64Value = ul;
+                dataType = ZVecDataType.UInt64;
                 break;
             case float f:
                 fieldValue.FloatValue = f;

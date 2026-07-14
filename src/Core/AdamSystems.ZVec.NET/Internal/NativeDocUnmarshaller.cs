@@ -24,12 +24,13 @@ internal static class NativeDocUnmarshaller
 
         var fields = new Dictionary<string, object>();
         var denseVectors = new Dictionary<string, ReadOnlyMemory<float>>();
+        var sparseVectors = new Dictionary<string, IReadOnlyDictionary<int, float>>();
 
         // 3. Extract Fields
         int rc = NativeMethods.zvec_doc_get_field_names(docPtr, out nint namesPtr, out nuint count);
         if (rc != 0 || namesPtr == IntPtr.Zero || count == 0) 
         {
-            return new ZVecDoc { Id = pk, Score = score, Fields = fields, DenseVectors = denseVectors };
+            return new ZVecDoc { Id = pk, Score = score, Fields = fields, DenseVectors = denseVectors, SparseVectors = sparseVectors };
         }
 
         try
@@ -56,7 +57,7 @@ internal static class NativeDocUnmarshaller
 
                 if (!dataType.HasValue) continue; // Cannot unmarshal without knowing the type
 
-                ExtractFieldValue(docPtr, fieldName, dataType.Value, fields, denseVectors);
+                ExtractFieldValue(docPtr, fieldName, dataType.Value, fields, denseVectors, sparseVectors);
             }
         }
         finally
@@ -66,7 +67,7 @@ internal static class NativeDocUnmarshaller
             NativeMethods.zvec_free(namesPtr);
         }
 
-        return new ZVecDoc { Id = pk, Score = score, Fields = fields, DenseVectors = denseVectors };
+        return new ZVecDoc { Id = pk, Score = score, Fields = fields, DenseVectors = denseVectors, SparseVectors = sparseVectors };
     }
 
     private static unsafe void ExtractFieldValue(
@@ -74,7 +75,8 @@ internal static class NativeDocUnmarshaller
         string fieldName, 
         ZVecDataType dataType, 
         Dictionary<string, object> fields,
-        Dictionary<string, ReadOnlyMemory<float>> denseVectors)
+        Dictionary<string, ReadOnlyMemory<float>> denseVectors,
+        Dictionary<string, IReadOnlyDictionary<int, float>> sparseVectors)
     {
         // zvec_doc_get_field_value_pointer provides zero-copy access
         var rc = NativeMethods.zvec_doc_get_field_value_pointer(docPtr, fieldName, (int)dataType, out nint valuePtr);
@@ -93,6 +95,12 @@ internal static class NativeDocUnmarshaller
             case ZVecDataType.Int64:
                 fields[fieldName] = val.Int64Value;
                 break;
+            case ZVecDataType.UInt32:
+                fields[fieldName] = val.Uint32Value;
+                break;
+            case ZVecDataType.UInt64:
+                fields[fieldName] = val.Uint64Value;
+                break;
             case ZVecDataType.Float:
                 fields[fieldName] = val.FloatValue;
                 break;
@@ -109,10 +117,24 @@ internal static class NativeDocUnmarshaller
             case ZVecDataType.VectorFp32:
                 if (val.VectorValue.Data != IntPtr.Zero)
                 {
-                    // Copy native float array into a managed array so it survives after the doc is destroyed
-                    float[] floatArray = new float[val.VectorValue.Len];
+                    // Use AllocateUninitializedArray to skip zeroing the float array
+                    float[] floatArray = GC.AllocateUninitializedArray<float>((int)val.VectorValue.Len);
                     Marshal.Copy(val.VectorValue.Data, floatArray, 0, (int)val.VectorValue.Len);
                     denseVectors[fieldName] = floatArray;
+                }
+                break;
+            case ZVecDataType.SparseVectorFp32:
+                int rcSparse = NativeMethods.zvec_doc_get_sparse_vector_field(docPtr, fieldName, out nint indicesPtr, out nint valuesPtr, out nuint sparseCount);
+                if (rcSparse == 0 && sparseCount > 0)
+                {
+                    var dict = new Dictionary<int, float>((int)sparseCount);
+                    int* indices = (int*)indicesPtr;
+                    float* values = (float*)valuesPtr;
+                    for (int i = 0; i < (int)sparseCount; i++)
+                    {
+                        dict[indices[i]] = values[i];
+                    }
+                    sparseVectors[fieldName] = dict;
                 }
                 break;
             // Additional types can be implemented as needed

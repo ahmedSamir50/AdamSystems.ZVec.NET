@@ -65,6 +65,7 @@ public sealed class ZVecCollection : IZvecCollection
 
         // Capture result but don't throw during disposal per .NET conventions.
         _ = NativeMethods.zvec_collection_close(_handle);
+        ZVecFactory.OpenCollections.TryRemove(_handle, out _);
     }
 
     /// <summary>

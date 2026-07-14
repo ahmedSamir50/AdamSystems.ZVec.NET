@@ -23,7 +23,7 @@ internal struct ZVecByteArray
     public nuint Len;
 }
 
-[StructLayout(LayoutKind.Explicit, Size = 16)]
+[StructLayout(LayoutKind.Explicit)]
 internal struct ZVecFieldValue
 {
     [FieldOffset(0)] public bool BoolValue;

@@ -1866,6 +1866,11 @@ public class QueryThroughputBench
 
 ## 12. Work Breakdown Structure (WBS)
 
+### Recently Completed Epics
+- **Epic E14 (Schema DDL)**: Fully implemented DDL methods in `ZVecCollection` (`AddColumn`, `DropColumn`, `AlterColumn`, etc.) and validated with tests.
+- **Epic E16 (Dependency Injection)**: Integrated `Microsoft.Extensions.DependencyInjection` with `AddZVec` and `AddZVecCollection` using keyed singletons and DI options.
+- **Epic E17 (Mock Native Library)**: Created `zvec_c_api_mock.cpp` and `mock_structs.h` using CMake, removing the legacy C# mock and establishing a cross-platform mock matching the C API.
+
 ### Phase 1: Native Layer (upstream `zvec_c_api`) — ~2.5 weeks
 
 | ID | Task | Owner | Depends On | Est. |
@@ -1923,6 +1928,7 @@ public class QueryThroughputBench
 | 4.5 | Validate performance targets | .NET Dev | 4.4 | 1d |
 | 4.6 | Publish alpha NuGet | .NET Lead | 4.3 | 0.5d |
 | 4.7 | README + getting-started | .NET Lead | 4.6 | 1d |
+
 
 ### Total Estimated Duration: **~10–12 weeks** (2 developers)
 

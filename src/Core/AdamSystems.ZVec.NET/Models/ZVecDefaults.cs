@@ -6,6 +6,22 @@ namespace AdamSystems.ZVec.NET;
 /// </summary>
 public static class ZVecDefaults
 {
+    /// <summary>Expected native library versions.</summary>
+    public static class Version
+    {
+        /// <summary>Expected major version.</summary>
+        public static int ExpectedMajor { get; set; } = 0;
+
+        /// <summary>Expected minor version.</summary>
+        public static int ExpectedMinor { get; set; } = 5;
+
+        /// <summary>Expected patch version.</summary>
+        public static int ExpectedPatch { get; set; } = 1;
+
+        /// <summary>If true, bypasses the strict ABI version check during initialization.</summary>
+        public static bool BypassAbiCheck { get; set; } = false;
+    }
+
     /// <summary>Default parameters for HNSW index.</summary>
     public static class Hnsw
     {
@@ -222,5 +238,14 @@ public static class ZVecDefaults
 
         /// <summary>Message shown when the native library fails to allocate field schema.</summary>
         public const string NativeFieldSchemaCreateFailed = "Failed to create native field schema (zvec_field_schema_create returned null).";
+
+        /// <summary>Message shown when the native library fails to allocate collection schema.</summary>
+        public const string NativeCollectionSchemaCreateFailed = "Failed to create native collection schema (zvec_collection_schema_create returned null).";
+
+        /// <summary>Message shown when the native library fails to allocate collection options.</summary>
+        public const string NativeCollectionOptionsCreateFailed = "Failed to create native collection options (zvec_collection_options_create returned null).";
+
+        /// <summary>Message shown when trying to register a collection via DI without a path.</summary>
+        public const string CollectionPathRequired = "Collection path must be provided.";
     }
 }

@@ -11,9 +11,7 @@
   <Folder Name="/src/Core/">
     <Project Path="src/Core/AdamSystems.ZVec.NET/AdamSystems.ZVec.NET.csproj" />
   </Folder>
-  <Folder Name="/src/Mock/">
-    <Project Path="src/Mock/ZVec.Native.Mock/ZVec.Native.Mock.csproj" Id="63cd9570-c725-4067-936c-63753badda13" />
-  </Folder>
+
   <Folder Name="/src/Native/" />
   <Folder Name="/testing/">
     <Project Path="testing/AdamSystems.ZVec.NET.Benchmarks/AdamSystems.ZVec.NET.Benchmarks.csproj" />
