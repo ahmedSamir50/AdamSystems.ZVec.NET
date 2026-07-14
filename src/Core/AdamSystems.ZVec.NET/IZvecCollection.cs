@@ -30,4 +30,50 @@ public interface IZvecCollection : IDisposable, IAsyncDisposable
     /// Asynchronously destroys the collection.
     /// </summary>
     ValueTask DestroyAsync(CancellationToken ct = default);
+
+    // =========================================================================
+    // Epic E12 — CRUD
+    // =========================================================================
+
+    ZVecStatus Insert(ZVecDoc doc);
+    ZVecStatus Insert(ReadOnlySpan<ZVecDoc> docs);
+    IReadOnlyList<ZVecWriteResult> InsertWithResults(ReadOnlySpan<ZVecDoc> docs);
+    ValueTask<ZVecStatus> InsertAsync(ZVecDoc doc, CancellationToken ct = default);
+    ValueTask<IReadOnlyList<ZVecWriteResult>> InsertAsync(IReadOnlyList<ZVecDoc> docs, CancellationToken ct = default);
+
+    ZVecStatus Update(ZVecDoc doc);
+    ZVecStatus Upsert(ZVecDoc doc);
+
+    ZVecStatus Delete(string pk);
+    ZVecStatus Delete(ReadOnlySpan<string> pks);
+    IReadOnlyList<ZVecWriteResult> DeleteWithResults(ReadOnlySpan<string> pks);
+    ZVecStatus DeleteByFilter(string filter);
+    ValueTask<ZVecStatus> DeleteAsync(string pk, CancellationToken ct = default);
+    ValueTask<ZVecStatus> DeleteByFilterAsync(string filter, CancellationToken ct = default);
+
+    ZVecDoc? Fetch(string pk, bool includeVector = false);
+    IReadOnlyList<ZVecDoc> Fetch(ReadOnlySpan<string> pks, bool includeVector = false);
+    ValueTask<ZVecDoc?> FetchAsync(string pk, bool includeVector = false, CancellationToken ct = default);
+
+    // =========================================================================
+    // Epic E13 — Query
+    // =========================================================================
+
+    IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk = 10, string? filter = null);
+    IReadOnlyList<ZVecDoc> Query(IReadOnlyList<ZVecQuery> queries, int topk = 10, ZVecReranker? reranker = null);
+    ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(ZVecQuery query, int topk = 10, string? filter = null, CancellationToken ct = default);
+
+    // =========================================================================
+    // Epic E14 — DDL
+    // =========================================================================
+
+    void AddColumn(ZVecFieldSchema field, string? defaultExpression = null);
+    void DropColumn(string columnName);
+    void AlterColumn(string columnName, string? newName = null, ZVecFieldSchema? newSchema = null);
+    void CreateIndex(string columnName, ZVecIndexParam indexParam);
+    void DropIndex(string columnName);
+    void Optimize();
+    ValueTask AddColumnAsync(ZVecFieldSchema field, string? defaultExpression = null, CancellationToken ct = default);
+    ValueTask DropColumnAsync(string columnName, CancellationToken ct = default);
+    ValueTask OptimizeAsync(CancellationToken ct = default);
 }

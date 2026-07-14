@@ -126,16 +126,24 @@ internal static partial class NativeMethods
         [MarshalAs(UnmanagedType.U1)] bool enableMmap);
 
     // =========================================================================
-    // CRUD Operations
+    // CRUD Operations (DML)
     // =========================================================================
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_insert(
         IntPtr collection,
-        IntPtr docs,
+        IntPtr docs, // zvec_doc_t**
         nuint docCount,
         out nuint successCount,
         out nuint errorCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_insert_with_results(
+        IntPtr collection,
+        IntPtr docs, // zvec_doc_t**
+        nuint docCount,
+        out IntPtr results, // zvec_write_result_t**
+        out nuint resultCount);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_update(
@@ -146,6 +154,14 @@ internal static partial class NativeMethods
         out nuint errorCount);
 
     [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_update_with_results(
+        IntPtr collection,
+        IntPtr docs,
+        nuint docCount,
+        out IntPtr results,
+        out nuint resultCount);
+
+    [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_upsert(
         IntPtr collection,
         IntPtr docs,
@@ -154,12 +170,28 @@ internal static partial class NativeMethods
         out nuint errorCount);
 
     [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_upsert_with_results(
+        IntPtr collection,
+        IntPtr docs,
+        nuint docCount,
+        out IntPtr results,
+        out nuint resultCount);
+
+    [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_delete(
         IntPtr collection,
-        IntPtr primaryKeys,
+        IntPtr primaryKeys, // char**
         nuint keyCount,
         out nuint successCount,
         out nuint errorCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_delete_with_results(
+        IntPtr collection,
+        IntPtr primaryKeys,
+        nuint keyCount,
+        out IntPtr results,
+        out nuint resultCount);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_delete_by_filter(
@@ -169,24 +201,41 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_fetch(
         IntPtr collection,
-        IntPtr primaryKeys,
+        IntPtr primaryKeys, // char**
         nuint keyCount,
-        out IntPtr results,
-        out nuint resultCount);
+        IntPtr outputFields, // char**
+        nuint outputFieldCount,
+        [MarshalAs(UnmanagedType.U1)] bool includeVector,
+        out IntPtr documents, // zvec_doc_t***
+        out nuint foundCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_write_results_free(IntPtr results, nuint resultCount);
 
     // =========================================================================
-    // Query Operations
+    // Query Operations (DQL)
     // =========================================================================
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_query(
         IntPtr collection,
-        IntPtr query,
+        IntPtr query, // zvec_vector_query_t*
+        [MarshalAs(UnmanagedType.U1)] bool includeVector,
+        out IntPtr results, // zvec_doc_t***
+        out nuint resultCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_multi_query(
+        IntPtr collection,
+        IntPtr multiQuery,
         out IntPtr results,
         out nuint resultCount);
 
     [LibraryImport(LibraryName)]
     internal static partial void zvec_multi_query_destroy(IntPtr query);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_docs_free(IntPtr documents, nuint count);
 
     // =========================================================================
     // DDL Operations
@@ -224,4 +273,169 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_optimize(
         IntPtr collection);
+
+    // =========================================================================
+    // Doc Builder (zvec_doc_t)
+    // =========================================================================
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_doc_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_doc_destroy(IntPtr doc);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_doc_set_pk(
+        IntPtr doc,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string pk);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_doc_set_score(IntPtr doc, float score);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_doc_add_field_by_value(
+        IntPtr doc,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
+        int dataType, // zvec_data_type_t
+        IntPtr value); // zvec_field_value_t*
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_doc_get_field_value_copy(
+        IntPtr doc,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
+        int dataType,
+        IntPtr value); // zvec_field_value_t*
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_doc_get_field_value_pointer(
+        IntPtr doc,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
+        int dataType,
+        out IntPtr value); // zvec_field_value_t**
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_doc_get_field_names(
+        IntPtr doc,
+        out IntPtr fieldNames, // char***
+        out nuint count);
+
+    // =========================================================================
+    // Query Builder (zvec_vector_query_t)
+    // =========================================================================
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_vector_query_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_vector_query_destroy(IntPtr query);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_topk(IntPtr query, int topk);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_field_name(
+        IntPtr query,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_query_vector(
+        IntPtr query,
+        IntPtr data,
+        nuint size);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_filter(
+        IntPtr query,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string filter);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_include_vector(
+        IntPtr query,
+        [MarshalAs(UnmanagedType.U1)] bool include);
+
+
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_doc_get_pk_copy(IntPtr doc);
+
+    [LibraryImport(LibraryName)]
+    internal static partial float zvec_doc_get_score(IntPtr doc);
+
+    // =========================================================================
+    // String Array (zvec_string_array_t)
+    // =========================================================================
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_string_array_create(nuint count);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_string_array_add(
+        IntPtr array,
+        nuint idx,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string str);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_string_array_destroy(IntPtr array);
+
+    // =========================================================================
+    // Index Params (zvec_index_params_t)
+    // =========================================================================
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_index_params_create(int indexType);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_index_params_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_metric_type(IntPtr paramsPtr, int metricType);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_quantize_type(IntPtr paramsPtr, int quantizeType);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_hnsw_params(IntPtr paramsPtr, int m, int efConstruction);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_vamana_params(
+        IntPtr paramsPtr, 
+        int maxDegree, 
+        int searchListSize, 
+        float alpha, 
+        [MarshalAs(UnmanagedType.U1)] bool saturateGraph, 
+        [MarshalAs(UnmanagedType.U1)] bool useContiguousMemory);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_diskann_params(IntPtr paramsPtr, int maxDegree, int listSize, int pqChunkNum);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_ivf_params(IntPtr paramsPtr, int nList, int nIters, [MarshalAs(UnmanagedType.U1)] bool useSoar);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_invert_params(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool enableRangeOpt, [MarshalAs(UnmanagedType.U1)] bool enableWildcard);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_fts_params(
+        IntPtr paramsPtr, 
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string tokenizerName,
+        IntPtr filters,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? extraParams);
+
+    // =========================================================================
+    // Field Schema (zvec_field_schema_t)
+    // =========================================================================
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_field_schema_create(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
+        int dataType,
+        [MarshalAs(UnmanagedType.U1)] bool nullable,
+        uint dimension);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_field_schema_destroy(IntPtr schemaPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_field_schema_set_index_params(IntPtr schemaPtr, IntPtr indexParamsPtr);
+
 }

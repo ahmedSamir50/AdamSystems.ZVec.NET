@@ -207,5 +207,20 @@ public static class ZVecDefaults
 
         /// <summary>Message shown when Destroy is called more than once on a collection.</summary>
         public const string CollectionAlreadyDestroyed = "This collection has already been destroyed.";        
+
+        /// <summary>Message shown when the native library fails to allocate a document.</summary>
+        public const string NativeDocCreateFailed = "Failed to create native document (zvec_doc_create returned null).";
+
+        /// <summary>Message shown when an unsupported data type is passed to a scalar field.</summary>
+        public const string NativeDataTypeNotSupported = "Data type {0} is not supported for scalar fields.";
+
+        /// <summary>Message shown when the native library fails to allocate a vector query.</summary>
+        public const string NativeQueryCreateFailed = "Failed to create native vector query (zvec_vector_query_create returned null).";
+
+        /// <summary>Message shown when the native library fails to allocate index parameters.</summary>
+        public const string NativeIndexParamsCreateFailed = "Failed to create native index parameters (zvec_index_params_create returned null).";
+
+        /// <summary>Message shown when the native library fails to allocate field schema.</summary>
+        public const string NativeFieldSchemaCreateFailed = "Failed to create native field schema (zvec_field_schema_create returned null).";
     }
 }
