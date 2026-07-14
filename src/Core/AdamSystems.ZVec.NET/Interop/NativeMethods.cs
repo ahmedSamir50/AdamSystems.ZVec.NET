@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.InteropServices;
 
 namespace AdamSystems.ZVec.NET.Interop;
@@ -48,6 +47,35 @@ internal static partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_initialize(IntPtr configData);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_config_data_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_config_data_destroy(IntPtr config);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_config_data_set_memory_limit(IntPtr config, ulong memoryLimitBytes);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_config_data_set_log_config(IntPtr config, IntPtr logConfig);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_config_data_set_query_thread_count(IntPtr config, uint threadCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_config_log_create_console(int level);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_config_log_create_file(
+        int level,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string dir,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string basename,
+        uint fileSize,
+        uint overdueDays);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_config_log_destroy(IntPtr config);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_shutdown();

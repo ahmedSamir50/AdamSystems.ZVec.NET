@@ -1,5 +1,3 @@
-using System;
-
 namespace AdamSystems.ZVec.NET.Interop;
 
 /// <summary>

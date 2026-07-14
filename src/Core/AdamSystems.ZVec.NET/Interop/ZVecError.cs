@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.InteropServices;
 using AdamSystems.ZVec.NET.Exceptions;
 

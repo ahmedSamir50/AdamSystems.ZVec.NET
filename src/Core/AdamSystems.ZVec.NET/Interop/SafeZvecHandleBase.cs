@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Win32.SafeHandles;
 
 namespace AdamSystems.ZVec.NET.Interop;

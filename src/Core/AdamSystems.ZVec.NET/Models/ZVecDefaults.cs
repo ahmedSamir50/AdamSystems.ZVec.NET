@@ -179,4 +179,33 @@ public static class ZVecDefaults
         /// <summary>Default rank constant for RRF reranking: 60.</summary>
         public const int RankConstant = 60;
     }
+
+    /// <summary>Default options for process-wide initialization.</summary>
+    public static class GlobalOptions
+    {
+        /// <summary>Default log type: Console.</summary>
+        public const ZVecLogType LogType = ZVecLogType.Console;
+
+        /// <summary>Default log level: Warn.</summary>
+        public const ZVecLogLevel LogLevel = ZVecLogLevel.Warn;
+
+        /// <summary>Default query threads: -1 (auto).</summary>
+        public const int QueryThreads = -1;
+
+        /// <summary>Default max concurrent native calls: 0 (unlimited).</summary>
+        public const int MaxConcurrentNativeCalls = 0;
+    }
+
+    /// <summary>Centralized error message strings.</summary>
+    public static class Errors
+    {
+        /// <summary>Message shown when write lock is re-entered on the same context.</summary>
+        public const string WriteLockReentrancyNotSupported = "Write lock reentrancy is not supported.";
+
+        /// <summary>Message shown when a collection operation is attempted before the factory is initialized.</summary>
+        public const string FactoryNotInitialized = "ZVecFactory is not initialized. Call Initialize() or InitializeAsync() first.";        
+
+        /// <summary>Message shown when Destroy is called more than once on a collection.</summary>
+        public const string CollectionAlreadyDestroyed = "This collection has already been destroyed.";        
+    }
 }
