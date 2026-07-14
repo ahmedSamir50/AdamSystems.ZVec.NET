@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>AdamSystems.ZVec.NET</PackageId>
+    <AssemblyName>AdamSystems.ZVec.NET</AssemblyName>
+    <RootNamespace>AdamSystems.ZVec.NET</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Version = our SemVer + pinned ZVec native: 1.0.0-alpha.1+zvec.XMajor.XMinor.3Build.0.5.1, where 0.5.1 is the ZVec C++ version we wrap. The
+         .NET target lives in TargetFrameworks + lib/ folder, NOT in the version string -->
+    <Version>1.0.0-alpha.1+zvec.0.5.1</Version>
+    <Authors>Adam Systems</Authors>
+    <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (win/linux/mac, x64/arm64).</Description>
+    <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReleaseNotes>Wraps ZVec C++ 0.5.1; targets .NET 8.0+ (LTS baseline)</PackageReleaseNotes>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="DependencyInjection\" />
+    <Folder Include="Builders\" />
+    <Folder Include="Interop\" />
+    <Folder Include="Internal\" />
+    <Folder Include="Models\" />
+    <Folder Include="IndexParams\" />
+    <Folder Include="Abstractions\" />
+    <Folder Include="Query\" />
+    <Folder Include="runtimes\win-x64\native\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+
+</Project>
+

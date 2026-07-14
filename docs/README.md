@@ -10,4 +10,4 @@ Re-fetch when re-auditing:
 Invoke-WebRequest -Uri "https://zvec.org/llms-full.txt" -OutFile "docs/llms-full.txt" -UseBasicParsing
 ```
 
-AI Integration sections in that file are **out of scope** for AdamSystems.ZVec.Core (embeddings, MCP, skills, model rerankers).
+AI Integration sections in that file are **out of scope** for AdamSystems.ZVec.NET (embeddings, MCP, skills, model rerankers).
