@@ -6,7 +6,10 @@ namespace AdamSystems.ZVec.NET;
 /// </summary>
 public sealed class ZVecCollectionStats
 {
+    /// <summary>Total document count in the collection.</summary>
     public long DocCount { get; init; }
+
+    /// <summary>Index construction completeness percentage (from 0.0 to 1.0) mapped by index name.</summary>
     public IReadOnlyDictionary<string, float> IndexCompleteness { get; init; } =
         new Dictionary<string, float>();
 }

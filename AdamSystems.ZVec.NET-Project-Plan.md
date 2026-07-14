@@ -88,6 +88,14 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 | Enum / ABI source of truth | Upstream `zvec/db/type.h` + `c_api.h` only | Prefer `type.h` when C macros lag; **never** invent parallel headers or numeric values |
 | Bool marshalling | `[MarshalAs(UnmanagedType.U1)]` for C99 `bool` | Not `UnmanagedType.Bool` (4-byte Win32 BOOL) |
 
+### 1.5 General Coding Rules & Guidelines
+
+For all current and future development tasks, the following strict rules apply:
+1. **Developer-Friendly Documentation**: Check created classes and enums against `c_api.h` and `docs/llms-full.txt`. All C# code must include explicitly written XML documentation (`///`) reflecting the original C++ docs so it is highly accessible to developers.
+2. **Centralized Defaults**: Use a public `Defaults` class (or similar structural mechanism) that groups many static classes/defaults by related functionality instead of scattering magic values. 
+3. **No Magic Strings**: All strings must be defined as constants, `nameof()`, or strongly typed enums. 
+4. **No Magic Default Values**: All default values must be sourced from the centralized `Defaults` class or clearly defined constants. 
+
 ---
 
 ## 2. ZVec API Surface Catalog
@@ -160,7 +168,7 @@ Managed wrappers must expose the **full** C++ set from `type.h` (see Appendix A)
 | `FlatIndexParam` | `metric_type: MetricType`, `quantize_type: QuantizeType` |
 | `DiskAnnIndexParam` | `metric_type: MetricType`, `max_degree: int`, `list_size: int`, `pq_chunk_num: int`, `quantize_type: QuantizeType` |
 | `VamanaIndexParam` | `metric_type: MetricType`, `max_degree: int`, `search_list_size: int`, `alpha: float`, `saturate_graph: bool`, `use_contiguous_memory: bool`, `use_id_map: bool`, `quantize_type: QuantizeType` |
-| `FtsIndexParam` | `tokenizer_name: string`, `filters: list[string]`, `extra_params: string` |
+| `FtsIndexParam` | Python: `tokenizer_name`/`filters`/`extra_params` strings → .NET: `ZVecFtsTokenizer` / `IReadOnlyList<ZVecFtsTokenFilter>` / `ZVecFtsExtraParams?` |
 | `CollectionOption` | `read_only: bool`, `enable_mmap: bool` |
 
 ### 2.4 Document Type
@@ -954,7 +962,7 @@ public sealed class ZVecWeightedReranker : ZVecReranker
 public sealed class ZVecRrfReranker : ZVecReranker
 {
     public int TopN { get; init; }
-    public float RankConstant { get; init; } = 60.0f;
+    public int RankConstant { get; init; } = ZVecDefaults.Rerank.RankConstant; // native int, default 60
 }
 ```
 
@@ -1055,9 +1063,9 @@ public sealed class ZVecVamanaIndexParam : ZVecIndexParam
 
 public sealed class ZVecFtsIndexParam : ZVecIndexParam
 {
-    public string TokenizerName { get; init; } = "standard";
-    public IReadOnlyList<string> Filters { get; init; } = ["lowercase"];
-    public string? ExtraParams { get; init; }
+    public ZVecFtsTokenizer Tokenizer { get; init; } = ZVecFtsTokenizer.Standard;
+    public IReadOnlyList<ZVecFtsTokenFilter> Filters { get; init; } = [ZVecFtsTokenFilter.Lowercase];
+    public ZVecFtsExtraParams? ExtraParams { get; init; }
 }
 
 public sealed class ZVecInvertIndexParam : ZVecIndexParam

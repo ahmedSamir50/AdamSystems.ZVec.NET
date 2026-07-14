@@ -6,9 +6,14 @@ namespace AdamSystems.ZVec.NET;
 /// </summary>
 public sealed class ZVecDoc
 {
+    /// <summary>Unique identifier of the document.</summary>
     public required string Id { get; init; }
+
+    /// <summary>Dense vectors associated with the document, mapped by field name.</summary>
     public IReadOnlyDictionary<string, ReadOnlyMemory<float>> DenseVectors { get; init; } =
         new Dictionary<string, ReadOnlyMemory<float>>();
+
+    /// <summary>Sparse vectors associated with the document, mapped by field name. Mapped as {dimension_index: weight}.</summary>
     public IReadOnlyDictionary<string, IReadOnlyDictionary<int, float>> SparseVectors { get; init; } =
         new Dictionary<string, IReadOnlyDictionary<int, float>>();
 
@@ -19,8 +24,15 @@ public sealed class ZVecDoc
     public IReadOnlyDictionary<string, object> Fields { get; init; } =
         new Dictionary<string, object>();
 
+    /// <summary>Score assigned to the document in search results.</summary>
     public float Score { get; init; }
 
+    /// <summary>Creates a new document instance with validation.</summary>
+    /// <param name="id">The document ID.</param>
+    /// <param name="denseVectors">Optional dense vectors.</param>
+    /// <param name="sparseVectors">Optional sparse vectors.</param>
+    /// <param name="fields">Optional scalar fields.</param>
+    /// <returns>A validated ZVecDoc instance.</returns>
     public static ZVecDoc Create(
         string id,
         IReadOnlyDictionary<string, ReadOnlyMemory<float>>? denseVectors = null,

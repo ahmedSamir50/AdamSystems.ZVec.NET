@@ -11,6 +11,28 @@ namespace AdamSystems.ZVec.NET;
 /// </summary>
 public sealed class ZVecFtsExtraParams
 {
+    /// <summary>
+    /// Inner class defining native JSON key constants for FTS extra parameters.
+    /// Prevents magic strings inside JSON generation.
+    /// </summary>
+    public static class ZVecFtsExtraParamsJsonDefaults
+    {
+        /// <summary>JSON key for max_token_length.</summary>
+        public const string MaxTokenLength = "max_token_length";
+
+        /// <summary>JSON key for jieba_dict_dir.</summary>
+        public const string JiebaDictDir = "jieba_dict_dir";
+
+        /// <summary>JSON key for user_dict_path.</summary>
+        public const string UserDictPath = "user_dict_path";
+
+        /// <summary>JSON key for cut_mode.</summary>
+        public const string CutMode = "cut_mode";
+
+        /// <summary>JSON key for stemmer_lang.</summary>
+        public const string StemmerLang = "stemmer_lang";
+    }
+
     /// <summary>standard only. Positive int; native default 255, range [1, 1048576].</summary>
     public int? MaxTokenLength { get; init; }
 
@@ -40,27 +62,27 @@ public sealed class ZVecFtsExtraParams
         if (MaxTokenLength is { } maxTokenLength)
         {
             parts.Add(FormattableString.Invariant(
-                $"\"max_token_length\":{maxTokenLength.ToString(CultureInfo.InvariantCulture)}"));
+                $"\"{ZVecFtsExtraParamsJsonDefaults.MaxTokenLength}\":{maxTokenLength.ToString(CultureInfo.InvariantCulture)}"));
         }
 
         if (JiebaDictDir is not null)
         {
-            parts.Add($"\"jieba_dict_dir\":{QuoteJsonString(JiebaDictDir)}");
+            parts.Add($"\"{ZVecFtsExtraParamsJsonDefaults.JiebaDictDir}\":{QuoteJsonString(JiebaDictDir)}");
         }
 
         if (UserDictPath is not null)
         {
-            parts.Add($"\"user_dict_path\":{QuoteJsonString(UserDictPath)}");
+            parts.Add($"\"{ZVecFtsExtraParamsJsonDefaults.UserDictPath}\":{QuoteJsonString(UserDictPath)}");
         }
 
         if (CutMode is { } cutMode)
         {
-            parts.Add($"\"cut_mode\":{QuoteJsonString(ZVecNativeStrings.ToNative(cutMode))}");
+            parts.Add($"\"{ZVecFtsExtraParamsJsonDefaults.CutMode}\":{QuoteJsonString(ZVecNativeStrings.ToNative(cutMode))}");
         }
 
         if (StemmerLang is not null)
         {
-            parts.Add($"\"stemmer_lang\":{QuoteJsonString(StemmerLang)}");
+            parts.Add($"\"{ZVecFtsExtraParamsJsonDefaults.StemmerLang}\":{QuoteJsonString(StemmerLang)}");
         }
 
         if (parts.Count == 0)
