@@ -18,13 +18,15 @@
 CMakeCache.txt
 CMakeFiles/
 CMakeScripts/
-Testing/
+#Testing/
 Makefile
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
 *.so
-*.dll
+*.dll  
+#not in the runtimes "~\src\Core\AdamSystems.ZVec.NET\runtimes\" path those should be tracked
+!/src/Core/AdamSystems.ZVec.NET/runtimes/*.dll
 *.dylib
 *.exe
 *.pdb
