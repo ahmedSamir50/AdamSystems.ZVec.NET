@@ -15,6 +15,13 @@ internal sealed class SafeZvecDocHandle : SafeHandle
 
     protected override bool ReleaseHandle()
     {
+        // If the factory is not initialized (or already shut down), the native library
+        // resources are no longer valid, so calling destroy would cause an Access Violation.
+        if (!ZVecFactory.IsInitialized)
+        {
+            return true;
+        }
+
         if (handle != IntPtr.Zero)
         {
             NativeMethods.zvec_doc_destroy(handle);

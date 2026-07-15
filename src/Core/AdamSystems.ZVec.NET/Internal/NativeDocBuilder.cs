@@ -49,8 +49,11 @@ internal sealed class NativeDocBuilder : IDisposable
                 builder.AddScalarField(kvp.Key, kvp.Value);
             }
             
-            // Note: Sparse vectors are not implemented yet in the native builder per current headers,
-            // or if they are, they require a specific struct. We will skip sparse for now or add if needed.
+            // Add sparse vectors
+            foreach (var kvp in doc.SparseVectors)
+            {
+                builder.AddSparseVectorField(kvp.Key, kvp.Value);
+            }
             
             return builder;
         }
@@ -66,63 +69,128 @@ internal sealed class NativeDocBuilder : IDisposable
         var memHandle = vector.Pin();
         _pinnedHandles.Add(memHandle);
 
-        var floatArray = new ZVecFloatArray
-        {
-            Data = (IntPtr)memHandle.Pointer,
-            Len = (nuint)vector.Length
-        };
+        // Pass the raw float* pointer and the byte size of the vector directly.
+        // The real C API signature is: zvec_doc_add_field_by_value(doc, name, type, value, value_size)
+        // where value_size = count * sizeof(float).
+        nuint valueSize = (nuint)(vector.Length * sizeof(float));
 
-        var fieldValue = new ZVecFieldValue { VectorValue = floatArray };
         int rc = NativeMethods.zvec_doc_add_field_by_value(
             _handle,
             name,
             (int)ZVecDataType.VectorFp32,
-            new IntPtr(&fieldValue));
+            (IntPtr)memHandle.Pointer,
+            valueSize);
 
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddDenseVectorField));
     }
 
+    private unsafe void AddSparseVectorField(string name, IReadOnlyDictionary<int, float> vector)
+    {
+        var count = vector.Count;
+        var indicesPtr = Marshal.AllocHGlobal(count * sizeof(int));
+        var valuesPtr = Marshal.AllocHGlobal(count * sizeof(float));
+        _unmanagedAllocations.Add(indicesPtr);
+        _unmanagedAllocations.Add(valuesPtr);
+
+        var indices = new Span<int>((void*)indicesPtr, count);
+        var values = new Span<float>((void*)valuesPtr, count);
+
+        int i = 0;
+        foreach (var kvp in vector)
+        {
+            indices[i] = kvp.Key;
+            values[i] = kvp.Value;
+            i++;
+        }
+
+        int rc = NativeMethods.zvec_doc_add_sparse_vector_field(
+            _handle,
+            name,
+            indicesPtr,
+            valuesPtr,
+            (nuint)count);
+
+        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddSparseVectorField));
+    }
+
     private unsafe void AddScalarField(string name, object value)
     {
-        ZVecFieldValue fieldValue = default;
+        // The real C API signature is:
+        //   zvec_doc_add_field_by_value(doc, name, data_type, const void* value, size_t value_size)
+        // where value is a raw pointer to the typed payload and value_size is its byte size.
+        IntPtr valuePtr;
+        nuint valueSize;
         ZVecDataType dataType;
 
         switch (value)
         {
             case bool b:
-                fieldValue.BoolValue = b;
-                dataType = ZVecDataType.Bool;
+            {
+                byte bv = b ? (byte)1 : (byte)0;
+                var ptr = Marshal.AllocHGlobal(1);
+                _unmanagedAllocations.Add(ptr);
+                Marshal.WriteByte(ptr, bv);
+                valuePtr = ptr; valueSize = 1; dataType = ZVecDataType.Bool;
                 break;
+            }
             case int i:
-                fieldValue.Int32Value = i;
-                dataType = ZVecDataType.Int32;
+            {
+                var ptr = Marshal.AllocHGlobal(sizeof(int));
+                _unmanagedAllocations.Add(ptr);
+                Marshal.WriteInt32(ptr, i);
+                valuePtr = ptr; valueSize = sizeof(int); dataType = ZVecDataType.Int32;
                 break;
+            }
             case long l:
-                fieldValue.Int64Value = l;
-                dataType = ZVecDataType.Int64;
+            {
+                var ptr = Marshal.AllocHGlobal(sizeof(long));
+                _unmanagedAllocations.Add(ptr);
+                Marshal.WriteInt64(ptr, l);
+                valuePtr = ptr; valueSize = sizeof(long); dataType = ZVecDataType.Int64;
                 break;
+            }
+            case uint ui:
+            {
+                var ptr = Marshal.AllocHGlobal(sizeof(uint));
+                _unmanagedAllocations.Add(ptr);
+                Marshal.WriteInt32(ptr, (int)ui);
+                valuePtr = ptr; valueSize = sizeof(uint); dataType = ZVecDataType.UInt32;
+                break;
+            }
+            case ulong ul:
+            {
+                var ptr = Marshal.AllocHGlobal(sizeof(ulong));
+                _unmanagedAllocations.Add(ptr);
+                Marshal.WriteInt64(ptr, (long)ul);
+                valuePtr = ptr; valueSize = sizeof(ulong); dataType = ZVecDataType.UInt64;
+                break;
+            }
             case float f:
-                fieldValue.FloatValue = f;
-                dataType = ZVecDataType.Float;
+            {
+                var ptr = Marshal.AllocHGlobal(sizeof(float));
+                _unmanagedAllocations.Add(ptr);
+                *(float*)ptr = f;
+                valuePtr = ptr; valueSize = sizeof(float); dataType = ZVecDataType.Float;
                 break;
+            }
             case double d:
-                fieldValue.DoubleValue = d;
-                dataType = ZVecDataType.Double;
+            {
+                var ptr = Marshal.AllocHGlobal(sizeof(double));
+                _unmanagedAllocations.Add(ptr);
+                *(double*)ptr = d;
+                valuePtr = ptr; valueSize = sizeof(double); dataType = ZVecDataType.Double;
                 break;
+            }
             case string s:
+            {
                 var utf8Bytes = Encoding.UTF8.GetBytes(s);
-                IntPtr ptr = Marshal.AllocHGlobal(utf8Bytes.Length + 1); // +1 for null terminator just in case, though len is provided
+                IntPtr ptr = Marshal.AllocHGlobal(utf8Bytes.Length + 1);
                 _unmanagedAllocations.Add(ptr);
                 Marshal.Copy(utf8Bytes, 0, ptr, utf8Bytes.Length);
                 Marshal.WriteByte(ptr, utf8Bytes.Length, 0);
-                
-                fieldValue.StringValue = new ZVecString
-                {
-                    Str = ptr,
-                    Len = (nuint)utf8Bytes.Length
-                };
-                dataType = ZVecDataType.String;
+                valuePtr = ptr; valueSize = (nuint)utf8Bytes.Length; dataType = ZVecDataType.String;
                 break;
+            }
             default:
                 throw new NotSupportedException(string.Format(ZVecDefaults.Errors.NativeDataTypeNotSupported, value.GetType()));
         }
@@ -131,7 +199,8 @@ internal sealed class NativeDocBuilder : IDisposable
             _handle,
             name,
             (int)dataType,
-            new IntPtr(&fieldValue));
+            valuePtr,
+            valueSize);
 
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddScalarField));
     }

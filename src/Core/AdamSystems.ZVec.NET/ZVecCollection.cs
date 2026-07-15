@@ -16,7 +16,7 @@ namespace AdamSystems.ZVec.NET;
 /// <para>
 /// <b>Thread safety:</b> Idempotency and mutual exclusion for all disposal paths are achieved
 /// with <see cref="Interlocked.Exchange(ref int, ref int)"/> on <c>int</c> flags — no custom lock.
-/// This mirrors the BCL <see cref="System.Runtime.InteropServices.SafeHandle"/> pattern.
+/// This mirrors the BCL <see cref="SafeHandle"/> pattern.
 /// </para>
 /// </remarks>
 public sealed class ZVecCollection : IZvecCollection
@@ -64,7 +64,12 @@ public sealed class ZVecCollection : IZvecCollection
             return; // Already closed — no-op.
 
         // Capture result but don't throw during disposal per .NET conventions.
-        _ = NativeMethods.zvec_collection_close(_handle);
+        // Only call native close if the factory is initialized — otherwise the native
+        // library resources are invalid and calling close would cause an Access Violation.
+        // This mirrors the documented guard in SafeZvecHandle.ReleaseHandle().
+        if (ZVecFactory.IsInitialized)
+            _ = NativeMethods.zvec_collection_close(_handle);
+        ZVecFactory.OpenCollections.TryRemove(_handle, out _);
     }
 
     /// <summary>
@@ -93,7 +98,9 @@ public sealed class ZVecCollection : IZvecCollection
             return; // Already destroyed — no-op.
 
         // Destroy deletes the on-disk data. Capture result but don't throw during cleanup.
-        _ = NativeMethods.zvec_collection_destroy(_handle);
+        // Only call native destroy if the factory is initialized (mirrors SafeZvecHandle.ReleaseHandle()).
+        if (ZVecFactory.IsInitialized)
+            _ = NativeMethods.zvec_collection_destroy(_handle);
 
         // Close the handle (no-op if Dispose() already ran concurrently,
         // but _disposed guards against double-close).
@@ -172,7 +179,7 @@ public sealed class ZVecCollection : IZvecCollection
     public IReadOnlyList<ZVecWriteResult> InsertWithResults(ReadOnlySpan<ZVecDoc> docs)
     {
         ThrowIfDisposed();
-        if (docs.IsEmpty) return Array.Empty<ZVecWriteResult>();
+        if (docs.IsEmpty) return [];
 
         var builders = new NativeDocBuilder[docs.Length];
         nint[] ptrs = new nint[docs.Length];
@@ -277,14 +284,14 @@ public sealed class ZVecCollection : IZvecCollection
         {
             var utf8Pks = new byte[pks.Length][];
             nint[] ptrs = new nint[pks.Length];
-            var handles = new System.Runtime.InteropServices.GCHandle[pks.Length];
+            var handles = new GCHandle[pks.Length];
             
             try
             {
                 for (int i = 0; i < pks.Length; i++)
                 {
                     utf8Pks[i] = System.Text.Encoding.UTF8.GetBytes(pks[i]);
-                    handles[i] = System.Runtime.InteropServices.GCHandle.Alloc(utf8Pks[i], System.Runtime.InteropServices.GCHandleType.Pinned);
+                    handles[i] = GCHandle.Alloc(utf8Pks[i], GCHandleType.Pinned);
                     ptrs[i] = handles[i].AddrOfPinnedObject();
                 }
 
@@ -306,20 +313,20 @@ public sealed class ZVecCollection : IZvecCollection
     public IReadOnlyList<ZVecWriteResult> DeleteWithResults(ReadOnlySpan<string> pks)
     {
         ThrowIfDisposed();
-        if (pks.IsEmpty) return Array.Empty<ZVecWriteResult>();
+        if (pks.IsEmpty) return [];
 
         unsafe
         {
             var utf8Pks = new byte[pks.Length][];
             nint[] ptrs = new nint[pks.Length];
-            var handles = new System.Runtime.InteropServices.GCHandle[pks.Length];
+            var handles = new GCHandle[pks.Length];
             
             try
             {
                 for (int i = 0; i < pks.Length; i++)
                 {
                     utf8Pks[i] = System.Text.Encoding.UTF8.GetBytes(pks[i]);
-                    handles[i] = System.Runtime.InteropServices.GCHandle.Alloc(utf8Pks[i], System.Runtime.InteropServices.GCHandleType.Pinned);
+                    handles[i] = GCHandle.Alloc(utf8Pks[i], GCHandleType.Pinned);
                     ptrs[i] = handles[i].AddrOfPinnedObject();
                 }
 
@@ -364,27 +371,27 @@ public sealed class ZVecCollection : IZvecCollection
         ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrWhiteSpace(pk);
 
-        var list = Fetch(new[] { pk }, includeVector);
+        var list = Fetch([pk], includeVector);
         return list.Count > 0 ? list[0] : null;
     }
 
     public IReadOnlyList<ZVecDoc> Fetch(ReadOnlySpan<string> pks, bool includeVector = false)
     {
         ThrowIfDisposed();
-        if (pks.IsEmpty) return Array.Empty<ZVecDoc>();
+        if (pks.IsEmpty) return [];
 
         unsafe
         {
             var utf8Pks = new byte[pks.Length][];
             nint[] ptrs = new nint[pks.Length];
-            var handles = new System.Runtime.InteropServices.GCHandle[pks.Length];
+            var handles = new GCHandle[pks.Length];
             
             try
             {
                 for (int i = 0; i < pks.Length; i++)
                 {
                     utf8Pks[i] = System.Text.Encoding.UTF8.GetBytes(pks[i]);
-                    handles[i] = System.Runtime.InteropServices.GCHandle.Alloc(utf8Pks[i], System.Runtime.InteropServices.GCHandleType.Pinned);
+                    handles[i] = GCHandle.Alloc(utf8Pks[i], GCHandleType.Pinned);
                     ptrs[i] = handles[i].AddrOfPinnedObject();
                 }
 
@@ -411,7 +418,7 @@ public sealed class ZVecCollection : IZvecCollection
 
     private unsafe IReadOnlyList<ZVecWriteResult> UnmarshalWriteResults(nint resultsPtr, nuint count)
     {
-        if (resultsPtr == IntPtr.Zero || count == 0) return Array.Empty<ZVecWriteResult>();
+        if (resultsPtr == IntPtr.Zero || count == 0) return [];
         
         var list = new List<ZVecWriteResult>((int)count);
         try
@@ -438,7 +445,7 @@ public sealed class ZVecCollection : IZvecCollection
 
     private unsafe IReadOnlyList<ZVecDoc> UnmarshalDocs(nint docsPtr, nuint count)
     {
-        if (docsPtr == IntPtr.Zero || count == 0) return Array.Empty<ZVecDoc>();
+        if (docsPtr == IntPtr.Zero || count == 0) return [];
 
         var list = new List<ZVecDoc>((int)count);
         try
@@ -448,7 +455,7 @@ public sealed class ZVecCollection : IZvecCollection
 
             for (int i = 0; i < (int)count; i++)
             {
-                var doc = Internal.NativeDocUnmarshaller.Unmarshal(ptrArray[i], Schema);
+                var doc = NativeDocUnmarshaller.Unmarshal(ptrArray[i], Schema);
                 list.Add(doc);
             }
         }
@@ -469,12 +476,11 @@ public sealed class ZVecCollection : IZvecCollection
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(query);
 
-        using var builder = new Internal.NativeQueryBuilder(query, topk, filter);
+        using var builder = new NativeQueryBuilder(query, topk, filter);
         
         int rc = NativeMethods.zvec_collection_query(
             _handle, 
             builder.Handle, 
-            true, // include vectors
             out nint resultsPtr, 
             out nuint resultCount);
 
@@ -506,8 +512,8 @@ public sealed class ZVecCollection : IZvecCollection
     public void AddColumn(ZVecFieldSchema field, string? defaultExpression = null)
     {
         ThrowIfDisposed();
-        using var builder = new Internal.NativeFieldSchemaBuilder(field);
-        int rc = NativeMethods.zvec_collection_add_column(_handle, builder.Handle, defaultExpression);
+        using var builder = new NativeFieldSchemaBuilder(field);
+        int rc = NativeMethods.zvec_collection_add_column(_handle, builder.Handle, defaultExpression??string.Empty);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddColumn));
     }
 
@@ -521,7 +527,7 @@ public sealed class ZVecCollection : IZvecCollection
     public void AlterColumn(string columnName, string? newName = null, ZVecFieldSchema? newSchema = null)
     {
         ThrowIfDisposed();
-        using var builder = newSchema != null ? new Internal.NativeFieldSchemaBuilder(newSchema) : null;
+        using var builder = newSchema != null ? new NativeFieldSchemaBuilder(newSchema) : null;
         int rc = NativeMethods.zvec_collection_alter_column(
             _handle, 
             columnName, 
@@ -533,7 +539,7 @@ public sealed class ZVecCollection : IZvecCollection
     public void CreateIndex(string columnName, ZVecIndexParam indexParam)
     {
         ThrowIfDisposed();
-        using var builder = new Internal.NativeIndexParamBuilder(indexParam);
+        using var builder = new NativeIndexParamBuilder(indexParam);
         int rc = NativeMethods.zvec_collection_create_index(_handle, columnName, builder.Handle);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(CreateIndex));
     }

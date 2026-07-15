@@ -7,7 +7,7 @@ namespace AdamSystems.ZVec.NET;
 /// Dispose/DisposeAsync perform a <c>zvec_collection_close</c> (safe to call multiple times;
 /// internally idempotent). <see cref="Destroy"/> and <see cref="DestroyAsync"/> first call
 /// <c>zvec_collection_destroy</c> (deletes on-disk data) then close. All idempotency and
-/// mutual exclusion is achieved via <see cref="System.Threading.Interlocked"/> — no custom locks.
+/// mutual exclusion is achieved via <see cref="Interlocked"/> — no custom locks.
 /// </remarks>
 public interface IZvecCollection : IDisposable, IAsyncDisposable
 {
