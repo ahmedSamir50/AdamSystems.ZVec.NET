@@ -24,9 +24,10 @@ cmake_install.cmake
 install_manifest.txt
 compile_commands.json
 *.so
-*.dll  
-#not in the runtimes "~\src\Core\AdamSystems.ZVec.NET\runtimes\" path those should be tracked
-!/src/Core/AdamSystems.ZVec.NET/runtimes/*.dll
+*.dll
+# Native DLLs in runtimes/ are tracked (required for NuGet packaging)
+!/src/Core/AdamSystems.ZVec.NET/runtimes/**
+!/src/Core/AdamSystems.ZVec.NET/runtimes/**/
 *.dylib
 *.exe
 *.pdb
