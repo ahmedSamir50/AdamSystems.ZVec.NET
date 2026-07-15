@@ -64,7 +64,11 @@ public sealed class ZVecCollection : IZvecCollection
             return; // Already closed — no-op.
 
         // Capture result but don't throw during disposal per .NET conventions.
-        _ = NativeMethods.zvec_collection_close(_handle);
+        // Only call native close if the factory is initialized — otherwise the native
+        // library resources are invalid and calling close would cause an Access Violation.
+        // This mirrors the documented guard in SafeZvecHandle.ReleaseHandle().
+        if (ZVecFactory.IsInitialized)
+            _ = NativeMethods.zvec_collection_close(_handle);
         ZVecFactory.OpenCollections.TryRemove(_handle, out _);
     }
 
@@ -94,7 +98,9 @@ public sealed class ZVecCollection : IZvecCollection
             return; // Already destroyed — no-op.
 
         // Destroy deletes the on-disk data. Capture result but don't throw during cleanup.
-        _ = NativeMethods.zvec_collection_destroy(_handle);
+        // Only call native destroy if the factory is initialized (mirrors SafeZvecHandle.ReleaseHandle()).
+        if (ZVecFactory.IsInitialized)
+            _ = NativeMethods.zvec_collection_destroy(_handle);
 
         // Close the handle (no-op if Dispose() already ran concurrently,
         // but _disposed guards against double-close).
@@ -365,7 +371,7 @@ public sealed class ZVecCollection : IZvecCollection
         ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrWhiteSpace(pk);
 
-        var list = Fetch(new[] { pk }, includeVector);
+        var list = Fetch([pk], includeVector);
         return list.Count > 0 ? list[0] : null;
     }
 

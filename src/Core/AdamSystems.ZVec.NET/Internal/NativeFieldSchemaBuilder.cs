@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using AdamSystems.ZVec.NET.Interop;
 
 namespace AdamSystems.ZVec.NET.Internal;

@@ -1,6 +1,4 @@
-using System.Runtime.InteropServices;
 using AdamSystems.ZVec.NET.Interop;
-using AdamSystems.ZVec.NET.Exceptions;
 
 namespace AdamSystems.ZVec.NET.Internal;
 

@@ -1,11 +1,13 @@
-# AdamSystems.ZVec.NET
+# 🚧 AdamSystems.ZVec.NET
 
-[![NuGet](https://img.shields.io/nuget/v/AdamSystems.ZVec.NET?label=NuGet)](https://www.nuget.org/packages/AdamSystems.ZVec.NET/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0%2B-512bd4.svg)](https://dotnet.microsoft.com/)
-[![ZVec C++](https://img.shields.io/badge/ZVec-1.2.3-green.svg)](https://github.com/alibaba/zvec)
 
-**The definitive .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)** — the open-source, in-process vector database built on the battle-tested Proxima search engine. Sub-millisecond HNSW search, hybrid scalar+vector filtering, full-text search, WAL durability, and memory-mapped I/O — all with zero network overhead.
+> **⚠️ UNDER CONSTRUCTION — PRE-ALPHA**  
+> This project is in early active development. APIs are unstable. Not yet available on NuGet.  
+> See [Project Status](AdamSystems.ZVecNET-Implementation-Plan.md) for what's implemented.
+
+**The definitive .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)**
 
 ---
 
