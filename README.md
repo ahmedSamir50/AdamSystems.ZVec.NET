@@ -130,7 +130,7 @@ foreach (var hit in results)
           │  IZvecFactory / IZvecCollection  │
           │  Builders / DTOs / DI        │
           ├──────────────────────────────┤
-          │  AsyncReaderWriterLock       │
+           │  Interlocked lifecycle gate   │
           │  SafeHandle Layer            │
           │  [LibraryImport] P/Invoke    │
           └─────────────┬──────────────┘
@@ -266,7 +266,7 @@ AdamSystems.ZVec.NET/
 │   │   ├── DependencyInjection/      # AddZVec, AddZVecCollection, ZVecOptions
 │   │   ├── Builders/                 # SchemaBuilder, FilterBuilder
 │   │   ├── Interop/                  # NativeMethods, SafeHandles, NativeLibraryResolver
-│   │   ├── Internal/                 # AsyncReaderWriterLock
+│   │   ├── Internal/                 # NativeDocBuilder, NativeQueryBuilder, etc.
 │   │   ├── Models/                   # ZVecDoc, ZVecStatus, enums
 │   │   ├── IndexParams/              # All 8 index param types
 │   │   ├── Query/                    # ZVecQuery, ZVecFtsQuery, ZVecReranker

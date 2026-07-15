@@ -32,7 +32,7 @@ AdamSystems.ZVec.NET is an ambitious, well-planned .NET SDK wrapping Alibaba's Z
 **However, the current code has several critical issues that must be resolved before any alpha release:**
 
 - **ZVecCollection uses a raw `nint` handle instead of SafeHandle** — this undermines the entire SafeHandle guarantee the project plan promises, and creates genuine native resource leak paths on async exceptions and thread aborts.
-- **The `AsyncReaderWriterLock` is defined but never used** — `ZVecCollection` has zero concurrency gating, meaning concurrent readers and writers can call native code simultaneously without any managed-side protection, violating the project plan's own design.
+- **The `AsyncReaderWriterLock` was defined but never used, then removed** — `ZVecCollection` has zero concurrency gating (native C++ owns thread safety; the planned managed-side RW lock was canceled due to redundancy and correctness concerns).
 - **Version constants are inconsistent** — `NativeMethods.cs` declares `ExpectedMajor=1, ExpectedMinor=0, ExpectedPatch=0`, but `.csproj` declares `Version=1.0.0-alpha.1+zvec.0.5.1`, implying the native version is 0.5.1. This will cause `ZVecAbiMismatchException` on every startup.
 - **`CreateAndOpen` and `Open` ignore `ZVecCollectionSchema` / `ZVecCollectionOptions`** — schema is passed to the constructor but never sent to native code; options are accepted but never applied.
 
@@ -112,19 +112,25 @@ private readonly SafeZvecHandle _safeHandle;
 // Destroy → explicit zvec_collection_destroy → then Dispose/close
 ```
 
-### 3.2 AsyncReaderWriterLock Is Never Used
+### 3.2 AsyncReaderWriterLock — Removed (Canceled Concept)
 
-**File:** `ZVecCollection.cs`, `AsyncReaderWriterLock.cs`
+**File:** `ZVecCollection.cs` (the `AsyncReaderWriterLock.cs` file no longer exists)
 
-The project plan (§8) specifies: *"Collection-level concurrency: readers enter read-lock, writers enter write-lock. Custom AsyncReaderWriterLock (write-preferring, no reentrancy, CancellationToken)."*
+The project plan (§8) originally specified a managed-side RW lock. That component was **removed from the codebase** — the concept was abandoned. Reasons:
 
-The `AsyncReaderWriterLock` is fully implemented (287 lines) and appears correct — but `ZVecCollection` never instantiates or uses it. This means:
+- ZVec's native C++ core already handles its own thread safety (`std::atomic<bool>` in
+  `GlobalConfig`, internal synchronization for operations).
+- Factory/collection lifecycle uses `Interlocked.CompareExchange` / `Interlocked.Exchange` —
+  sufficient for managed-side state transitions.
+- The lock had correctness concerns (see §9.1): `AsyncLocal` leakage, cancellation races,
+  no read-ownership tracking.
+- It was redundant: adding a managed lock on top of a natively-thread-safe engine adds
+  latency without providing correctness guarantees the native side doesn't already have.
 
-- **Concurrent `Insert` and `Query` calls hit native code simultaneously** — no managed-side gate exists.
-- **Concurrent `CreateIndex` and `Query` calls can corrupt native state** — the C++ side may have internal synchronization, but the project plan explicitly assumes it does NOT for DDL vs DML.
-- **The `MaxConcurrentReads` option in `ZVecCollectionOptions` is entirely ignored.**
-
-**Recommendation:** Add an `AsyncReaderWriterLock _rwLock` field to `ZVecCollection`. All read methods (`Query`, `Fetch`) enter read-lock; all write methods (`Insert`, `Update`, `Upsert`, `Delete`, DDL) enter write-lock. The lock should also enforce `MaxConcurrentReads` as a semaphore.
+**Impact:** `ZVecCollection` has zero managed-side concurrency gating. `MaxConcurrentReads`
+in `ZVecCollectionOptions` is not enforced on the managed side. Consumers who need strict
+serialization should manage their own access patterns or rely on the native engine's internal
+synchronization.
 
 ### 3.3 Version Constants Are Inconsistent
 
@@ -551,34 +557,41 @@ Despite the issues above, the codebase demonstrates several excellent design dec
 
 ## 9. Concurrency Deep-Dive
 
-### 9.1 AsyncReaderWriterLock — Correctness Analysis
+### 9.1 AsyncReaderWriterLock — Post-Mortem (Canceled)
 
-The `AsyncReaderWriterLock` implementation is the most complex component in the codebase. Here's a detailed analysis:
+The `AsyncReaderWriterLock` was **removed from the codebase** after this review. The analysis below
+documents the issues that contributed to the cancellation decision — the file no longer exists.
 
-**Correctness:**
-- ✅ Write-preferring: Writers are prioritized over readers when both are waiting.
-- ✅ Non-reentrant: `AsyncLocal<bool>` detects re-entrant write lock attempts.
-- ✅ Cancellation: Both sync and async entry points honor `CancellationToken`.
-- ✅ Idempotent release: `Interlocked.Exchange` on `_disposed` in releasers prevents double-release.
-- ✅ No sync-over-async: Sync path uses `Monitor.Wait`, async path uses `TaskCompletionSource`.
+**Originally identified correctness traits (all now moot):**
+- Write-preferring, non-reentrant, cancellation support, idempotent release, no sync-over-async.
 
-**Potential Issues:**
-- ⚠️ **Writer starvation possible:** If writers continuously arrive, readers may never enter. The write-preferring policy is by design, but it should be documented with guidance on when to use reader-preferring instead.
-- ⚠️ **`_isWriteLockHeld` is `AsyncLocal` but not flow-suppressed:** `AsyncLocal` flows to child tasks. If a write lock is acquired and then a child task tries to acquire a read lock, `_isWriteLockHeld.Value` will be `true` in the child — but the child isn't actually holding the write lock. This could cause false `InvalidOperationException` in nested async scenarios.
-- ⚠️ **No lock ownership tracking for reads:** Unlike writes, reads don't track which async context holds them. This means `ReleaseReader()` could be called from any context, including one that never entered the read lock.
-- ⚠️ **Cancellation race in `EnterReadAsync`:** The `CancellationToken.Register` callback acquires `lock(_sync)` and calls `tcs.TrySetCanceled()`. If the reader has already been admitted (fast path), the cancellation is a no-op — correct. But if the TCS has already been completed by `ReleaseWriter()`, the register callback still fires (just no-ops). This is benign but wastes a lock acquisition.
+**Issues that contributed to cancellation:**
+- ❌ **Writer starvation possible** — If writers continuously arrive, readers may never enter.
+- ❌ **`AsyncLocal` not flow-suppressed** — `_isWriteLockHeld` flows to child tasks, causing
+     false `InvalidOperationException` in nested async scenarios.
+- ❌ **No read-ownership tracking** — `ReleaseReader()` could be called from any context.
+- ❌ **Cancellation race** — `CancellationToken.Register` fires even when TCS is already
+     completed; benign but wastes a lock acquisition.
 
-**Recommendation:** Add `ExecutionContext.SuppressFlow()` around write lock acquisition to prevent `AsyncLocal` leakage. Consider adding an `AsyncLocal<int>` reader count for ownership tracking.
+**Cancellation rationale:** The lock was redundant (native C++ owns thread safety), added
+complexity without benefit, and these correctness concerns made it unsuitable for production.
 
-### 9.2 ZVecCollection — No Concurrency Protection
+### 9.2 ZVecCollection — No Concurrency Protection (Accepted Design)
 
-As noted in §3.2, `ZVecCollection` has zero concurrency gates. This is the most dangerous gap in the current implementation. Even if the native library has internal synchronization, the managed SDK should still provide:
+As noted in §3.2, `ZVecCollection` has zero managed-side concurrency gates. This was the
+original planned design for the `AsyncReaderWriterLock` — but after review, the decision
+was made to **accept this gap** and rely on the native C++ engine's internal thread safety.
 
-1. **Reader/writer gating** — to prevent `Dispose`/`Destroy` while queries are in flight.
-2. **Max concurrent reads** — to prevent resource exhaustion on the native side.
-3. **Disposed-state checks** — `ThrowIfDisposed()` is called at the start of each method, but there's a TOCTOU race: a concurrent `Dispose()` can set `_disposed = 1` between the check and the native call.
-
-**Recommendation:** Wrap every public method in a lock or reader/writer gate. At minimum, ensure `Dispose`/`Destroy` wait for in-flight operations to complete before closing.
+Key observations:
+1. **Dispose/Destroy safety** — Uses `Interlocked.Exchange` on `_disposed`/`_destroyed` flags,
+   ensuring lifecycle operations run exactly once. The TOCTOU race between `ThrowIfDisposed()`
+   and the actual native call is accepted: the native call itself must be safe to call on a
+   closing handle (which it is, per upstream C API semantics).
+2. **Max concurrent reads** — Not enforced on the managed side. The native engine manages its
+   own resource limits. If throttling is needed, consumers should use the `MaxConcurrentNativeCalls`
+   global throttle or manage their own access patterns.
+3. **No reader/writer gating** — `Dispose`/`Destroy` may be called while queries are in-flight.
+   The native `close`/`destroy` functions are designed to be safe under concurrent access.
 
 ---
 
@@ -704,7 +717,7 @@ However, there's no CI/CD for building the native binaries. The project plan des
 | # | Issue | Effort | Impact |
 |---|-------|--------|--------|
 | 1 | Replace `nint _handle` with `SafeZvecHandle` in `ZVecCollection` | 4h | Prevents native handle leaks |
-| 2 | Add `AsyncReaderWriterLock` usage to `ZVecCollection` | 3h | Enables thread-safe concurrent access |
+| 2 | ~~Add `AsyncReaderWriterLock` usage to `ZVecCollection`~~ 🗑️ Canceled | — | — |
 | 3 | Fix version constants (`ExpectedMajor/Minor/Patch`) | 0.5h | Makes the SDK actually usable |
 | 4 | Implement schema/options marshalling in `CreateAndOpen`/`Open` | 8h | Makes collections functional |
 
@@ -753,7 +766,7 @@ However, there's no CI/CD for building the native binaries. The project plan des
 |------|-------|------|
 | `ZVecCollection.cs` | ~530 | Core CRUD/Query/DDL implementation |
 | `ZVecFactory.cs` | ~200 | Factory lifecycle & collection management |
-| `AsyncReaderWriterLock.cs` | ~287 | Custom reader-writer lock |
+| ~~`AsyncReaderWriterLock.cs`~~ 🗑️ Removed | ~287 | ~~Custom reader-writer lock~~ |
 | `NativeMethods.cs` | ~441 | P/Invoke declarations |
 | `NativeDocBuilder.cs` | ~165 | Doc serialization |
 | `NativeDocUnmarshaller.cs` | ~125 | Doc deserialization |

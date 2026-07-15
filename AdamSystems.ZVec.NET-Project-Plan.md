@@ -80,7 +80,7 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 | Docs audit source | Fresh snapshot [`docs/llms-full.txt`](docs/llms-full.txt) | Re-audit when upstream docs change |
 | LINQ | On results only | Engine predicates stay FilterBuilder + query objects |
 | Public API shape | **Sync + async** entry points | Sync = lowest latency after RW lock; async = bounded offload for ASP.NET |
-| Concurrency gates | Custom internal `AsyncReaderWriterLock` (shared by sync/async) | **Not in BCL**; no `Microsoft.VisualStudio.Threading` dep. Write-preferring, no reentrancy, `CancellationToken`; unit-tested in Phase 3 |
+| Concurrency gates | Interlocked for lifecycle state; native C++ owns operation-level thread safety | No managed-side RW lock — `Interlocked.CompareExchange`/`Exchange` for factory/collection state transitions; native `std::atomic` for its own global config. The planned `AsyncReaderWriterLock` was canceled (redundant with native guarantees, correctness concerns) |
 | Native version gate | Prefer `zvec_check_version` / int major/minor/patch; string version is diagnostics only | Fail fast on ABI mismatch; never free static version string |
 | Close vs Destroy | `Dispose`/`ReleaseHandle` → `close` only; `Destroy` → `destroy` then `close` | Close releases handle (data on disk); Destroy permanently deletes collection |
 | Factory shutdown | `IZvecFactory` : `IAsyncDisposable` + `Shutdown`/`ShutdownAsync` → `zvec_shutdown` | DI singleton dispose tears down process-wide native state |
@@ -261,7 +261,7 @@ ZVec uses string-based filter expressions:
 │  └──────────────────────────┬─────────────────────────────┘  │
 │                              │                                │
 │  ┌──────────────────────────┴─────────────────────────────┐  │
-│  │  Custom AsyncReaderWriterLock + process-wide native cap  │  │
+│  │  Interlocked lifecycle gating + process-wide native cap    │  │
 │  └──────────────────────────┬─────────────────────────────┘  │
 │                              │                                │
 │  ┌──────────────────────────┴─────────────────────────────┐  │
@@ -297,7 +297,7 @@ ZVec uses string-based filter expressions:
 | **Public SDK** | Idiomatic sync + async C# API + DI; hides unsafe code | Code against `IZvecFactory` / `IZvecCollection`; never expose `IntPtr`; namespace `AdamSystems.ZVec.NET` |
 | **Builders** | `ZVecCollectionSchemaBuilder` + fluent `ZVecFilterBuilder` | Immutable outputs; no native calls |
 | **DTO Layer** | Strongly-typed data transfer objects | `init` properties; `ReadOnlyMemory<float>` for vectors |
-| **Concurrency gates** | Custom internal `AsyncReaderWriterLock` + process-wide native cap | Sync and async share the same lock; exclusive writes vs concurrent readers; no third-party NuGet |
+| **Concurrency gates** | `Interlocked` lifecycle gating + process-wide native cap | Factory/collection state transitions via `Interlocked.CompareExchange`/`Exchange`; no managed-side RW lock (canceled — native C++ handles operation-level safety) |
 | **SafeHandle Layer** | Wraps native pointers; guarantees cleanup | Prefer explicit `Dispose`; finalizer is last resort (see §8.2) |
 | **P/Invoke Layer** | `[LibraryImport]` from upstream `c_api.h` | Blittable spans where applicable; C99 `bool` as `U1` |
 | **C-API Bridge** | Upstream official `zvec_c_api` (Alibaba C bindings) | C-linkage; `zvec_error_code_t` + last-error APIs — **do not invent headers** |
@@ -339,7 +339,6 @@ AdamSystems.ZVec.NET/                    # repo / product root
 │   │       │   ├── SafeZvecSchemaHandle.cs
 │   │       │   └── NativeLibraryResolver.cs
 │   │       ├── Internal/
-│   │       │   └── AsyncReaderWriterLock.cs  # Custom; no NuGet dep
 │   │       ├── Models/
 │   │       │   ├── ZVecDoc.cs
 │   │       │   ├── ZVecStatus.cs
@@ -1136,17 +1135,16 @@ internal static class ResultBufferPool
 }
 ```
 
-### 8.4 Concurrency Model (Sync + Async + Reader-Writer)
+### 8.4 Concurrency Model (Sync + Async)
 
-The upstream C API is **synchronous/blocking**. Managed code uses a **custom internal** `AsyncReaderWriterLock` (namespace `AdamSystems.ZVec.NET.Internal`) — **not** a BCL type and **not** `Microsoft.VisualStudio.Threading`. Spec:
+The upstream C API is **synchronous/blocking**. The managed SDK uses a minimalist concurrency
+model — **no custom managed-side RW lock** — because:
 
-- Write-preferring
-- No reentrancy
-- Sync + async acquire APIs with `CancellationToken`
-- Shared by sync and async public collection methods
-- Unit-tested in Phase 3 (reader concurrency, writer exclusivity, cancel-while-waiting)
-
-Do **not** use two independent `SemaphoreSlim` instances for read vs write (that allows writer+reader to enter native concurrently).
+- ZVec's native `GlobalConfig` uses `std::atomic<bool>` for its own thread-safe init (config.h:197)
+- Factory/collection lifecycle uses `Interlocked.CompareExchange` / `Interlocked.Exchange`
+- The C++ engine is responsible for its own operation-level thread safety
+- The planned `AsyncReaderWriterLock` was **canceled** (redundant with native guarantees;
+  CoreReview flagged correctness issues: AsyncLocal leakage, cancellation races)
 
 ```
 ┌──────────────┐     ┌──────────────────┐
@@ -1154,16 +1152,8 @@ Do **not** use two independent `SemaphoreSlim` instances for read vs write (that
 │ (sync|async) │     │ (sync|async)     │
 └──────┬───────┘     └──────┬───────────┘
        │                     │
-       ▼                     ▼
-┌──────────────────────────────────────┐
-│  Per-collection custom               │
-│  AsyncReaderWriterLock (Internal)    │
-│  • EnterRead  → Query / Fetch        │  ← multiple concurrent readers
-│  • EnterWrite → Insert/Update/Delete │  ← exclusive; blocks readers
-│                 /DDL/Optimize        │
-└──────────────┬───────────────────────┘
-               │
-               ▼
+       └──────────┬──────────┘
+                  ▼
 ┌──────────────────────────────────────┐
 │  Process-wide MaxConcurrentNative    │  ← caps threads blocked in P/Invoke
 └──────────────┬───────────────────────┘
@@ -1171,27 +1161,26 @@ Do **not** use two independent `SemaphoreSlim` instances for read vs write (that
                ▼
 ┌──────────────────────────────────────┐
 │  Sync: P/Invoke on caller thread     │
-│  Async: bounded offload after lock   │  ← ConfigureAwait(false) in library
+│  Async: bounded offload after call   │  ← ConfigureAwait(false) in library
 │  → zvec_c_api                        │
 └──────────────┬───────────────────────┘
                │
                ▼
 ┌──────────────────────────────────────┐
 │  ZVec C++ Core                       │
-│  concurrent reads; exclusive writes  │
+│  (owns its own thread safety)        │
 │  + QueryThreads intra-query pool     │
 └──────────────────────────────────────┘
 ```
 
 **Rules:**
 
-1. **One custom RW lock** — Sync and async share the same internal `AsyncReaderWriterLock`. Never two independent `SemaphoreSlim` instances for read vs write; never depend on VS.Threading.
-2. **Sync path** — Acquire lock → P/Invoke on caller thread → release. Lowest latency (console, batch jobs, MAUI background).
-3. **Async path** — Acquire lock (async) → bounded offload for blocking P/Invoke → release. Never unbounded `Task.Run` per request.
-4. **Parallel reads** — Multiple Query/Fetch up to `MaxConcurrentReads` (default: `Environment.ProcessorCount`), subject to the RW lock’s reader slots.
-5. **Exclusive writes** — Mutations and DDL take the write lock; writers exclude readers.
-6. **Global throttle** — `MaxConcurrentNativeCalls` protects ASP.NET thread pools (`0` = auto).
-7. **Native query threads** — `ZVecOptions.QueryThreads` is orthogonal (intra-query parallelism).
+1. **No managed-side RW lock** — The native C++ engine handles concurrent reads and exclusive writes internally. Managed code uses `Interlocked` for lifecycle state transitions only.
+2. **Sync path** — P/Invoke on caller thread. Lowest latency (console, batch jobs, MAUI background).
+3. **Async path** — Bounded offload for blocking P/Invoke. Never unbounded `Task.Run` per request.
+4. **Global throttle** — `MaxConcurrentNativeCalls` protects ASP.NET thread pools (`0` = auto).
+5. **Native query threads** — `ZVecOptions.QueryThreads` is orthogonal (intra-query parallelism).
+6. **Dispose/Destroy safety** — `Interlocked.Exchange` on `_disposed`/`_destroyed` flags ensures lifecycle operations run exactly once, even under concurrent calls.
 8. **Batch over chatty P/Invoke** — Prefer list overloads.
 9. **Zero-copy vectors** — Pin only for the native call duration.
 10. **Cancellation** — Honored while waiting on the lock and before entering native. Mid-P/Invoke cancel is best-effort — document that limitation.
@@ -1555,110 +1544,11 @@ For **systematic concurrency testing**, add:
 <!-- No special testing package — use raw Task + xUnit assertions -->
 ```
 
-#### 10.3.2 AsyncReaderWriterLock Test Suite
+#### 10.3.2 ~~AsyncReaderWriterLock~~ Test Suite
 
-**Correctness Tests (~10 tests)**
-
-| # | Test Name | What It Verifies |
-|---|-----------|-----------------|
-| 1 | `MultipleReaders_CanEnterConcurrently` | 8 readers enter simultaneously, all complete |
-| 2 | `WriteBlocks_Readers` | Writer holds lock; readers wait until release |
-| 3 | `WritePreferring_NewReadersBlocked` | Pending write blocks new readers (write-preference) |
-| 4 | `CancelWhileWaiting_ThrowsOperationCanceled` | `CancellationToken` cancels while waiting on lock |
-| 5 | `WriteReentrancy_Throws` | Same thread cannot re-acquire write lock |
-| 6 | `ReadReentrancy_Allowed` | Same thread can acquire read lock multiple times (if supported) |
-| 7 | `SyncAndAsync_ShareSameLock` | Sync `EnterRead` + async `EnterWriteAsync` share one lock object |
-| 8 | `Dispose_ReleaseLock` | Disposing the lock handle releases the lock |
-| 9 | `MultipleWriters_Serialized` | Two concurrent writers execute sequentially, never simultaneously |
-| 10 | `ReaderUpgradesToWriter_NotSupported` | Read-lock holder cannot upgrade to write lock (documented limitation) |
-
-**Concurrency Stress Tests (~5 tests)**
-
-```csharp
-[Fact]
-public async Task Stress_8Readers_2Writers_NoDeadlock()
-{
-    const int iterations = 100;
-    const int readerCount = 8;
-    const int writerCount = 2;
-    var rwLock = new AsyncReaderWriterLock();
-    var value = 0;
-
-    async Task reader(int id)
-    {
-        for (int i = 0; i < iterations; i++)
-        {
-            using var handle = await rwLock.EnterReadAsync(default);
-            _ = value;
-        }
-    }
-
-    async Task writer(int id)
-    {
-        for (int i = 0; i < iterations; i++)
-        {
-            using var handle = await rwLock.EnterWriteAsync(default);
-            Interlocked.Increment(ref value);
-        }
-    }
-
-    var tasks = new List<Task>();
-    for (int r = 0; r < readerCount; r++) tasks.Add(reader(r));
-    for (int w = 0; w < writerCount; w++) tasks.Add(writer(w));
-
-    await Task.WhenAll(tasks);
-    Interlocked.CompareExchange(ref value, 0, 0).Should().Be(writerCount * iterations);
-}
-
-[Fact]
-public async Task Stress_CancelWhile100ReadersWaiting()
-{
-    var rwLock = new AsyncReaderWriterLock();
-    using var writeHandle = await rwLock.EnterWriteAsync(default);
-
-    var cts = new CancellationTokenSource();
-    var tasks = Enumerable.Range(0, 100)
-        .Select(_ => rwLock.EnterReadAsync(cts.Token).AsTask())
-        .ToList();
-
-    cts.Cancel();
-
-    foreach (var t in tasks)
-    {
-        await t.Invoking(async x => await x)
-            .Should().ThrowAsync<OperationCanceledException>();
-    }
-}
-```
-
-**Model-Based Concurrency Test (Advanced)**
-
-Use a **linearizability checker** pattern:
-
-```csharp
-// Sequential specification of the lock behavior
-class LockModel
-{
-    private int _activeReaders = 0;
-    private bool _writerActive = false;
-
-    public bool TryEnterRead() => !_writerActive;
-    public bool TryEnterWrite() => !_writerActive && _activeReaders == 0;
-    public void ExitRead() => _activeReaders--;
-    public void ExitWrite() => _writerActive = false;
-}
-
-// Run 1000 random interleavings and verify the actual lock
-// never violates the model's invariants.
-[Fact]
-public async Task Linearizability_RandomInterleavings()
-{
-    var rng = new Random(42);
-    var rwLock = new AsyncReaderWriterLock();
-    var model = new LockModel();
-    // ... interleaved operations with model checking
-}
-```
+**🗑️ Canceled** — This subsection described correctness + stress + linearizability tests for the
+`AsyncReaderWriterLock` component, which was removed from the codebase. The native C++ engine
+handles its own thread safety; no managed-side RW lock exists to test.
 
 #### 10.3.3 Collection-Level Concurrency Tests (~8 tests)
 
@@ -1906,7 +1796,7 @@ public class QueryThroughputBench
 | 3.0 | `IZvecFactory` / `IZvecCollection` sync+async + DI + Shutdown | .NET Lead | 2.2 | 1.5d |
 | 3.1 | DTOs + SchemaBuilder + typed query params | .NET Lead | 2.2 | 2d |
 | 3.2 | `ZVecFactory` (init, first-init-wins, version gate, create/open, shutdown) | .NET Lead | 2.3, 3.0, 3.1 | 2d |
-| 3.3 | Custom `Internal.AsyncReaderWriterLock` + unit tests (write-prefer, cancel) | .NET Lead | 3.0 | 2d |
+| 3.3 | ~~Custom `Internal.AsyncReaderWriterLock` + unit tests~~ 🗑️ Canceled | — | — | — |
 | 3.4 | `ZVecCollection` CRUD sync+async + RW lock + close-vs-destroy | .NET Lead | 3.2, 3.3 | 4d |
 | 3.5 | Query sync+async (single + multi-vector) | .NET Lead | 3.4 | 3d |
 | 3.6 | Optimize / Destroy sync+async (destroy then close) | .NET Lead | 3.2 | 0.5d |
@@ -2241,16 +2131,12 @@ See §13.3 for the dedicated cross-compilation strategy. Key points: CI-first wi
 
 ---
 
-#### R9: Dual-semaphore race if RW lock regresses
+#### R9: Dual-semaphore race ~~if RW lock regresses~~
 
-1. **Single custom lock:** `AsyncReaderWriterLock` is the ONLY concurrency primitive. Code review checklist item: "No `SemaphoreSlim`, no `ReaderWriterLockSlim`, no `Monitor.Enter` on the native call path."
-2. **Static analysis:** Add a Roslyn analyzer (or simple `grep` in CI) that flags any `new SemaphoreSlim` or `new ReaderWriterLockSlim` in the `AdamSystems.ZVec.NET` project:
-   ```yaml
-   # CI step
-   - name: Check no dual-lock regression
-     run: |
-       ! grep -rn "SemaphoreSlim\|ReaderWriterLockSlim" src/Core/AdamSystems.ZVec.NET/
-   ```
+**🗑️ No longer applicable** — The `AsyncReaderWriterLock` was canceled; there is no custom
+managed-side lock to regress against. Native C++ owns all operation-level thread safety.
+Managed code uses `Interlocked` for lifecycle state only — the `SemaphoreSlim`/`ReaderWriterLockSlim`
+restriction does not apply.
 
 ---
 
