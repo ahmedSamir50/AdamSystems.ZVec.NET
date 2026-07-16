@@ -1,3 +1,4 @@
+using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -12,6 +13,7 @@ internal static class NativeLibraryResolver
     private static bool _useMock = false;
     private static string? _mockLibraryPath = null;
     private static bool _isRegistered = false;
+    private static IntPtr _cachedHandle = IntPtr.Zero;
     private static readonly object _lock = new();
 
 #pragma warning disable CA2255
@@ -53,16 +55,40 @@ internal static class NativeLibraryResolver
         _useMock = false;
     }
 
+    /// <summary>
+    /// Attempts to load the native library by probing well-known paths,
+    /// then falls back to standard .NET resolution.
+    /// </summary>
     internal static void EnsureLoaded()
     {
+        // Try custom probe paths first (runtimes/{rid}/native/ layout).
+        if (_cachedHandle != IntPtr.Zero)
+            return;
+
+        string baseDir = AppContext.BaseDirectory;
+        string rid = RuntimeInformation.RuntimeIdentifier;
+        string[] probePaths = [
+            Path.Combine(baseDir, "runtimes", rid, "native", NativeMethods.LibraryName + ".dll"),
+            Path.Combine(baseDir, NativeMethods.LibraryName + ".dll"),
+        ];
+
+        foreach (var path in probePaths)
+        {
+            if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
+            {
+                _cachedHandle = handle;
+                return;
+            }
+        }
+
+        // Fall back to standard .NET native library resolution.
         try
         {
-            // Calling NativeLibrary.Load validates existence.
             _ = NativeLibrary.Load(NativeMethods.LibraryName, typeof(NativeMethods).Assembly, null);
         }
         catch (DllNotFoundException)
         {
-            // Call our resolver directly to throw the custom RID exception
+            // Call our resolver directly to throw the custom RID exception.
             Resolve(NativeMethods.LibraryName, typeof(NativeMethods).Assembly, null);
             throw;
         }
@@ -72,15 +98,23 @@ internal static class NativeLibraryResolver
     {
         if (name != NativeMethods.LibraryName) return IntPtr.Zero;
 
+        // Mock path takes priority — when mock is set, never fall through to real library.
         if (_useMock && _mockLibraryPath is not null)
         {
             if (NativeLibrary.TryLoad(_mockLibraryPath, out var handle))
                 return handle;
+
+            throw new DllNotFoundException(
+                $"ZVec native library not found: mock library path '{_mockLibraryPath}' does not exist.");
         }
 
-        // Fall back to standard native resolution rules
+        // Return cached handle if already loaded.
+        if (_cachedHandle != IntPtr.Zero)
+            return _cachedHandle;
+
+        // Fall back to standard native resolution rules.
         if (NativeLibrary.TryLoad(name, assembly, searchPath, out var realHandle))
-            return realHandle;
+            return _cachedHandle = realHandle;
 
         throw new DllNotFoundException(
             $"ZVec native library not found for RID '{RuntimeInformation.RuntimeIdentifier}'. " +

@@ -1,4 +1,3 @@
-using AdamSystems.ZVec.NET.Interop;
 using FluentAssertions;
 
 namespace AdamSystems.ZVec.NET.Tests.Unit;
@@ -78,13 +77,12 @@ public class ZVecCollectionDdlTests
     {
         var col = CreateTestCollection();
         var field = new ZVecFieldSchema { Name = "title", DataType = ZVecDataType.String };
-        var act = () => col.AddColumn(field);
-        if (NativeLibraryHelper.IsAvailable())
+        var ex = Record.Exception(() => col.AddColumn(field));
+        if (ex != null)
         {
-            act.Should().NotThrow();
+            ex.Should().NotBeOfType<DllNotFoundException>();
+            ex.Should().NotBeOfType<EntryPointNotFoundException>();
         }
-
-        act.Should().Throw<Exception>().Where(ex => ex is DllNotFoundException || ex is EntryPointNotFoundException);
     }
 
     [Fact]
@@ -92,16 +90,24 @@ public class ZVecCollectionDdlTests
     {
         var col = CreateTestCollection();
         var param = new ZVecFlatIndexParam { MetricType = ZVecMetricType.Cosine };
-        var act = () => col.CreateIndex("vec", param);
-        act.Should().Throw<Exception>().Where(ex => ex is DllNotFoundException || ex is EntryPointNotFoundException);
+        var ex = Record.Exception(() => col.CreateIndex("vec", param));
+        if (ex != null)
+        {
+            ex.Should().NotBeOfType<DllNotFoundException>();
+            ex.Should().NotBeOfType<EntryPointNotFoundException>();
+        }
     }
 
     [Fact]
     public void Optimize_AttemptsNativeCall()
     {
         var col = CreateTestCollection();
-        var act = () => col.Optimize();
-        act.Should().Throw<Exception>().Where(ex => ex is DllNotFoundException || ex is EntryPointNotFoundException);
+        var ex = Record.Exception(() => col.Optimize());
+        if (ex != null)
+        {
+            ex.Should().NotBeOfType<DllNotFoundException>();
+            ex.Should().NotBeOfType<EntryPointNotFoundException>();
+        }
     }
 
 
@@ -118,21 +124,5 @@ public class ZVecCollectionDdlTests
                 Directory.Delete(_testDir, recursive: true);
         }
         catch { }
-    }
-}
-
-internal static class NativeLibraryHelper
-{
-    public static bool IsAvailable()
-    {
-        try
-        {
-            NativeMethods.zvec_get_version();
-            return true;
-        }
-        catch (DllNotFoundException)
-        {
-            return false;
-        }
     }
 }

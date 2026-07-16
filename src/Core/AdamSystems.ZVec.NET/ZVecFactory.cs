@@ -69,6 +69,7 @@ public sealed class ZVecFactory : IZvecFactory
 
         try
         {
+            NativeLibraryResolver.EnsureLoaded();
             CheckAbiVersion();
             ApplyNativeConfig(options);
         }
