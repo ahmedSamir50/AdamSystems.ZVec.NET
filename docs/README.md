@@ -2,7 +2,7 @@
 
 | File | Source | Purpose |
 |------|--------|---------|
-| [llms-full.txt](llms-full.txt) | https://zvec.org/llms-full.txt | Full upstream doc dump for DB coverage audits (see project plan Â§2.0) |
+| [llms-full.txt](llms-full.txt) | https://zvec.org/llms-full.txt | Full upstream doc dump for DB coverage audits (see project plan §2.0) |
 
 Re-fetch when re-auditing:
 

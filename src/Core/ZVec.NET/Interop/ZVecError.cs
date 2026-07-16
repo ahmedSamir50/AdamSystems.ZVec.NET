@@ -82,7 +82,7 @@ internal static class ZVecError
 
             // Read fields: code (int at offset 0), message (IntPtr), file (IntPtr), line (int), function (IntPtr)
             int offset = 0;
-            // code (int) â€” skip, we already have it
+            // code (int) — skip, we already have it
             offset += sizeof(int);
             // padding to IntPtr alignment
             offset = (offset + IntPtr.Size - 1) & ~(IntPtr.Size - 1);

@@ -30,7 +30,7 @@ internal sealed class SafeZvecHandle : SafeZvecHandleBase
         }
 
         // US-E5.1: SafeHandle finalizer / Dispose safety net: CLOSE ONLY.
-        // Never call zvec_collection_destroy here â€” that permanently deletes on-disk data.
+        // Never call zvec_collection_destroy here — that permanently deletes on-disk data.
         if (!IsInvalid)
         {
             _ = NativeMethods.zvec_collection_close(handle);

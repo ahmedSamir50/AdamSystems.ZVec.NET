@@ -7,6 +7,6 @@ public enum ZVecQuantizeType
     Fp16 = 1,
     Int8 = 2,
     Int4 = 3,
-    /// <summary>Defined in <c>type.h</c>; missing from <c>c_api.h</c> macros â€” value is 4.</summary>
+    /// <summary>Defined in <c>type.h</c>; missing from <c>c_api.h</c> macros — value is 4.</summary>
     Rabitq = 4
 }

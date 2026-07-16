@@ -36,7 +36,7 @@ public class ZVecDocTests
         var mem = new ReadOnlyMemory<float>(vec);
         var doc = ZVecDoc.Create("d1", denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["v"] = mem });
         doc.DenseVectors["v"].Span[0].Should().Be(0f);
-        // Same underlying array â€” no copy
+        // Same underlying array — no copy
         doc.DenseVectors["v"].Equals(mem).Should().BeTrue();
     }
 }
