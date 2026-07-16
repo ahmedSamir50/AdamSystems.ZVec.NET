@@ -1,4 +1,4 @@
-# ZVec.Native â€” Windows build guide
+# ZVec.Native — Windows build guide
 
 This folder is a thin CMake wrapper around the Alibaba `external/zvec` submodule. It builds the **upstream official** fat C API shared library:
 
@@ -15,7 +15,7 @@ There is no separate stub bridge DLL. C# / NuGet P/Invoke loads `zvec_c_api` and
 | Tool | Notes |
 |------|--------|
 | Visual Studio 2026 | Desktop C++ workload; use **Developer PowerShell for VS 2026** (or `VsDevCmd.bat`) so `cl.exe` is on PATH |
-| CMake â‰¥ 3.26 | Bundled with VS is fine |
+| CMake ≥ 3.26 | Bundled with VS is fine |
 | Git | Submodule + Snowball scripts; also provides `perl` / `env` under `Git\usr\bin` |
 | Scoop: `ninja`, `make`, `mingw`, `perl` | Required on Windows for Ninja builds and Snowball host codegen |
 
@@ -43,7 +43,7 @@ Even with long paths enabled, MSBuild **FileTracker** can still fail at ~260 cha
 
 ### Antivirus noise
 
-AV may quarantine unrelated Scoop files under MinGW `opt\` (e.g. `tdbcmysql112.dll`). Ignore those â€” the build does not use them. Escalate only if AV blocks `gcc.exe`, `make.exe`, `ninja.exe`, or MinGW `bin\` runtimes that `gcc` needs.
+AV may quarantine unrelated Scoop files under MinGW `opt\` (e.g. `tdbcmysql112.dll`). Ignore those — the build does not use them. Escalate only if AV blocks `gcc.exe`, `make.exe`, `ninja.exe`, or MinGW `bin\` runtimes that `gcc` needs.
 
 ---
 
@@ -62,7 +62,7 @@ These scripts:
 1. Call VsDevCmd (MSVC first on PATH)
 2. Append Git `usr\bin`, Scoop shims, MinGW `bin`
 3. Set `CMAKE_GENERATOR=Ninja` and `CMAKE_POLICY_VERSION_MINIMUM=3.5`
-4. Configure/build **in-tree** `build\` with `-G Ninja` and `SNOWBALL_HOST_CC` â†’ MinGW `gcc`
+4. Configure/build **in-tree** `build\` with `-G Ninja` and `SNOWBALL_HOST_CC` → MinGW `gcc`
 
 First configure + build is long (Arrow, RocksDB, protobuf, etc.). Arrow alone can take many minutes after step ~948.
 
@@ -132,8 +132,8 @@ This tweak lives inside the submodule, so a clean upgrade removes it.
 
 1. Update the submodule (see below).
 2. Try a Windows Release build.
-3. If Arrow builds fine â†’ nothing to do.
-4. If `FTK1011` returns â†’ re-apply the same MSVC/Ninja change in `external/zvec/thirdparty/arrow/CMakeLists.txt`.
+3. If Arrow builds fine → nothing to do.
+4. If `FTK1011` returns → re-apply the same MSVC/Ninja change in `external/zvec/thirdparty/arrow/CMakeLists.txt`.
 
 Keep the change local / uncommitted in the submodule unless you later fork/patch differently.
 

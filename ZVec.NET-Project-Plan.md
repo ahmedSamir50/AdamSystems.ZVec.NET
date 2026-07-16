@@ -1,6 +1,6 @@
-# ZVec.NET â€” Production-Grade Project Plan
+# ZVec.NET — Production-Grade Project Plan
 
-> **ZVec** is Alibaba's open-source, in-process vector database â€” the "SQLite of Vector DBs" â€” built on the battle-tested Proxima search engine. Written in C++, it delivers sub-millisecond HNSW search, hybrid scalar+vector filtering, full-text search, WAL durability, and memory-mapped I/O with zero network overhead.
+> **ZVec** is Alibaba's open-source, in-process vector database — the "SQLite of Vector DBs" — built on the battle-tested Proxima search engine. Written in C++, it delivers sub-millisecond HNSW search, hybrid scalar+vector filtering, full-text search, WAL durability, and memory-mapped I/O with zero network overhead.
 >
 > **ZVec.NET** is Adam Systems' .NET NuGet package that wraps ZVec's C++ core via the official `zvec_c_api` and exposes an idiomatic C# API (sync + async) with zero-allocation vector pipelines. Public identity follows the Newtonsoft-style pattern: **company (AdamSystems) + product (ZVec) + framework (.NET)**.
 
@@ -16,15 +16,15 @@
 6. [P/Invoke & Marshalling Layer](#6-pinvoke--marshalling-layer)
 7. [Public SDK API Design](#7-public-sdk-api-design)
 8. [Memory & Performance Strategy](#8-memory--performance-strategy)
-9. [Cross-Platform NuGet Packaging](#9-cross-platform-nuget-packaging) *(incl. Â§9.3 Versioning & Â§9.4 Announcing to Upstream)*
+9. [Cross-Platform NuGet Packaging](#9-cross-platform-nuget-packaging) *(incl. §9.3 Versioning & §9.4 Announcing to Upstream)*
 10. [Testing Strategy](#10-testing-strategy)
 11. [Benchmark Strategy](#11-benchmark-strategy)
 12. [Work Breakdown Structure (WBS)](#12-work-breakdown-structure-wbs)
 13. [CI/CD Pipeline](#13-cicd-pipeline)
 14. [Risk Register](#14-risk-register)
 15. [Timeline & Milestones](#15-timeline--milestones)
-16. [Appendix A â€” ZVec Enum Reference](#appendix-a--zvec-enum-reference)
-17. [Appendix B â€” ZVec Method Signature Reference](#appendix-b--zvec-method-signature-reference)
+16. [Appendix A — ZVec Enum Reference](#appendix-a--zvec-enum-reference)
+17. [Appendix B — ZVec Method Signature Reference](#appendix-b--zvec-method-signature-reference)
 
 ---
 
@@ -32,7 +32,7 @@
 
 ### 1.1 Vision
 
-Deliver the **definitive .NET SDK** for ZVec â€” the same raw performance as the C++ core, with the ergonomics .NET developers expect. The SDK should feel like it was written by Microsoft, not by a C++ engineer who learned C# last week.
+Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the C++ core, with the ergonomics .NET developers expect. The SDK should feel like it was written by Microsoft, not by a C++ engineer who learned C# last week.
 
 ### 1.2 Goals
 
@@ -40,19 +40,19 @@ Deliver the **definitive .NET SDK** for ZVec â€” the same raw performance a
 |---|------|---------------|
 | G1 | **Idiomatic C# API** | Sync + async entry points; .NET naming guidelines; `ValueTask` for async; `IAsyncEnumerable` for streaming where useful |
 | G2 | **Zero-allocation vector pipeline** | `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` on vector hot paths; no `float[]` copies. Scalar `Fields` may box (documented) |
-| G3 | **Sub-millisecond overhead** | Sync P/Invoke marshalling overhead < 50 Âµs on a 768-dim vector query (verified by BenchmarkDotNet); async path uses bounded offload |
+| G3 | **Sub-millisecond overhead** | Sync P/Invoke marshalling overhead < 50 µs on a 768-dim vector query (verified by BenchmarkDotNet); async path uses bounded offload |
 | G4 | **Cross-platform single NuGet** | One `.nupkg` (`ZVec.NET`) with native binaries for win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 |
 | G5 | **Edge-ready / MAUI-compatible** | Memory-mapped I/O exposed; resource governance knobs exposed; no server dependency |
 | G6 | **Full in-process DB / C++ wrap** | 100% of the **Vector Database** API that `zvec_c_api` / C++ exposes, with managed shapes aligned to Python/Node **DB** docs in [llms-full](https://zvec.org/llms-full.txt) (collections, schema, CRUD, query modes, indexes, schema evolution, config). **Not** 100% of AI Integration packages (embeddings, MCP, skills, model rerankers) |
 | G7 | **SafeHandle guarantees** | Every native pointer wrapped in `SafeHandle`; consumers **must** `Dispose` / `await using`; finalizer is a safety net only |
-| G8 | **Comprehensive test & benchmark suite** | â‰¥90% line coverage; BenchmarkDotNet comparison vs. raw P/Invoke baseline |
+| G8 | **Comprehensive test & benchmark suite** | ≥90% line coverage; BenchmarkDotNet comparison vs. raw P/Invoke baseline |
 
 ### 1.3 Non-Goals (v1)
 
-- Embedding generation (dense/sparse) â€” AI Integration; left to user or separate package
-- MCP server integration â€” AI Integration; not part of `zvec_c_api`
-- Skills / agent tooling packages â€” AI Integration
-- Model-based / API rerankers (e.g. Qwen, local cross-encoder) â€” AI Integration; **in-DB** fusion rerankers (`Rrf` / `Weighted` via multi-query C API) **are** in scope
+- Embedding generation (dense/sparse) — AI Integration; left to user or separate package
+- MCP server integration — AI Integration; not part of `zvec_c_api`
+- Skills / agent tooling packages — AI Integration
+- Model-based / API rerankers (e.g. Qwen, local cross-encoder) — AI Integration; **in-DB** fusion rerankers (`Rrf` / `Weighted` via multi-query C API) **are** in scope
 - Custom `IQueryable` / LINQ provider over the engine (LINQ applies to **query results** only)
 - Blazor WebAssembly hosting (no native `zvec_c_api` RID for WASM in v1; Blazor Server is supported)
 
@@ -66,24 +66,24 @@ Deliver the **definitive .NET SDK** for ZVec â€” the same raw performance a
 |----------|--------|-----------|
 | Public identity | Namespace, assembly, PackageId = **`ZVec.NET`** |  ZVec (wrapped product) + .NET (framework). Consumers import only this name |
 | Inner project path | `src/Core/...` for layout only | Folder/project may use `Core` internally; **never** ship a public `*.Core` namespace or PackageId |
-| .NET Target | `net8.0` â€“ `net10.0` (pack `lib/net8.0` when identical) | `net8.0` is LTS; net9/10 fall back to net8.0 asset if no TFM-specific code |
+| .NET Target | `net8.0` – `net10.0` (pack `lib/net8.0` when identical) | `net8.0` is LTS; net9/10 fall back to net8.0 asset if no TFM-specific code |
 | C++ Standard | C++17 | Matches ZVec upstream |
 | License | MIT via `<PackageLicenseExpression>` | Correct NuGet metadata property (not `<License>`) |
-| Strong-naming | Yes, open signing key (`.snk` committed to repo) | Enterprise / strong-named consumer compatibility. The `.snk` is an **identity key** (not a security secret) â€” like SQLitePCLRaw's approach. Generated once via `sn -k ZVec.NET.snk` and placed in `build/`. It lets strong-named consumers reference our assembly |
+| Strong-naming | Yes, open signing key (`.snk` committed to repo) | Enterprise / strong-named consumer compatibility. The `.snk` is an **identity key** (not a security secret) — like SQLitePCLRaw's approach. Generated once via `sn -k ZVec.NET.snk` and placed in `build/`. It lets strong-named consumers reference our assembly |
 | Test Framework | xUnit + FluentAssertions | User decision |
 | Mock Strategy | C++ mock C-API DLL (primary); managed `SetDllImportResolver` mock optional | Unit tests without full native rebuild; integration uses real binaries |
 | NuGet Layout | Single `.nupkg` with `runtimes/{rid}/native/` | Runtime resolves RID natives; no custom `build/*.props` for RID packing |
 | P/Invoke Style | `[LibraryImport]` (source generator) | Compile-time marshalling; faster than `[DllImport]` |
 | Public API style | DI-first (`IZvecFactory` / `IZvecCollection`) + selective builders | Hostable in ASP.NET Core, MAUI, Blazor Server |
 | Factory / Builder | Factory for open/create; builders for schema + filters | Immutable configs vs native resource lifecycle |
-| C++ type surface (v1) | Full wrap â€” every `type.h` enum + every index-param class | Match C++ library; align with [llms-full.txt](https://zvec.org/llms-full.txt) DB sections |
+| C++ type surface (v1) | Full wrap — every `type.h` enum + every index-param class | Match C++ library; align with [llms-full.txt](https://zvec.org/llms-full.txt) DB sections |
 | Docs audit source | Fresh snapshot [`docs/llms-full.txt`](docs/llms-full.txt) | Re-audit when upstream docs change |
 | LINQ | On results only | Engine predicates stay FilterBuilder + query objects |
 | Public API shape | **Sync + async** entry points | Sync = lowest latency after RW lock; async = bounded offload for ASP.NET |
-| Concurrency gates | Interlocked for lifecycle state; native C++ owns operation-level thread safety | No managed-side RW lock â€” `Interlocked.CompareExchange`/`Exchange` for factory/collection state transitions; native `std::atomic` for its own global config. The planned `AsyncReaderWriterLock` was canceled (redundant with native guarantees, correctness concerns) |
+| Concurrency gates | Interlocked for lifecycle state; native C++ owns operation-level thread safety | No managed-side RW lock — `Interlocked.CompareExchange`/`Exchange` for factory/collection state transitions; native `std::atomic` for its own global config. The planned `AsyncReaderWriterLock` was canceled (redundant with native guarantees, correctness concerns) |
 | Native version gate | Prefer `zvec_check_version` / int major/minor/patch; string version is diagnostics only | Fail fast on ABI mismatch; never free static version string |
-| Close vs Destroy | `Dispose`/`ReleaseHandle` â†’ `close` only; `Destroy` â†’ `destroy` then `close` | Close releases handle (data on disk); Destroy permanently deletes collection |
-| Factory shutdown | `IZvecFactory` : `IAsyncDisposable` + `Shutdown`/`ShutdownAsync` â†’ `zvec_shutdown` | DI singleton dispose tears down process-wide native state |
+| Close vs Destroy | `Dispose`/`ReleaseHandle` → `close` only; `Destroy` → `destroy` then `close` | Close releases handle (data on disk); Destroy permanently deletes collection |
+| Factory shutdown | `IZvecFactory` : `IAsyncDisposable` + `Shutdown`/`ShutdownAsync` → `zvec_shutdown` | DI singleton dispose tears down process-wide native state |
 | First-init-wins | First successful `Initialize` wins; later calls no-op | Log warning if subsequent `ZVecOptions` differ (incl. `MemoryLimitMb`) |
 | Enum / ABI source of truth | Upstream `zvec/db/type.h` + `c_api.h` only | Prefer `type.h` when C macros lag; **never** invent parallel headers or numeric values |
 | Bool marshalling | `[MarshalAs(UnmanagedType.U1)]` for C99 `bool` | Not `UnmanagedType.Bool` (4-byte Win32 BOOL) |
@@ -100,38 +100,38 @@ For all current and future development tasks, the following strict rules apply:
 
 ## 2. ZVec API Surface Catalog
 
-This catalog covers the **Vector Database** surface that maps to our submodule (`zvec_c_api` / C++). It is aligned to the DB sections of [llms-full.txt](https://zvec.org/llms-full.txt) / [llms.txt](https://zvec.org/llms.txt). **AI Integration** (Embedding, MCP, Skills, model rerankers) is out of scope for this package â€” see Â§1.3.
+This catalog covers the **Vector Database** surface that maps to our submodule (`zvec_c_api` / C++). It is aligned to the DB sections of [llms-full.txt](https://zvec.org/llms-full.txt) / [llms.txt](https://zvec.org/llms.txt). **AI Integration** (Embedding, MCP, Skills, model rerankers) is out of scope for this package — see §1.3.
 
 Every **DB** item below that has a C API (or `type.h`) counterpart **must** have a corresponding C# wrapper. Features documented for Python/Node but **missing from `c_api.h`** are listed as **binding gaps** (use `type.h` numeric values where possible; do not invent P/Invoke).
 
-> **Full audit completed:** Cross-checked `c_api.h` (4,144 lines) Ã— `type.h` (146 lines). Only 2 binding gaps remain (`HNSW_RABITQ=4`, `RABITQ=4`), both resolved via `type.h` values. All other DB features have matching C API functions.
+> **Full audit completed:** Cross-checked `c_api.h` (4,144 lines) × `type.h` (146 lines). Only 2 binding gaps remain (`HNSW_RABITQ=4`, `RABITQ=4`), both resolved via `type.h` values. All other DB features have matching C API functions.
 
-### 2.0 Coverage matrix (DB docs Ã— C++ Ã— plan)
+### 2.0 Coverage matrix (DB docs × C++ × plan)
 
-Audit basis: remote `https://zvec.org/llms-full.txt` saved as [`docs/llms-full.txt`](docs/llms-full.txt) (2026-07-14, ~715 KB), cross-checked against `c_api.h` + `type.h` and this plan Â§7.
+Audit basis: remote `https://zvec.org/llms-full.txt` saved as [`docs/llms-full.txt`](docs/llms-full.txt) (2026-07-14, ~715 KB), cross-checked against `c_api.h` + `type.h` and this plan §7.
 
-| DB feature (llms-full / llms.txt) | `c_api.h` / `type.h` | Plan Â§7 / catalog | Status |
+| DB feature (llms-full / llms.txt) | `c_api.h` / `type.h` | Plan §7 / catalog | Status |
 |----------------------------------|----------------------|-------------------|--------|
 | Global config / init | `zvec_initialize`, config/log APIs, `zvec_get_version*` | `IZvecFactory.Initialize` / `InitializeAsync`, first-init-wins, `ZVecOptions`, version gate | Covered |
 | Global shutdown | `zvec_shutdown` | `Shutdown` / `ShutdownAsync`, factory `IAsyncDisposable` | Covered |
 | Create and open | `zvec_collection_create_and_open` | `CreateAndOpen` / `CreateAndOpenAsync` | Covered |
-| Open / close / destroy | `zvec_collection_open` / `close` / `destroy` | `Open` / `OpenAsync`; `Dispose`â†’close only; `Destroy`â†’destroy+close | Covered |
+| Open / close / destroy | `zvec_collection_open` / `close` / `destroy` | `Open` / `OpenAsync`; `Dispose`→close only; `Destroy`→destroy+close | Covered |
 | Inspect (schema/stats/options/path) | `zvec_collection_get_schema` / `stats` / `options` | Collection properties | Covered |
 | Optimize | `zvec_collection_optimize` | `Optimize` / `OptimizeAsync` | Covered |
 | Schema + field/vector indexes | schema + `zvec_index_params_*` | SchemaBuilder + IndexParams | Covered |
 | Schema evolution (add/alter/drop column, create/drop index) | `zvec_collection_add_column`, schema alter/drop, index add/drop | DDL methods on `IZvecCollection` (sync + async) | Covered |
 | Insert / Upsert / Update / Delete / DeleteByFilter | matching `zvec_collection_*` | Sync + `*Async` CRUD | Covered |
-| Fetch | `zvec_collection_fetch` | `Fetch` / `FetchAsync` (single â†’ `ZVecDoc?`; batch â†’ dictionary) | Covered |
+| Fetch | `zvec_collection_fetch` | `Fetch` / `FetchAsync` (single → `ZVecDoc?`; batch → dictionary) | Covered |
 | Query single / multi / filter / hybrid | `zvec_collection_query`, multi-query APIs | `Query` / `QueryAsync` | Covered |
 | Full-text query | FTS query params + collection query | `ZVecFtsQuery` | Covered |
 | Group query | `zvec_group_by_vector_query_*` | `QueryGroupBy` / `QueryGroupByAsync` / `ZVecGroupByQuery` | Covered |
 | In-DB RRF / Weighted fusion | `zvec_multi_query_set_rerank_rrf` / `_weighted` | `ZVecRrfReranker` / `ZVecWeightedReranker` | Covered |
 | Indexes: HNSW, Flat, IVF, Invert, FTS | index type macros + params APIs | IndexParams + Appendix A | Covered |
 | Indexes: DiskANN, Vamana | types + query/index params in C API | `ZVecDiskAnnIndexParam` / `ZVecVamanaIndexParam` | Covered (DiskANN: Linux-only per docs) |
-| Index: HNSW-RaBitQ | **`type.h` = 4**; **no `#define` in `c_api.h`** | `ZVecHnswRabitqIndexParam` | **Binding gap** â€” pass value `4` from `type.h` until upstream adds macro |
-| Quantize `RABITQ` | **`type.h` = 4**; C quantize macros stop at INT4 | `ZVecQuantizeType.Rabitq` | **Binding gap** â€” same as above |
+| Index: HNSW-RaBitQ | **`type.h` = 4**; **no `#define` in `c_api.h`** | `ZVecHnswRabitqIndexParam` | **Binding gap** — pass value `4` from `type.h` until upstream adds macro |
+| Quantize `RABITQ` | **`type.h` = 4**; C quantize macros stop at INT4 | `ZVecQuantizeType.Rabitq` | **Binding gap** — same as above |
 | All `DataType` ABI values | `ZVEC_DATA_TYPE_*` | Appendix A | Covered |
-| Embedding models / MCP / Skills / model rerankers | Not in `zvec_c_api` | Â§1.3 non-goals | **Out of scope (AI)** |
+| Embedding models / MCP / Skills / model rerankers | Not in `zvec_c_api` | §1.3 non-goals | **Out of scope (AI)** |
 
 ### 2.1 Top-Level Module Functions
 
@@ -168,7 +168,7 @@ Managed wrappers must expose the **full** C++ set from `type.h` (see Appendix A)
 | `FlatIndexParam` | `metric_type: MetricType`, `quantize_type: QuantizeType` |
 | `DiskAnnIndexParam` | `metric_type: MetricType`, `max_degree: int`, `list_size: int`, `pq_chunk_num: int`, `quantize_type: QuantizeType` |
 | `VamanaIndexParam` | `metric_type: MetricType`, `max_degree: int`, `search_list_size: int`, `alpha: float`, `saturate_graph: bool`, `use_contiguous_memory: bool`, `use_id_map: bool`, `quantize_type: QuantizeType` |
-| `FtsIndexParam` | Python: `tokenizer_name`/`filters`/`extra_params` strings â†’ .NET: `ZVecFtsTokenizer` / `IReadOnlyList<ZVecFtsTokenFilter>` / `ZVecFtsExtraParams?` |
+| `FtsIndexParam` | Python: `tokenizer_name`/`filters`/`extra_params` strings → .NET: `ZVecFtsTokenizer` / `IReadOnlyList<ZVecFtsTokenFilter>` / `ZVecFtsExtraParams?` |
 | `CollectionOption` | `read_only: bool`, `enable_mmap: bool` |
 
 ### 2.4 Document Type
@@ -207,13 +207,13 @@ Managed wrappers must expose the **full** C++ set from `type.h` (see Appendix A)
 
 ### 2.7 Query Types
 
-Query modes documented in [llms-full.txt](https://zvec.org/llms-full.txt) â€” all must be wrapped: **single vector**, **multi vector**, **filter**, **hybrid** (dense + sparse), **FTS**, **group**.
+Query modes documented in [llms-full.txt](https://zvec.org/llms-full.txt) — all must be wrapped: **single vector**, **multi vector**, **filter**, **hybrid** (dense + sparse), **FTS**, **group**.
 
 | Type | Properties |
 |------|-----------|
 | `Query` | `field_name: string`, `vector?: float[] or dict[int,float]`, `id?: string`, `fts?: Fts`, `params?: dict` |
 | `Fts` | `match_string?: string`, `query_string?: string`, `default_operator?: string` |
-| `GroupBy` / grouped query | Group field + per-group topk / limit (see docs â€œGroupâ€ query); C# `ZVecGroupByQuery` |
+| `GroupBy` / grouped query | Group field + per-group topk / limit (see docs “Group” query); C# `ZVecGroupByQuery` |
 
 ### 2.8 Reranker Types
 
@@ -241,53 +241,53 @@ ZVec uses string-based filter expressions:
 ## 3. Architecture Overview
 
 ```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚         Consumer (ASP.NET Core / MAUI / Blazor Server)       â”‚
-â”‚              DI: AddZVec / AddZVecCollection                  â”‚
-â”‚         using ZVec.NET;                           â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                        â”‚
-                        â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚              ZVec.NET Public SDK                  â”‚
-â”‚                                                               â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
-â”‚  â”‚ IZvecFactory â”‚  â”‚ IZvecCollectionâ”‚  â”‚ SchemaBuilder + â”‚  â”‚
-â”‚  â”‚ (open/create)â”‚  â”‚ sync + async   â”‚  â”‚ FilterBuilder   â”‚  â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
-â”‚         â”‚                  â”‚                     â”‚            â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
-â”‚  â”‚  DTO Layer (ZVecDoc, ZVecStatus, schemas, index params) â”‚  â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
-â”‚                              â”‚                                â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
-â”‚  â”‚  Interlocked lifecycle gating + process-wide native cap    â”‚  â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
-â”‚                              â”‚                                â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
-â”‚  â”‚          SafeHandle Layer (SafeZvecHandle, etc.)         â”‚  â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
-â”‚                              â”‚                                â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
-â”‚  â”‚        P/Invoke Layer ([LibraryImport] source-gen)       â”‚  â”‚
-â”‚  â”‚              NativeMethods.cs                            â”‚  â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                              â”‚  P/Invoke (flat C ABI)
-                              â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚              zvec_c_api (official Alibaba C bindings)        â”‚
-â”‚                                                               â”‚
-â”‚  zvec_initialize / zvec_get_version / zvec_check_version     â”‚
-â”‚  zvec_collection_create_and_open / open / close / destroy    â”‚
-â”‚  zvec_collection_insert / query / fetch / delete / optimize  â”‚
-â”‚  zvec_get_last_error / zvec_get_last_error_details           â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                           â”‚  C++ function calls
-                           â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚                   ZVec C++ Core (Proxima Engine)              â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+┌──────────────────────────────────────────────────────────────┐
+│         Consumer (ASP.NET Core / MAUI / Blazor Server)       │
+│              DI: AddZVec / AddZVecCollection                  │
+│         using ZVec.NET;                           │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│              ZVec.NET Public SDK                  │
+│                                                               │
+│  ┌──────────────┐  ┌────────────────┐  ┌─────────────────┐  │
+│  │ IZvecFactory │  │ IZvecCollection│  │ SchemaBuilder + │  │
+│  │ (open/create)│  │ sync + async   │  │ FilterBuilder   │  │
+│  └──────┬───────┘  └───────┬────────┘  └────────┬────────┘  │
+│         │                  │                     │            │
+│  ┌──────┴──────────────────┴─────────────────────┴────────┐  │
+│  │  DTO Layer (ZVecDoc, ZVecStatus, schemas, index params) │  │
+│  └──────────────────────────┬─────────────────────────────┘  │
+│                              │                                │
+│  ┌──────────────────────────┴─────────────────────────────┐  │
+│  │  Interlocked lifecycle gating + process-wide native cap    │  │
+│  └──────────────────────────┬─────────────────────────────┘  │
+│                              │                                │
+│  ┌──────────────────────────┴─────────────────────────────┐  │
+│  │          SafeHandle Layer (SafeZvecHandle, etc.)         │  │
+│  └──────────────────────────┬─────────────────────────────┘  │
+│                              │                                │
+│  ┌──────────────────────────┴─────────────────────────────┐  │
+│  │        P/Invoke Layer ([LibraryImport] source-gen)       │  │
+│  │              NativeMethods.cs                            │  │
+│  └──────────────────────────┬─────────────────────────────┘  │
+└─────────────────────────────┼────────────────────────────────┘
+                              │  P/Invoke (flat C ABI)
+                              ▼
+┌──────────────────────────────────────────────────────────────┐
+│              zvec_c_api (official Alibaba C bindings)        │
+│                                                               │
+│  zvec_initialize / zvec_get_version / zvec_check_version     │
+│  zvec_collection_create_and_open / open / close / destroy    │
+│  zvec_collection_insert / query / fetch / delete / optimize  │
+│  zvec_get_last_error / zvec_get_last_error_details           │
+└──────────────────────────┬───────────────────────────────────┘
+                           │  C++ function calls
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│                   ZVec C++ Core (Proxima Engine)              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### 3.1 Layer Responsibilities
@@ -297,10 +297,10 @@ ZVec uses string-based filter expressions:
 | **Public SDK** | Idiomatic sync + async C# API + DI; hides unsafe code | Code against `IZvecFactory` / `IZvecCollection`; never expose `IntPtr`; namespace `ZVec.NET` |
 | **Builders** | `ZVecCollectionSchemaBuilder` + fluent `ZVecFilterBuilder` | Immutable outputs; no native calls |
 | **DTO Layer** | Strongly-typed data transfer objects | `init` properties; `ReadOnlyMemory<float>` for vectors |
-| **Concurrency gates** | `Interlocked` lifecycle gating + process-wide native cap | Factory/collection state transitions via `Interlocked.CompareExchange`/`Exchange`; no managed-side RW lock (canceled â€” native C++ handles operation-level safety) |
-| **SafeHandle Layer** | Wraps native pointers; guarantees cleanup | Prefer explicit `Dispose`; finalizer is last resort (see Â§8.2) |
+| **Concurrency gates** | `Interlocked` lifecycle gating + process-wide native cap | Factory/collection state transitions via `Interlocked.CompareExchange`/`Exchange`; no managed-side RW lock (canceled — native C++ handles operation-level safety) |
+| **SafeHandle Layer** | Wraps native pointers; guarantees cleanup | Prefer explicit `Dispose`; finalizer is last resort (see §8.2) |
 | **P/Invoke Layer** | `[LibraryImport]` from upstream `c_api.h` | Blittable spans where applicable; C99 `bool` as `U1` |
-| **C-API Bridge** | Upstream official `zvec_c_api` (Alibaba C bindings) | C-linkage; `zvec_error_code_t` + last-error APIs â€” **do not invent headers** |
+| **C-API Bridge** | Upstream official `zvec_c_api` (Alibaba C bindings) | C-linkage; `zvec_error_code_t` + last-error APIs — **do not invent headers** |
 | **ZVec Core** | Upstream C++ library (git submodule) | Consumed via CMake `add_subdirectory`; not forked for API surface |
 
 ---
@@ -311,84 +311,84 @@ ZVec uses string-based filter expressions:
 
 ```
 ZVec.NET/                    # repo / product root
-â”œâ”€â”€ src/
-â”‚   â”œâ”€â”€ Native/
-â”‚   â”‚   â””â”€â”€ ZVec.Native/                 # CMake wrapper â†’ upstream zvec_c_api
-â”‚   â”‚       â”œâ”€â”€ CMakeLists.txt           # Forces BUILD_C_BINDINGS=ON; add_subdirectory(external/zvec)
-â”‚   â”‚       â”œâ”€â”€ steps.md                 # Windows operator build guide
-â”‚   â”‚       â””â”€â”€ external/zvec/           # Git submodule (alibaba/zvec)
-â”‚   â”‚           â”œâ”€â”€ src/include/zvec/c_api.h   # Official C API (P/Invoke source of truth)
-â”‚   â”‚           â””â”€â”€ src/binding/c/             # Builds fat zvec_c_api shared library
-â”‚   â”‚
-â”‚   â”œâ”€â”€ Core/                            # INTERNAL layout only â€” not a public package name
-â”‚   â”‚   â””â”€â”€ ZVec.NET/        # Published assembly / PackageId: ZVec.NET
-â”‚   â”‚       â”œâ”€â”€ ZVec.NET.csproj
-â”‚   â”‚       â”œâ”€â”€ Abstractions/
-â”‚   â”‚       â”‚   â”œâ”€â”€ IZvecFactory.cs         # Open/create collections (sync + async)
-â”‚   â”‚       â”‚   â””â”€â”€ IZvecCollection.cs      # Sync + async CRUD + query + DDL
-â”‚   â”‚       â”œâ”€â”€ DependencyInjection/
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecServiceCollectionExtensions.cs  # AddZVec / AddZVecCollection
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecOptions.cs          # Global init (incl. MemoryLimitMb)
-â”‚   â”‚       â”‚   â””â”€â”€ ZVecCollectionRegistrationOptions.cs
-â”‚   â”‚       â”œâ”€â”€ Builders/
-â”‚   â”‚       â”‚   â””â”€â”€ ZVecCollectionSchemaBuilder.cs
-â”‚   â”‚       â”œâ”€â”€ Interop/
-â”‚   â”‚       â”‚   â”œâ”€â”€ NativeMethods.cs        # [LibraryImport] from c_api.h
-â”‚   â”‚       â”‚   â”œâ”€â”€ SafeZvecHandle.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ SafeZvecQueryHandle.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ SafeZvecSchemaHandle.cs
-â”‚   â”‚       â”‚   â””â”€â”€ NativeLibraryResolver.cs
-â”‚   â”‚       â”œâ”€â”€ Internal/
-â”‚   â”‚       â”œâ”€â”€ Models/
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecDoc.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecStatus.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecCollectionSchema.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecFieldSchema.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecVectorSchema.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecCollectionOptions.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecCollectionStats.cs
-â”‚   â”‚       â”‚   â””â”€â”€ Enums/                 # Values MUST match type.h / c_api.h (Appendix A)
-â”‚   â”‚       â”œâ”€â”€ IndexParams/
-â”‚   â”‚       â”œâ”€â”€ Query/
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecQuery.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecQueryParams.cs      # Typed index-specific query params
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecFtsQuery.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecGroupByQuery.cs
-â”‚   â”‚       â”‚   â”œâ”€â”€ ZVecFilterBuilder.cs
-â”‚   â”‚       â”‚   â””â”€â”€ ZVecReranker.cs
-â”‚   â”‚       â”œâ”€â”€ ZVecFactory.cs
-â”‚   â”‚       â””â”€â”€ ZVecCollection.cs
-â”‚   â”‚
-â”‚   â””â”€â”€ Mock/
-â”‚       â””â”€â”€ ZVec.Native.Mock/          # Mock native library for testing (C++ primary; outside main Core code)
-â”‚           â”œâ”€â”€ CMakeLists.txt
-â”‚           â””â”€â”€ src/
-â”‚               â””â”€â”€ zvec_c_api_mock.cpp # In-memory mock matching upstream C API surface
-â”‚
-â”œâ”€â”€ testing/
-â”‚   â”œâ”€â”€ ZVec.NET.Tests/
-â”‚   â”‚   â”œâ”€â”€ ZVec.NET.Tests.csproj
-â”‚   â”‚   â”œâ”€â”€ Unit/
-â”‚   â”‚   â”œâ”€â”€ Integration/
-â”‚   â”‚   â””â”€â”€ Memory/
-â”‚   â”‚
-â”‚   â””â”€â”€ ZVec.NET.Benchmarks/
-â”‚       â””â”€â”€ ZVec.NET.Benchmarks.csproj
-â”‚
-â”œâ”€â”€ build/
-â”‚   â”œâ”€â”€ ZVec.NET.snk   # Strong-name identity key (not a secret)
-â”‚   â””â”€â”€ ci/
-â”‚       â”œâ”€â”€ build-native.yml
-â”‚       â”œâ”€â”€ build-managed.yml
-â”‚       â””â”€â”€ publish-nuget.yml
-â”‚
-â”œâ”€â”€ ZVec.NET.slnx      # Solution at repo root (VS .slnx)
-â”œâ”€â”€ Directory.Build.props         # Auto-imported by MSBuild (must be at root / ancestor of projects)
-â”œâ”€â”€ Directory.Packages.props      # Central Package Management (must be at root)
-â””â”€â”€ README.md
+├── src/
+│   ├── Native/
+│   │   └── ZVec.Native/                 # CMake wrapper → upstream zvec_c_api
+│   │       ├── CMakeLists.txt           # Forces BUILD_C_BINDINGS=ON; add_subdirectory(external/zvec)
+│   │       ├── steps.md                 # Windows operator build guide
+│   │       └── external/zvec/           # Git submodule (alibaba/zvec)
+│   │           ├── src/include/zvec/c_api.h   # Official C API (P/Invoke source of truth)
+│   │           └── src/binding/c/             # Builds fat zvec_c_api shared library
+│   │
+│   ├── Core/                            # INTERNAL layout only — not a public package name
+│   │   └── ZVec.NET/        # Published assembly / PackageId: ZVec.NET
+│   │       ├── ZVec.NET.csproj
+│   │       ├── Abstractions/
+│   │       │   ├── IZvecFactory.cs         # Open/create collections (sync + async)
+│   │       │   └── IZvecCollection.cs      # Sync + async CRUD + query + DDL
+│   │       ├── DependencyInjection/
+│   │       │   ├── ZVecServiceCollectionExtensions.cs  # AddZVec / AddZVecCollection
+│   │       │   ├── ZVecOptions.cs          # Global init (incl. MemoryLimitMb)
+│   │       │   └── ZVecCollectionRegistrationOptions.cs
+│   │       ├── Builders/
+│   │       │   └── ZVecCollectionSchemaBuilder.cs
+│   │       ├── Interop/
+│   │       │   ├── NativeMethods.cs        # [LibraryImport] from c_api.h
+│   │       │   ├── SafeZvecHandle.cs
+│   │       │   ├── SafeZvecQueryHandle.cs
+│   │       │   ├── SafeZvecSchemaHandle.cs
+│   │       │   └── NativeLibraryResolver.cs
+│   │       ├── Internal/
+│   │       ├── Models/
+│   │       │   ├── ZVecDoc.cs
+│   │       │   ├── ZVecStatus.cs
+│   │       │   ├── ZVecCollectionSchema.cs
+│   │       │   ├── ZVecFieldSchema.cs
+│   │       │   ├── ZVecVectorSchema.cs
+│   │       │   ├── ZVecCollectionOptions.cs
+│   │       │   ├── ZVecCollectionStats.cs
+│   │       │   └── Enums/                 # Values MUST match type.h / c_api.h (Appendix A)
+│   │       ├── IndexParams/
+│   │       ├── Query/
+│   │       │   ├── ZVecQuery.cs
+│   │       │   ├── ZVecQueryParams.cs      # Typed index-specific query params
+│   │       │   ├── ZVecFtsQuery.cs
+│   │       │   ├── ZVecGroupByQuery.cs
+│   │       │   ├── ZVecFilterBuilder.cs
+│   │       │   └── ZVecReranker.cs
+│   │       ├── ZVecFactory.cs
+│   │       └── ZVecCollection.cs
+│   │
+│   └── Mock/
+│       └── ZVec.Native.Mock/          # Mock native library for testing (C++ primary; outside main Core code)
+│           ├── CMakeLists.txt
+│           └── src/
+│               └── zvec_c_api_mock.cpp # In-memory mock matching upstream C API surface
+│
+├── testing/
+│   ├── ZVec.NET.Tests/
+│   │   ├── ZVec.NET.Tests.csproj
+│   │   ├── Unit/
+│   │   ├── Integration/
+│   │   └── Memory/
+│   │
+│   └── ZVec.NET.Benchmarks/
+│       └── ZVec.NET.Benchmarks.csproj
+│
+├── build/
+│   ├── ZVec.NET.snk   # Strong-name identity key (not a secret)
+│   └── ci/
+│       ├── build-native.yml
+│       ├── build-managed.yml
+│       └── publish-nuget.yml
+│
+├── ZVec.NET.slnx      # Solution at repo root (VS .slnx)
+├── Directory.Build.props         # Auto-imported by MSBuild (must be at root / ancestor of projects)
+├── Directory.Packages.props      # Central Package Management (must be at root)
+└── README.md
 ```
 
-> **Consumer rule:** all imports are `using ZVec.NET;` (plus `.DependencyInjection` / `.Query` as needed). The `Core/` folder is repo layout only â€” it must not appear in PackageId, assembly name, or public namespaces.
+> **Consumer rule:** all imports are `using ZVec.NET;` (plus `.DependencyInjection` / `.Query` as needed). The `Core/` folder is repo layout only — it must not appear in PackageId, assembly name, or public namespaces.
 
 ### 4.2 Multi-Targeting Strategy
 
@@ -413,7 +413,7 @@ ZVec.NET/                    # repo / product root
 
 ## 5. Native C-API Bridge Specification
 
-> **Implementation rule:** ZVec.NET consumes Alibabaâ€™s official C API at
+> **Implementation rule:** ZVec.NET consumes Alibaba’s official C API at
 > `src/Native/ZVec.Native/external/zvec/src/include/zvec/c_api.h` (built by
 > `src/binding/c` as `zvec_c_api`). **Do not invent a parallel custom header,**
 > stub `.cpp`, enum table, or error-code table. P/Invoke signatures, enums, and
@@ -422,12 +422,12 @@ ZVec.NET/                    # repo / product root
 
 ### 5.1 Design Principles
 
-1. **Flat C linkage only** â€” no C++ name mangling, no exceptions across boundary
-2. **Error code return pattern** â€” upstream returns `zvec_error_code_t`; details via `zvec_get_last_error` / `zvec_get_last_error_details` (managed layer maps to exceptions / status DTOs). There is **no** `ZvecStatus { int code; char message[512]; }` struct in upstream.
-3. **Opaque handles** â€” C++ objects exposed as opaque pointers (`zvec_collection_t*`, etc.)
-4. **No heap allocations in the managed vector hot path** â€” native allocations stay in ZVec core; C# uses spans / pooling for vectors
-5. **Version gate** â€” call `zvec_check_version` / `zvec_get_version*` during `Initialize` and fail with `ZVecAbiMismatchException` on mismatch
-6. **Lifecycle names** â€” `Dispose` / finalizer â†’ `zvec_collection_close` only. `Destroy` â†’ `zvec_collection_destroy` then `zvec_collection_close`. Do not invent `zvec_destroy` / `zvec_destroy_collection`.
+1. **Flat C linkage only** — no C++ name mangling, no exceptions across boundary
+2. **Error code return pattern** — upstream returns `zvec_error_code_t`; details via `zvec_get_last_error` / `zvec_get_last_error_details` (managed layer maps to exceptions / status DTOs). There is **no** `ZvecStatus { int code; char message[512]; }` struct in upstream.
+3. **Opaque handles** — C++ objects exposed as opaque pointers (`zvec_collection_t*`, etc.)
+4. **No heap allocations in the managed vector hot path** — native allocations stay in ZVec core; C# uses spans / pooling for vectors
+5. **Version gate** — call `zvec_check_version` / `zvec_get_version*` during `Initialize` and fail with `ZVecAbiMismatchException` on mismatch
+6. **Lifecycle names** — `Dispose` / finalizer → `zvec_collection_close` only. `Destroy` → `zvec_collection_destroy` then `zvec_collection_close`. Do not invent `zvec_destroy` / `zvec_destroy_collection`.
 
 ### 5.2 Source of Truth (no parallel header)
 
@@ -435,21 +435,21 @@ ZVec.NET/                    # repo / product root
 |----------|------------|
 | C API header | `external/zvec/src/include/zvec/c_api.h` |
 | Enum / type ABI | `external/zvec/src/include/zvec/db/type.h` (+ macros in `c_api.h`) |
-| Error codes | `zvec_error_code_t` â€” see Appendix A (`ZVecErrorCode`) |
+| Error codes | `zvec_error_code_t` — see Appendix A (`ZVecErrorCode`) |
 | Version | `zvec_get_version`, `zvec_get_version_{major,minor,patch}`, `zvec_check_version` |
 | Init / shutdown | `zvec_initialize(const zvec_config_data_t*)`, `zvec_shutdown` |
 | Memory limit | `zvec_config_data_set_memory_limit` (**global** config, not collection options) |
 
-Before Phase 1 coding starts: audit every Â§2.5 method against `c_api.h` and record any remaining binding gaps in Â§2.0.
+Before Phase 1 coding starts: audit every §2.5 method against `c_api.h` and record any remaining binding gaps in §2.0.
 
 ---
 
 ## 6. P/Invoke & Marshalling Layer
 
-### 6.1 `[LibraryImport]` Declarations (illustrative â€” align every signature to `c_api.h`)
+### 6.1 `[LibraryImport]` Declarations (illustrative — align every signature to `c_api.h`)
 
 ```csharp
-// NativeMethods.cs â€” namespace ZVec.NET.Interop (internal)
+// NativeMethods.cs — namespace ZVec.NET.Interop (internal)
 internal static partial class NativeMethods
 {
     private const string LibraryName = "zvec_c_api";
@@ -459,10 +459,10 @@ internal static partial class NativeMethods
     internal const int ExpectedMinor = /* pin */;
     internal const int ExpectedPatch = /* pin */;
 
-    // Version gate: prefer ints / zvec_check_version. String is library-owned static memory â€”
-    // MUST NOT use LPUTF8Str return (that CoTaskMemFrees the pointer â†’ crash).
+    // Version gate: prefer ints / zvec_check_version. String is library-owned static memory —
+    // MUST NOT use LPUTF8Str return (that CoTaskMemFrees the pointer → crash).
     [LibraryImport(LibraryName)]
-    internal static partial IntPtr zvec_get_version(); // const char* â€” do not free
+    internal static partial IntPtr zvec_get_version(); // const char* — do not free
 
     internal static string GetVersionString()
     {
@@ -483,36 +483,36 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial int zvec_get_version_patch();
 
-    // Returns zvec_error_code_t (int). Map via Appendix A â€” not a custom struct.
+    // Returns zvec_error_code_t (int). Map via Appendix A — not a custom struct.
     [LibraryImport(LibraryName)]
     internal static partial int zvec_initialize(IntPtr configData);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_shutdown();
 
-    // error_msg is malloc'd by native code â€” free with libc free(), NOT Marshal.FreeCoTaskMem.
+    // error_msg is malloc'd by native code — free with libc free(), NOT Marshal.FreeCoTaskMem.
     // Copy with PtrToStringUTF8, then NativeMemory.Free / P/Invoke free(ptr).
     [LibraryImport(LibraryName)]
     internal static partial int zvec_get_last_error(out IntPtr errorMsg); // char**; caller frees
 
     // Prefer zvec_get_last_error_details when you only need code/message pointers without owning allocation.
-    // Note: zvec_error_details_t is a struct, not an opaque pointer â€” define as managed struct with explicit layout.
+    // Note: zvec_error_details_t is a struct, not an opaque pointer — define as managed struct with explicit layout.
     [LibraryImport(LibraryName)]
     internal static partial int zvec_get_last_error_details(ref ZvecErrorDetails errorDetails);
 
-    // Error details struct â€” maps to zvec_error_details_t in c_api.h
+    // Error details struct — maps to zvec_error_details_t in c_api.h
     [StructLayout(LayoutKind.Sequential)]
     internal struct ZvecErrorDetails
     {
         public ZVecErrorCode Code;      // zvec_error_code_t
-        public IntPtr Message;          // const char* â€” do not free (owned by library)
-        public IntPtr File;             // const char* â€” do not free
+        public IntPtr Message;          // const char* — do not free (owned by library)
+        public IntPtr File;             // const char* — do not free
         public int Line;
-        public IntPtr Function;         // const char* â€” do not free
+        public IntPtr Function;         // const char* — do not free
     }
 
     // Free memory allocated by the native library (e.g., from zvec_get_last_error).
-    // Use this instead of Marshal.FreeCoTaskMem â€” the native library uses its own allocator.
+    // Use this instead of Marshal.FreeCoTaskMem — the native library uses its own allocator.
     [LibraryImport(LibraryName)]
     internal static partial void zvec_free(IntPtr ptr);
 
@@ -529,7 +529,7 @@ internal static partial class NativeMethods
         IntPtr collectionOptions,
         out IntPtr outCollection);
 
-    // C99 bool params â€” MUST use U1 (1 byte), not UnmanagedType.Bool (4-byte Win32 BOOL)
+    // C99 bool params — MUST use U1 (1 byte), not UnmanagedType.Bool (4-byte Win32 BOOL)
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_options_set_read_only(
         IntPtr options,
@@ -546,7 +546,7 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_destroy(IntPtr collection);
 
-    // Document/query paths use upstream zvec_doc_t / query builders â€” not a flat invented zvec_insert.
+    // Document/query paths use upstream zvec_doc_t / query builders — not a flat invented zvec_insert.
     // Pin ReadOnlyMemory<float> in managed code and pass IntPtr / unsafe float* into the
     // matching upstream doc/vector setter APIs. [LibraryImport] supports ReadOnlySpan<T> for
     // blittable T on net8+ when the C signature truly takes a pointer+length pair.
@@ -583,7 +583,7 @@ internal sealed class SafeZvecHandle : SafeHandleZeroOrMinusOneIsInvalid
     protected override bool ReleaseHandle()
     {
         // Finalizer / Dispose safety net: CLOSE ONLY.
-        // Never call zvec_collection_destroy here â€” that permanently deletes on-disk data.
+        // Never call zvec_collection_destroy here — that permanently deletes on-disk data.
         // Verify close is safe from any thread (incl. finalizer).
         if (!IsInvalid)
         {
@@ -601,7 +601,7 @@ internal sealed class SafeZvecHandle : SafeHandleZeroOrMinusOneIsInvalid
 | `Dispose` / `DisposeAsync` / `ReleaseHandle` | `zvec_collection_close` only | Free C handle (`shared_ptr*` delete); **data remains on disk** |
 | `Destroy` / `DestroyAsync` | `zvec_collection_destroy` **then** `zvec_collection_close` | Permanent disk delete (`Collection::Destroy`), then free handle |
 
-Note: `zvec_collection_destroy` does **not** free the C handle wrapper â€” `close` is still required after destroy. After destroy, mark the SafeHandle invalid so Dispose does not double-close.
+Note: `zvec_collection_destroy` does **not** free the C handle wrapper — `close` is still required after destroy. After destroy, mark the SafeHandle invalid so Dispose does not double-close.
 
 ### 6.3 Zero-Copy Vector Marshalling
 
@@ -647,11 +647,11 @@ internal static class VectorMarshaller
 
 ## 7. Public SDK API Design
 
-> **Primary surface is DI + interfaces** under namespace **`ZVec.NET`**. All consumer imports use this root (plus `.DependencyInjection` / `.Query`). A thin static faÃ§ade (scripting/console) may be added later; it must not be the only entry point.
+> **Primary surface is DI + interfaces** under namespace **`ZVec.NET`**. All consumer imports use this root (plus `.DependencyInjection` / `.Query`). A thin static façade (scripting/console) may be added later; it must not be the only entry point.
 >
 > **Sync + async:** Every mutating/querying operation exposes both. Sync calls acquire the RW lock and invoke P/Invoke on the caller thread. Async acquires the same lock, then runs P/Invoke via **bounded** offload (never unbounded `Task.Run`).
 
-### 7.1 Factory â€” `IZvecFactory`
+### 7.1 Factory — `IZvecFactory`
 
 ```csharp
 namespace ZVec.NET;
@@ -660,13 +660,13 @@ public interface IZvecFactory : IAsyncDisposable, IDisposable
 {
     /// <summary>
     /// Ensure global native init + ABI version gate have run.
-    /// <b>First successful init wins</b> â€” subsequent calls are no-ops even if
+    /// <b>First successful init wins</b> — subsequent calls are no-ops even if
     /// <see cref="ZVecOptions"/> differ; log a warning when options diverge.
     /// </summary>
     void Initialize();
     ValueTask InitializeAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Process-wide teardown â†’ <c>zvec_shutdown</c>. Idempotent. Prefer DI container dispose.</summary>
+    /// <summary>Process-wide teardown → <c>zvec_shutdown</c>. Idempotent. Prefer DI container dispose.</summary>
     void Shutdown();
     ValueTask ShutdownAsync(CancellationToken cancellationToken = default);
 
@@ -694,9 +694,9 @@ On first `Initialize` / `InitializeAsync`:
 
 1. Resolve native library via `NativeLibrary.SetDllImportResolver`
 2. Call `zvec_check_version(ExpectedMajor, ExpectedMinor, ExpectedPatch)` (prefer ints; use `GetVersionString()` only for exception messages)
-3. On mismatch â†’ throw `ZVecAbiMismatchException` with expected vs found versions
+3. On mismatch → throw `ZVecAbiMismatchException` with expected vs found versions
 4. Build `zvec_config_data` from `ZVecOptions` (log, query threads, **MemoryLimitMb**) and call `zvec_initialize`
-5. Remember applied options; later `Initialize*` calls return immediately (first-init-wins). If new options differ, log a warning â€” do not re-apply.
+5. Remember applied options; later `Initialize*` calls return immediately (first-init-wins). If new options differ, log a warning — do not re-apply.
 
 `Dispose` / `DisposeAsync` on the factory call `Shutdown` / `ShutdownAsync` once (`Interlocked.Exchange`). DI registers the factory as a singleton so host teardown runs shutdown.
 
@@ -711,7 +711,7 @@ services.AddZVec(options =>
     options.LogLevel = ZVecLogLevel.Warn;
     options.QueryThreads = -1;
     options.MaxConcurrentNativeCalls = 0;      // 0 = auto (e.g. ProcessorCount * 2)
-    options.MemoryLimitMb = 512;               // global â€” maps to zvec_config_data_set_memory_limit
+    options.MemoryLimitMb = 512;               // global — maps to zvec_config_data_set_memory_limit
 });
 
 services.AddZVecCollection("products", options =>
@@ -723,9 +723,9 @@ services.AddZVecCollection("products", options =>
 });
 ```
 
-**Host guidance:** ASP.NET Core / Blazor Server / MAUI â€” factory and named collections as **singletons**. Prefer injecting `IZvecCollection`. When the host stops, disposing the factory singleton runs `zvec_shutdown`. Blazor WASM is out of scope for v1.
+**Host guidance:** ASP.NET Core / Blazor Server / MAUI — factory and named collections as **singletons**. Prefer injecting `IZvecCollection`. When the host stops, disposing the factory singleton runs `zvec_shutdown`. Blazor WASM is out of scope for v1.
 
-### 7.2 Collection API â€” `IZvecCollection`
+### 7.2 Collection API — `IZvecCollection`
 
 ```csharp
 namespace ZVec.NET;
@@ -802,10 +802,10 @@ Concrete public class **`ZVecCollection`** implements this interface (~40 member
 
 **Dispose vs Destroy:**
 
-- `Dispose` / `DisposeAsync` â†’ `zvec_collection_close` only (data stays on disk). Both must be **idempotent and mutually exclusive** â€” use `Interlocked.Exchange` so cleanup runs exactly once.
-- `Destroy` / `DestroyAsync` â†’ `zvec_collection_destroy` then `zvec_collection_close` (permanent delete). After success, invalidate the handle so a later Dispose is a no-op.
+- `Dispose` / `DisposeAsync` → `zvec_collection_close` only (data stays on disk). Both must be **idempotent and mutually exclusive** — use `Interlocked.Exchange` so cleanup runs exactly once.
+- `Destroy` / `DestroyAsync` → `zvec_collection_destroy` then `zvec_collection_close` (permanent delete). After success, invalidate the handle so a later Dispose is a no-op.
 
-### 7.3 Document DTO â€” `ZVecDoc`
+### 7.3 Document DTO — `ZVecDoc`
 
 ```csharp
 namespace ZVec.NET;
@@ -818,7 +818,7 @@ public sealed class ZVecDoc
 
     /// <summary>
     /// Scalar fields. Values are boxed (<c>object</c>) for Python/Node parity.
-    /// Zero-allocation goal (G2) applies to <b>vector</b> paths only â€” iterating
+    /// Zero-allocation goal (G2) applies to <b>vector</b> paths only — iterating
     /// Fields on a hot query path allocates. Prefer vector-only access when measuring GC.
     /// </summary>
     public IReadOnlyDictionary<string, object> Fields { get; init; }
@@ -830,7 +830,7 @@ public sealed class ZVecDoc
         IReadOnlyDictionary<string, IReadOnlyDictionary<int, float>>? sparseVectors = null,
         IReadOnlyDictionary<string, object>? fields = null)
     {
-        // Runtime validation: reject null/whitespace â€” required alone is compile-time only.
+        // Runtime validation: reject null/whitespace — required alone is compile-time only.
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         // ...
     }
@@ -868,7 +868,7 @@ public sealed class ZVecIvfQueryParams : ZVecQueryParams
 }
 
 // Flat / DiskANN / Vamana / FTS query-param types are added when the matching
-// setters are confirmed in upstream c_api.h (same binding-gap pattern as Â§2.0).
+// setters are confirmed in upstream c_api.h (same binding-gap pattern as §2.0).
 
 public sealed class ZVecFtsQuery
 {
@@ -908,7 +908,7 @@ public sealed class ZVecFilterBuilder
     public ZVecFilterBuilder And(ZVecFilterBuilder inner);
     public ZVecFilterBuilder Or(ZVecFilterBuilder inner);
     public ZVecFilterBuilder Not(ZVecFilterBuilder inner);
-    public ZVecFilterBuilder In(string fieldName, params object[] values); // boxes; cold path â€” typed overloads deferred
+    public ZVecFilterBuilder In(string fieldName, params object[] values); // boxes; cold path — typed overloads deferred
     public ZVecFilterBuilder Like(string fieldName, string pattern);
     public ZVecFilterBuilder ContainAny(string fieldName, params object[] values); // boxes; cold path
     public ZVecFilterBuilder ContainAll(string fieldName, params object[] values); // boxes; cold path
@@ -1012,7 +1012,7 @@ public sealed class ZVecHnswIndexParam : ZVecIndexParam
 
 /// <summary>
 /// HNSW + RaBitQ. Maps to <c>IndexType::HNSW_RABITQ = 4</c> in <c>type.h</c>.
-/// <c>c_api.h</c> may omit the macro â€” pass value 4 until upstream adds it. x86_64/AVX2 only.
+/// <c>c_api.h</c> may omit the macro — pass value 4 until upstream adds it. x86_64/AVX2 only.
 /// </summary>
 public sealed class ZVecHnswRabitqIndexParam : ZVecIndexParam
 {
@@ -1082,11 +1082,11 @@ public sealed class ZVecInvertIndexParam : ZVecIndexParam
 
 ```
 User Code:  ReadOnlyMemory<float> vec = embeddingModel.Embed("query");
-                        â”‚
-                        â–¼
-ZVecDoc:    DenseVectors["embedding"] = vec;   // No copy â€” stored as Memory<T>
-                        â”‚
-                        â–¼
+                        │
+                        ▼
+ZVecDoc:    DenseVectors["embedding"] = vec;   // No copy — stored as Memory<T>
+                        │
+                        ▼
 ZVecCollection.Query() / QueryAsync():
             var (ptr, pin) = VectorMarshaller.PinVector(query.Vector);
             try {
@@ -1097,19 +1097,19 @@ ZVecCollection.Query() / QueryAsync():
 ```
 
 **Key guarantees:**
-- `ReadOnlyMemory<float>` is stored in `ZVecDoc` â€” no `float[]` copy on the vector path
+- `ReadOnlyMemory<float>` is stored in `ZVecDoc` — no `float[]` copy on the vector path
 - `Memory.Pin()` for the native call duration only; dispose in `finally`
-- G2 zero-allocation applies to **vectors**; scalar `Fields` may box (see Â§7.3)
+- G2 zero-allocation applies to **vectors**; scalar `Fields` may box (see §7.3)
 
 ### 8.2 SafeHandle Guarantee
 
 Every native pointer is wrapped in a `SafeHandle` subclass:
 
-- Consumers **must** call `Dispose()` / `await using` â€” that is the primary cleanup path
-- If forgotten, the `SafeHandle` finalizer frees on GC â€” **safety net only**
+- Consumers **must** call `Dispose()` / `await using` — that is the primary cleanup path
+- If forgotten, the `SafeHandle` finalizer frees on GC — **safety net only**
 - `ReleaseHandle` may run on the **finalizer thread**; P/Invoke there can deadlock if native code uses TLS or thread-affine locks. Verify `zvec_collection_close` is safe from any thread; log a diagnostic if release is detected from a finalizer (missing Dispose)
-- **`ReleaseHandle` / `Dispose` call `zvec_collection_close` only** â€” never `destroy` (that would wipe on-disk data)
-- `Dispose` and `DisposeAsync` on `ZVecCollection` must be idempotent and mutually exclusive (`Interlocked.Exchange` â€” cleanup once)
+- **`ReleaseHandle` / `Dispose` call `zvec_collection_close` only** — never `destroy` (that would wipe on-disk data)
+- `Dispose` and `DisposeAsync` on `ZVecCollection` must be idempotent and mutually exclusive (`Interlocked.Exchange` — cleanup once)
 - Do not rely on finalizers for hot-path resource turnover
 
 ### 8.3 ArrayPool for Intermediate Native Buffers
@@ -1138,7 +1138,7 @@ internal static class ResultBufferPool
 ### 8.4 Concurrency Model (Sync + Async)
 
 The upstream C API is **synchronous/blocking**. The managed SDK uses a minimalist concurrency
-model â€” **no custom managed-side RW lock** â€” because:
+model — **no custom managed-side RW lock** — because:
 
 - ZVec's native `GlobalConfig` uses `std::atomic<bool>` for its own thread-safe init (config.h:197)
 - Factory/collection lifecycle uses `Interlocked.CompareExchange` / `Interlocked.Exchange`
@@ -1147,43 +1147,43 @@ model â€” **no custom managed-side RW lock** â€” because:
   CoreReview flagged correctness issues: AsyncLocal leakage, cancellation races)
 
 ```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚ Query / Fetchâ”‚     â”‚ Insert / DDL     â”‚
-â”‚ (sync|async) â”‚     â”‚ (sync|async)     â”‚
-â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜     â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-       â”‚                     â”‚
-       â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                  â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚  Process-wide MaxConcurrentNative    â”‚  â† caps threads blocked in P/Invoke
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-               â”‚
-               â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚  Sync: P/Invoke on caller thread     â”‚
-â”‚  Async: bounded offload after call   â”‚  â† ConfigureAwait(false) in library
-â”‚  â†’ zvec_c_api                        â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-               â”‚
-               â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚  ZVec C++ Core                       â”‚
-â”‚  (owns its own thread safety)        â”‚
-â”‚  + QueryThreads intra-query pool     â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+┌──────────────┐     ┌──────────────────┐
+│ Query / Fetch│     │ Insert / DDL     │
+│ (sync|async) │     │ (sync|async)     │
+└──────┬───────┘     └──────┬───────────┘
+       │                     │
+       └──────────┬──────────┘
+                  ▼
+┌──────────────────────────────────────┐
+│  Process-wide MaxConcurrentNative    │  ← caps threads blocked in P/Invoke
+└──────────────┬───────────────────────┘
+               │
+               ▼
+┌──────────────────────────────────────┐
+│  Sync: P/Invoke on caller thread     │
+│  Async: bounded offload after call   │  ← ConfigureAwait(false) in library
+│  → zvec_c_api                        │
+└──────────────┬───────────────────────┘
+               │
+               ▼
+┌──────────────────────────────────────┐
+│  ZVec C++ Core                       │
+│  (owns its own thread safety)        │
+│  + QueryThreads intra-query pool     │
+└──────────────────────────────────────┘
 ```
 
 **Rules:**
 
-1. **No managed-side RW lock** â€” The native C++ engine handles concurrent reads and exclusive writes internally. Managed code uses `Interlocked` for lifecycle state transitions only.
-2. **Sync path** â€” P/Invoke on caller thread. Lowest latency (console, batch jobs, MAUI background).
-3. **Async path** â€” Bounded offload for blocking P/Invoke. Never unbounded `Task.Run` per request.
-4. **Global throttle** â€” `MaxConcurrentNativeCalls` protects ASP.NET thread pools (`0` = auto).
-5. **Native query threads** â€” `ZVecOptions.QueryThreads` is orthogonal (intra-query parallelism).
-6. **Dispose/Destroy safety** â€” `Interlocked.Exchange` on `_disposed`/`_destroyed` flags ensures lifecycle operations run exactly once, even under concurrent calls.
-8. **Batch over chatty P/Invoke** â€” Prefer list overloads.
-9. **Zero-copy vectors** â€” Pin only for the native call duration.
-10. **Cancellation** â€” Honored while waiting on the lock and before entering native. Mid-P/Invoke cancel is best-effort â€” document that limitation.
+1. **No managed-side RW lock** — The native C++ engine handles concurrent reads and exclusive writes internally. Managed code uses `Interlocked` for lifecycle state transitions only.
+2. **Sync path** — P/Invoke on caller thread. Lowest latency (console, batch jobs, MAUI background).
+3. **Async path** — Bounded offload for blocking P/Invoke. Never unbounded `Task.Run` per request.
+4. **Global throttle** — `MaxConcurrentNativeCalls` protects ASP.NET thread pools (`0` = auto).
+5. **Native query threads** — `ZVecOptions.QueryThreads` is orthogonal (intra-query parallelism).
+6. **Dispose/Destroy safety** — `Interlocked.Exchange` on `_disposed`/`_destroyed` flags ensures lifecycle operations run exactly once, even under concurrent calls.
+8. **Batch over chatty P/Invoke** — Prefer list overloads.
+9. **Zero-copy vectors** — Pin only for the native call duration.
+10. **Cancellation** — Honored while waiting on the lock and before entering native. Mid-P/Invoke cancel is best-effort — document that limitation.
 
 ### 8.5 Memory Governance for Edge
 
@@ -1199,7 +1199,7 @@ public sealed class ZVecOptions
 
     /// <summary>
     /// Process-wide memory limit (MB). Maps to zvec_config_data_set_memory_limit
-    /// on global init â€” not a per-collection option.
+    /// on global init — not a per-collection option.
     /// </summary>
     public int? MemoryLimitMb { get; set; }
 }
@@ -1218,24 +1218,24 @@ public sealed class ZVecCollectionOptions
 
 ### 9.1 NuGet Structure
 
-Prefer a **single** `lib/net8.0` asset when there is no TFM-specific `#if` code â€” net9/net10 consumers fall back to it. Multi-target locally if needed for testing.
+Prefer a **single** `lib/net8.0` asset when there is no TFM-specific `#if` code — net9/net10 consumers fall back to it. Multi-target locally if needed for testing.
 
 ```
 ZVec.NET.nupkg/
-â”œâ”€â”€ lib/
-â”‚   â””â”€â”€ net8.0/ZVec.NET.dll
-â”œâ”€â”€ runtimes/
-â”‚   â”œâ”€â”€ win-x64/native/zvec_c_api.dll
-â”‚   â”œâ”€â”€ win-arm64/native/zvec_c_api.dll
-â”‚   â”œâ”€â”€ linux-x64/native/libzvec_c_api.so
-â”‚   â”œâ”€â”€ linux-arm64/native/libzvec_c_api.so
-â”‚   â”œâ”€â”€ osx-x64/native/libzvec_c_api.dylib
-â”‚   â””â”€â”€ osx-arm64/native/libzvec_c_api.dylib
-â”œâ”€â”€ README.md
-â””â”€â”€ (optional) ZVec.NET.snupkg alongside
+├── lib/
+│   └── net8.0/ZVec.NET.dll
+├── runtimes/
+│   ├── win-x64/native/zvec_c_api.dll
+│   ├── win-arm64/native/zvec_c_api.dll
+│   ├── linux-x64/native/libzvec_c_api.so
+│   ├── linux-arm64/native/libzvec_c_api.so
+│   ├── osx-x64/native/libzvec_c_api.dylib
+│   └── osx-arm64/native/libzvec_c_api.dylib
+├── README.md
+└── (optional) ZVec.NET.snupkg alongside
 ```
 
-No `build/*.props` for RID native packing â€” the .NET runtime resolves `runtimes/{rid}/native/` automatically.
+No `build/*.props` for RID native packing — the .NET runtime resolves `runtimes/{rid}/native/` automatically.
 
 ### 9.2 .csproj NuGet Packaging Configuration
 
@@ -1248,11 +1248,11 @@ No `build/*.props` for RID native packing â€” the .NET runtime resolves `ru
     <RootNamespace>ZVec.NET</RootNamespace>
     <!-- Version = our SemVer + build metadata for pinned native ZVec release.
          Example: 1.0.0-alpha.1+zvec.1.2.3 means our SDK 1.0.0-alpha.1 wrapping ZVec C++ 1.2.3.
-         The .NET target is NOT in the version â€” it lives in TargetFrameworks + lib/ folder.
+         The .NET target is NOT in the version — it lives in TargetFrameworks + lib/ folder.
          NuGet already shows "net8.0" as the dependency framework. -->
     <Version>1.0.0-alpha.1+zvec.1.2.3</Version>
     <Authors>Adam Systems</Authors>
-    <Description>High-performance .NET SDK for Alibaba ZVec â€” the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (win/linux/mac, x64/arm64).</Description>
+    <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (win/linux/mac, x64/arm64).</Description>
     <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -1293,10 +1293,10 @@ If managed adds P/Invoke for new APIs before native ships those symbols, bump th
 
 Once the alpha NuGet package is published:
 
-1. **GitHub Issue** â€” Open a "Community SDK" issue on `alibaba/zvec` announcing the .NET wrapper with a link to the NuGet package and repo
-2. **Docs PR** â€” Submit a PR to ZVec's docs adding `ZVec.NET` to their SDK list (alongside Python/Node)
-3. **Community channels** â€” Announce in ZVec's Discord/Slack channels
-4. **NuGet discoverability** â€” `<PackageTags>` with `zvec`, `vector-database`, `alibaba` ensures developers searching NuGet for vector DBs find it
+1. **GitHub Issue** — Open a "Community SDK" issue on `alibaba/zvec` announcing the .NET wrapper with a link to the NuGet package and repo
+2. **Docs PR** — Submit a PR to ZVec's docs adding `ZVec.NET` to their SDK list (alongside Python/Node)
+3. **Community channels** — Announce in ZVec's Discord/Slack channels
+4. **NuGet discoverability** — `<PackageTags>` with `zvec`, `vector-database`, `alibaba` ensures developers searching NuGet for vector DBs find it
 
 ---
 
@@ -1311,7 +1311,7 @@ Once the alpha NuGet package is published:
 | **Memory** | Zero-allocation vector verification, SafeHandle leak detection, ArrayPool recycling | Real + Mock | ~15 |
 | **Concurrency** | Multi-threaded read/write under RW lock | Real | ~10 |
 
-### 10.2 Mock Native Library â€” Full Specification
+### 10.2 Mock Native Library — Full Specification
 
 #### 10.2.1 Design Goals
 
@@ -1323,7 +1323,7 @@ Once the alpha NuGet package is published:
 #### 10.2.2 Architecture
 
 ```cpp
-// zvec_c_api_mock.cpp â€” namespace ::mock (internal linkage)
+// zvec_c_api_mock.cpp — namespace ::mock (internal linkage)
 
 #include <mutex>
 #include <string>
@@ -1386,14 +1386,14 @@ static thread_local std::string t_last_error_msg;
 | Multi-query + sub-query | 10+ | Full | Store sub-queries; mock reranking merges results |
 | Doc create/destroy/get/set | 15+ | Full | Store pk, fields, vectors; getters return stored values |
 | DML (insert/upsert/update/delete) | 10 | Full | Mutate `MockCollection::documents`; return success/error counts |
-| DQL (query/multi_query/fetch) | 3 | **Core logic** | See Â§10.2.4 |
+| DQL (query/multi_query/fetch) | 3 | **Core logic** | See §10.2.4 |
 | DDL (add_column/drop_column/alter_column) | 3 | Full | Mutate schema fields |
 | Stats | 3 | Full | Return doc_count, index_count from store |
 | Utility (to_string converters) | 4 | Full | Switch on enum value, return static strings |
 
 #### 10.2.4 Mock Query Implementation (Brute-Force)
 
-This is the most important mock logic â€” it must produce **plausible ranked results**:
+This is the most important mock logic — it must produce **plausible ranked results**:
 
 ```cpp
 // Simplified brute-force cosine similarity search
@@ -1523,13 +1523,13 @@ internal static class NativeLibraryResolver
 }
 ```
 
-**Advisory alternative:** a pure managed mock that returns function pointers through `SetDllImportResolver` (no C++ mock project) â€” optional later; v1 keeps the C++ mock.
+**Advisory alternative:** a pure managed mock that returns function pointers through `SetDllImportResolver` (no C++ mock project) — optional later; v1 keeps the C++ mock.
 
 ### 10.3 Concurrency Testing Framework
 
 #### 10.3.1 Framework Choice
 
-No external concurrency testing framework is required â€” raw `Task` + `xUnit` assertions + `Interlocked` + `Barrier` are sufficient. The .NET BCL provides everything:
+No external concurrency testing framework is required — raw `Task` + `xUnit` assertions + `Interlocked` + `Barrier` are sufficient. The .NET BCL provides everything:
 
 - `Task.WhenAll` for concurrent launch
 - `SemaphoreSlim` for throttling
@@ -1541,12 +1541,12 @@ For **systematic concurrency testing**, add:
 
 ```xml
 <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
-<!-- No special testing package â€” use raw Task + xUnit assertions -->
+<!-- No special testing package — use raw Task + xUnit assertions -->
 ```
 
 #### 10.3.2 ~~AsyncReaderWriterLock~~ Test Suite
 
-**ðŸ—‘ï¸ Canceled** â€” This subsection described correctness + stress + linearizability tests for the
+**🗑️ Canceled** — This subsection described correctness + stress + linearizability tests for the
 `AsyncReaderWriterLock` component, which was removed from the codebase. The native C++ engine
 handles its own thread safety; no managed-side RW lock exists to test.
 
@@ -1656,7 +1656,7 @@ public async Task Collection_QueryAsync_ReturnsHits()
     results.Should().NotBeEmpty();
 }
 
-// Memory: vector path â€” prefer BenchmarkDotNet [MemoryDiagnoser] for accuracy.
+// Memory: vector path — prefer BenchmarkDotNet [MemoryDiagnoser] for accuracy.
 // GC.GetAllocatedBytesForCurrentThread includes framework noise; keep threshold tight.
 [Fact]
 public void Query_WithPinnedMemory_DoesNotAllocateFloatArrayCopy()
@@ -1685,7 +1685,7 @@ public void Query_WithPinnedMemory_DoesNotAllocateFloatArrayCopy()
 | `QueryThroughputBench` | QPS for single-vector search (sync path) | vs. Python ZVec SDK |
 | `InsertThroughputBench` | Docs/sec for batch insert | vs. Python ZVec SDK |
 | `MemoryDiagnosisBench` | GC allocations per operation | Near-zero on vector query path |
-| `FilterParsingBench` | Filter builder string generation | Must be < 1 Âµs |
+| `FilterParsingBench` | Filter builder string generation | Must be < 1 µs |
 
 ### 11.2 BenchmarkDotNet Configuration
 
@@ -1720,7 +1720,7 @@ public class QueryThroughputBench
 
     /// <summary>
     /// Forces a managed copy so GC allocation differs from the zero-copy baseline.
-    /// Note: passing float[] alone does NOT copy â€” it wraps as ReadOnlyMemory without alloc.
+    /// Note: passing float[] alone does NOT copy — it wraps as ReadOnlyMemory without alloc.
     /// </summary>
     [Benchmark]
     public IReadOnlyList<ZVecDoc> Query_ExplicitCopy()
@@ -1746,11 +1746,11 @@ public class QueryThroughputBench
 
 | Metric | Target | Baseline |
 |--------|--------|---------|
-| Sync P/Invoke overhead (768-dim vector) | < 50 Âµs | `DllImport float[]` â‰ˆ 30 Âµs |
-| Single-vector query (10k docs, topk=10) | < 1 ms | Python ZVec â‰ˆ 1.2 ms |
-| Batch insert (1000 docs) | > 50k docs/sec | Python ZVec â‰ˆ 40k docs/sec |
-| GC allocation per query (vector path) | < 256 B intermediate + result objects | `float[]` copy â‰ˆ 3 KB |
-| Filter builder string generation | < 1 Âµs | String concatenation â‰ˆ 0.5 Âµs |
+| Sync P/Invoke overhead (768-dim vector) | < 50 µs | `DllImport float[]` ≈ 30 µs |
+| Single-vector query (10k docs, topk=10) | < 1 ms | Python ZVec ≈ 1.2 ms |
+| Batch insert (1000 docs) | > 50k docs/sec | Python ZVec ≈ 40k docs/sec |
+| GC allocation per query (vector path) | < 256 B intermediate + result objects | `float[]` copy ≈ 3 KB |
+| Filter builder string generation | < 1 µs | String concatenation ≈ 0.5 µs |
 
 ---
 
@@ -1761,12 +1761,12 @@ public class QueryThroughputBench
 - **Epic E16 (Dependency Injection)**: Integrated `Microsoft.Extensions.DependencyInjection` with `AddZVec` and `AddZVecCollection` using keyed singletons and DI options.
 - **Epic E17 (Mock Native Library)**: Created `zvec_c_api_mock.cpp` and `mock_structs.h` using CMake, removing the legacy C# mock and establishing a cross-platform mock matching the C API.
 
-### Phase 1: Native Layer (upstream `zvec_c_api`) â€” ~2.5 weeks
+### Phase 1: Native Layer (upstream `zvec_c_api`) — ~2.5 weeks
 
 | ID | Task | Owner | Depends On | Est. |
 |----|------|-------|-----------|------|
-| 1.1 | Submodule + CMake wrapper for upstream `zvec_c_api` | C++ Lead | â€” | 2d |
-| 1.2 | Audit Â§2.5 vs `c_api.h`; freeze gap table | C++ Lead | 1.1 | 1d |
+| 1.1 | Submodule + CMake wrapper for upstream `zvec_c_api` | C++ Lead | — | 2d |
+| 1.2 | Audit §2.5 vs `c_api.h`; freeze gap table | C++ Lead | 1.1 | 1d |
 | 1.3 | Align P/Invoke surface with upstream `c_api.h` | C++ Lead | 1.2 | 1d |
 | 1.4 | Wire global init + version APIs + schema construction | C++ Lead | 1.3 | 2d |
 | 1.5 | Wire collection lifecycle (create_and_open, open, close, destroy) | C++ Lead | 1.4 | 2d |
@@ -1775,13 +1775,13 @@ public class QueryThroughputBench
 | 1.8 | Wire optimize + schema DDL | C++ Lead | 1.4 | 2d |
 | 1.9 | Compile test libraries (win-x64, linux-x64) | C++ Lead | 1.6-1.8 | 1d |
 | 1.10 | Cross-compile macOS + ARM64 | C++ Lead | 1.9 | 2d |
-| 1.11 | Implement mock C-API library | C++ Dev | 1.3 | 5â€“8d |
+| 1.11 | Implement mock C-API library | C++ Dev | 1.3 | 5–8d |
 
-### Phase 2: P/Invoke Layer â€” ~2 weeks
+### Phase 2: P/Invoke Layer — ~2 weeks
 
 | ID | Task | Owner | Depends On | Est. |
 |----|------|-------|-----------|------|
-| 2.1 | Create ZVec.NET class library | .NET Lead | â€” | 0.5d |
+| 2.1 | Create ZVec.NET class library | .NET Lead | — | 0.5d |
 | 2.2 | Define C# enums matching Appendix A | .NET Lead | 1.2 | 0.5d |
 | 2.3 | Implement `[LibraryImport]` (`U1` bools, version APIs) | .NET Lead | 2.1, 1.3 | 2d |
 | 2.4 | SafeHandles + finalizer/Dispose guidance | .NET Lead | 2.3 | 1d |
@@ -1789,14 +1789,14 @@ public class QueryThroughputBench
 | 2.6 | NativeLibraryResolver + clear DllNotFound | .NET Lead | 2.3 | 0.5d |
 | 2.7 | Unit tests for SafeHandle + enum mapping | .NET Dev | 2.4, 2.2 | 2d |
 
-### Phase 3: Public SDK â€” ~3.5 weeks
+### Phase 3: Public SDK — ~3.5 weeks
 
 | ID | Task | Owner | Depends On | Est. |
 |----|------|-------|-----------|------|
 | 3.0 | `IZvecFactory` / `IZvecCollection` sync+async + DI + Shutdown | .NET Lead | 2.2 | 1.5d |
 | 3.1 | DTOs + SchemaBuilder + typed query params | .NET Lead | 2.2 | 2d |
 | 3.2 | `ZVecFactory` (init, first-init-wins, version gate, create/open, shutdown) | .NET Lead | 2.3, 3.0, 3.1 | 2d |
-| 3.3 | ~~Custom `Internal.AsyncReaderWriterLock` + unit tests~~ ðŸ—‘ï¸ Canceled | â€” | â€” | â€” |
+| 3.3 | ~~Custom `Internal.AsyncReaderWriterLock` + unit tests~~ 🗑️ Canceled | — | — | — |
 | 3.4 | `ZVecCollection` CRUD sync+async + RW lock + close-vs-destroy | .NET Lead | 3.2, 3.3 | 4d |
 | 3.5 | Query sync+async (single + multi-vector) | .NET Lead | 3.4 | 3d |
 | 3.6 | Optimize / Destroy sync+async (destroy then close) | .NET Lead | 3.2 | 0.5d |
@@ -1804,25 +1804,25 @@ public class QueryThroughputBench
 | 3.8 | `ZVecFilterBuilder` (`ZVecCompareOp` + escaping) | .NET Lead | 3.1 | 1.5d |
 | 3.9 | Reranker types | .NET Lead | 3.1 | 1d |
 | 3.10 | Collection properties | .NET Lead | 3.2 | 1d |
-| 3.11 | Integration tests | .NET Dev | 3.4-3.10 | 5â€“7d |
+| 3.11 | Integration tests | .NET Dev | 3.4-3.10 | 5–7d |
 | 3.12 | Memory/concurrency tests | .NET Dev | 3.3-3.10 | 3d |
 
-### Phase 4: CI/CD & Publishing â€” ~2.5 weeks
+### Phase 4: CI/CD & Publishing — ~2.5 weeks
 
 | ID | Task | Owner | Depends On | Est. |
 |----|------|-------|-----------|------|
-| 4.1 | GitHub Actions: C++ matrix (6 RIDs) | DevOps | 1.9 | 3â€“5d |
+| 4.1 | GitHub Actions: C++ matrix (6 RIDs) | DevOps | 1.9 | 3–5d |
 | 4.2 | GitHub Actions: .NET build + test | DevOps | 2.1 | 1d |
-| 4.3 | NuGet pack (`PackageLicenseExpression`, snupkg, README, runtimes/) | .NET Lead | 4.1, 4.2 | 2â€“3d |
+| 4.3 | NuGet pack (`PackageLicenseExpression`, snupkg, README, runtimes/) | .NET Lead | 4.1, 4.2 | 2–3d |
 | 4.4 | BenchmarkDotNet suite | .NET Dev | 3.11 | 3d |
 | 4.5 | Validate performance targets | .NET Dev | 4.4 | 1d |
 | 4.6 | Publish alpha NuGet | .NET Lead | 4.3 | 0.5d |
 | 4.7 | README + getting-started | .NET Lead | 4.6 | 1d |
 
 
-### Total Estimated Duration: **~10â€“12 weeks** (2 developers)
+### Total Estimated Duration: **~10–12 weeks** (2 developers)
 
-Optimistic calendar floor remains ~8 weeks if native/CI goes smoothly; plan to **10â€“12 weeks** for cross-platform RIDs, packaging, and integration depth.
+Optimistic calendar floor remains ~8 weeks if native/CI goes smoothly; plan to **10–12 weeks** for cross-platform RIDs, packaging, and integration depth.
 
 ---
 
@@ -1860,13 +1860,13 @@ strategy:
 
 ### 13.2 Pipeline Stages
 
-1. **Build Native** â€” Compile `zvec_c_api` for all 6 RIDs
-2. **Build Managed** â€” `dotnet build` ZVec.NET
-3. **Test (Mock)** â€” Unit tests against mock native library
-4. **Test (Integration)** â€” Integration tests against real ZVec binaries (Linux x64)
-5. **Benchmark** â€” BenchmarkDotNet on Linux x64
-6. **Pack** â€” `dotnet pack` with `runtimes/` + symbols
-7. **Publish** â€” Push to nuget.org (release tag only)
+1. **Build Native** — Compile `zvec_c_api` for all 6 RIDs
+2. **Build Managed** — `dotnet build` ZVec.NET
+3. **Test (Mock)** — Unit tests against mock native library
+4. **Test (Integration)** — Integration tests against real ZVec binaries (Linux x64)
+5. **Benchmark** — BenchmarkDotNet on Linux x64
+6. **Pack** — `dotnet pack` with `runtimes/` + symbols
+7. **Publish** — Push to nuget.org (release tag only)
 
 ### 13.3 Cross-Compilation Strategy for 6 RIDs (No ARM64 Hardware)
 
@@ -1879,7 +1879,7 @@ You don't own ARM64 devices. Building native ARM64 binaries requires cross-compi
 | RID | Build Host | Cross-Compile Method | Test Method |
 |-----|-----------|---------------------|-------------|
 | **win-x64** | `windows-latest` | Native build (MSVC) | Run directly |
-| **win-arm64** | `windows-latest` | MSVC with `-A ARM64` | **No run test** â€” compile-only gate |
+| **win-arm64** | `windows-latest` | MSVC with `-A ARM64` | **No run test** — compile-only gate |
 | **linux-x64** | `ubuntu-latest` | Native build (GCC) | Run directly |
 | **linux-arm64** | `ubuntu-latest` | `aarch64-linux-gnu-gcc` cross-compiler | **QEMU user-mode** (`qemu-aarch64`) |
 | **osx-x64** | `macos-latest` (Intel runner) | Native build (Clang) | Run directly |
@@ -1888,7 +1888,7 @@ You don't own ARM64 devices. Building native ARM64 binaries requires cross-compi
 #### 13.3.3 CI Workflow: Cross-Compile + Emulated Test
 
 ```yaml
-# .github/workflows/build-native.yml â€” linux-arm64 job
+# .github/workflows/build-native.yml — linux-arm64 job
 build-linux-arm64:
   runs-on: ubuntu-latest
   steps:
@@ -1925,7 +1925,7 @@ build-linux-arm64:
 Windows ARM64 is the hardest because QEMU can't run Windows binaries. Strategy:
 
 1. **Compile-only gate:** Build with MSVC `-A ARM64` in CI. This verifies the code compiles correctly for ARM64.
-2. **No run test in CI** â€” document this as a known gap.
+2. **No run test in CI** — document this as a known gap.
 3. **Community testing:** Add a GitHub Issue template: "ARM64 Windows Testing Report" where users can report success/failure.
 4. **Alternative:** Use Windows ARM64 runners when GitHub makes them generally available (currently in preview).
 
@@ -1978,7 +1978,7 @@ For developers without ARM64 hardware:
 
 1. **Docker + QEMU:** Run `docker run --platform linux/arm64 ...` with QEMU emulation.
 2. **CI is the gate:** Don't build ARM64 locally. Push to CI and let the matrix handle it.
-3. **The mock library** (`zvec_c_api_mock`) is x64-only â€” all unit tests run on x64. ARM64 testing is integration-only.
+3. **The mock library** (`zvec_c_api_mock`) is x64-only — all unit tests run on x64. ARM64 testing is integration-only.
 
 ---
 
@@ -1988,20 +1988,20 @@ For developers without ARM64 hardware:
 
 | # | Risk | Impact | Probability | Status |
 |---|------|--------|-------------|--------|
-| R1 | ZVec C++ ABI changes between versions | High | Medium | âœ… Mitigated |
-| R2 | P/Invoke marshalling overhead exceeds 50Âµs (sync path) | High | Low | âœ… Mitigated |
-| R3 | Cross-compilation fails for ARM64 | Medium | Medium | âœ… Mitigated (Â§13.3) |
-| R4 | NuGet package size too large (>50MB) | Medium | Low | âœ… Mitigated |
-| R5 | GC pauses / Field boxing on hot paths | Medium | Medium | âœ… Mitigated |
-| R6 | Filter expression / escaping bugs | Medium | Medium | âœ… Mitigated |
-| R7 | .NET multi-target / SDK churn | Medium | Low | âœ… Mitigated |
-| R8 | SafeHandle finalizer-thread P/Invoke deadlock | High | Low | âœ… Mitigated |
-| R9 | Dual-semaphore race if RW lock regresses | High | Low | âœ… Mitigated |
-| R10 | Accidental on-disk delete via Dispose | High | Low | âœ… Mitigated |
-| R11 | `LPUTF8Str` / wrong free on version or error strings | High | Low | âœ… Mitigated |
-| R12 | Upstream license change (non-permissive) | High | Low | âœ… Mitigated |
-| R13 | Binding gaps (missing C API for documented DB features) | Medium | Medium | âœ… Closed (Â§2.0 audit) |
-| R14 | Native DLL name conflict with another package | Medium | Low | âœ… Mitigated |
+| R1 | ZVec C++ ABI changes between versions | High | Medium | ✅ Mitigated |
+| R2 | P/Invoke marshalling overhead exceeds 50µs (sync path) | High | Low | ✅ Mitigated |
+| R3 | Cross-compilation fails for ARM64 | Medium | Medium | ✅ Mitigated (§13.3) |
+| R4 | NuGet package size too large (>50MB) | Medium | Low | ✅ Mitigated |
+| R5 | GC pauses / Field boxing on hot paths | Medium | Medium | ✅ Mitigated |
+| R6 | Filter expression / escaping bugs | Medium | Medium | ✅ Mitigated |
+| R7 | .NET multi-target / SDK churn | Medium | Low | ✅ Mitigated |
+| R8 | SafeHandle finalizer-thread P/Invoke deadlock | High | Low | ✅ Mitigated |
+| R9 | Dual-semaphore race if RW lock regresses | High | Low | ✅ Mitigated |
+| R10 | Accidental on-disk delete via Dispose | High | Low | ✅ Mitigated |
+| R11 | `LPUTF8Str` / wrong free on version or error strings | High | Low | ✅ Mitigated |
+| R12 | Upstream license change (non-permissive) | High | Low | ✅ Mitigated |
+| R13 | Binding gaps (missing C API for documented DB features) | Medium | Medium | ✅ Closed (§2.0 audit) |
+| R14 | Native DLL name conflict with another package | Medium | Low | ✅ Mitigated |
 
 ### 14.2 Detailed Mitigations
 
@@ -2010,7 +2010,7 @@ For developers without ARM64 hardware:
 The version gate already mitigates this, but we add a **compile-time lock**:
 
 ```csharp
-// NativeMethods.cs â€” pinned at build time
+// NativeMethods.cs — pinned at build time
 internal const int ExpectedMajor = 0;  // TODO: set from zvec submodule tag
 internal const int ExpectedMinor = 3;
 internal const int ExpectedPatch = 0;
@@ -2026,7 +2026,7 @@ if (!NativeMethods.zvec_check_version(ExpectedMajor, ExpectedMinor, ExpectedPatc
 
 ---
 
-#### R2: P/Invoke marshalling overhead exceeds 50Âµs
+#### R2: P/Invoke marshalling overhead exceeds 50µs
 
 Already using `[LibraryImport]` (source-generated, no runtime reflection). Additional mitigation:
 
@@ -2037,13 +2037,13 @@ internal static partial int zvec_vector_query_set_query_vector(
     zvec_vector_query_t* query, void* data, UIntPtr size);
 ```
 
-**Benchmark gate in CI:** BenchmarkDotNet test runs on every PR targeting the `dev` branch. If sync P/Invoke overhead exceeds 50Âµs on a 768-dim vector, the PR is blocked.
+**Benchmark gate in CI:** BenchmarkDotNet test runs on every PR targeting the `dev` branch. If sync P/Invoke overhead exceeds 50µs on a 768-dim vector, the PR is blocked.
 
 ---
 
 #### R3: Cross-compilation fails for ARM64
 
-See Â§13.3 for the dedicated cross-compilation strategy. Key points: CI-first with QEMU emulation for linux-arm64, compile-only gate for win-arm64, native runners for macOS.
+See §13.3 for the dedicated cross-compilation strategy. Key points: CI-first with QEMU emulation for linux-arm64, compile-only gate for win-arm64, native runners for macOS.
 
 ---
 
@@ -2082,7 +2082,7 @@ See Â§13.3 for the dedicated cross-compilation strategy. Key points: CI-first 
    ```csharp
    /// <summary>
    /// Scalar fields. Values are boxed (object) for Python/Node parity.
-   /// Zero-allocation goal (G2) applies to VECTOR paths only â€” iterating
+   /// Zero-allocation goal (G2) applies to VECTOR paths only — iterating
    /// Fields on a hot query path allocates. Prefer vector-only access when measuring GC.
    /// </summary>
    public IReadOnlyDictionary<string, object> Fields { get; init; }
@@ -2107,13 +2107,13 @@ See Â§13.3 for the dedicated cross-compilation strategy. Key points: CI-first 
 
 1. Ship a single `lib/net8.0/` asset when no TFM-specific `#if` code exists. net9/net10 consumers fall back automatically.
 2. Pin `<LangVersion>latest</LangVersion>` but avoid preview features.
-3. CI tests against net8.0 and net9.0 only â€” net10.0 is optional until GA.
+3. CI tests against net8.0 and net9.0 only — net10.0 is optional until GA.
 
 ---
 
 #### R8: SafeHandle finalizer-thread P/Invoke deadlock
 
-1. `ReleaseHandle` calls `zvec_collection_close` only â€” verified thread-safe by upstream (uses `shared_ptr` with atomic refcount, no TLS).
+1. `ReleaseHandle` calls `zvec_collection_close` only — verified thread-safe by upstream (uses `shared_ptr` with atomic refcount, no TLS).
 2. Add diagnostic logging when finalizer runs:
    ```csharp
    protected override bool ReleaseHandle()
@@ -2121,7 +2121,7 @@ See Â§13.3 for the dedicated cross-compilation strategy. Key points: CI-first 
        if (!IsInvalid)
        {
            if (!Environment.HasShutdownStarted && Thread.CurrentThread.IsThreadPoolThread)
-               Debug.WriteLine("[ZVec] WARNING: SafeZvecHandle released from finalizer â€” missing Dispose()");
+               Debug.WriteLine("[ZVec] WARNING: SafeZvecHandle released from finalizer — missing Dispose()");
            _ = NativeMethods.zvec_collection_close(handle);
        }
        return true;
@@ -2133,16 +2133,16 @@ See Â§13.3 for the dedicated cross-compilation strategy. Key points: CI-first 
 
 #### R9: Dual-semaphore race ~~if RW lock regresses~~
 
-**ðŸ—‘ï¸ No longer applicable** â€” The `AsyncReaderWriterLock` was canceled; there is no custom
+**🗑️ No longer applicable** — The `AsyncReaderWriterLock` was canceled; there is no custom
 managed-side lock to regress against. Native C++ owns all operation-level thread safety.
-Managed code uses `Interlocked` for lifecycle state only â€” the `SemaphoreSlim`/`ReaderWriterLockSlim`
+Managed code uses `Interlocked` for lifecycle state only — the `SemaphoreSlim`/`ReaderWriterLockSlim`
 restriction does not apply.
 
 ---
 
 #### R10: Accidental on-disk delete via Dispose
 
-1. `Dispose`/`ReleaseHandle` calls `zvec_collection_close` ONLY â€” never `destroy`.
+1. `Dispose`/`ReleaseHandle` calls `zvec_collection_close` ONLY — never `destroy`.
 2. `Destroy`/`DestroyAsync` is a separate explicit method that calls `zvec_collection_destroy` then `zvec_collection_close`.
 3. After `Destroy`, mark the `SafeHandle` invalid so subsequent `Dispose` is a no-op.
 4. Integration test:
@@ -2164,8 +2164,8 @@ restriction does not apply.
 
 #### R11: LPUTF8Str / wrong free on version or error strings
 
-1. `zvec_get_version()` returns `const char*` â€” library-owned static memory. P/Invoke as `IntPtr`, read with `Marshal.PtrToStringUTF8`, **never free**.
-2. `zvec_get_last_error()` returns `char**` â€” caller must free with `free()` (libc). P/Invoke as `out IntPtr`, read with `Marshal.PtrToStringUTF8`, then free with `zvec_free()` (the library's own allocator):
+1. `zvec_get_version()` returns `const char*` — library-owned static memory. P/Invoke as `IntPtr`, read with `Marshal.PtrToStringUTF8`, **never free**.
+2. `zvec_get_last_error()` returns `char**` — caller must free with `free()` (libc). P/Invoke as `out IntPtr`, read with `Marshal.PtrToStringUTF8`, then free with `zvec_free()` (the library's own allocator):
    ```csharp
    internal static string GetLastErrorMessage()
    {
@@ -2193,13 +2193,13 @@ restriction does not apply.
        head -1 src/Native/ZVec.Native/external/zvec/LICENSE | grep -q "Apache License"
    ```
 2. If license changes, CI fails and blocks the build.
-3. NuGet metadata: `<PackageLicenseExpression>MIT</PackageLicenseExpression>` covers our package. The upstream Apache-2.0 license is for the native binary which we redistribute â€” legally compatible with MIT wrapping.
+3. NuGet metadata: `<PackageLicenseExpression>MIT</PackageLicenseExpression>` covers our package. The upstream Apache-2.0 license is for the native binary which we redistribute — legally compatible with MIT wrapping.
 
 ---
 
 #### R13: Binding gaps (missing C API for documented DB features)
 
-This is now **closed** â€” see Â§2.0 audit. Only 2 gaps exist (`HNSW_RABITQ=4`, `RABITQ=4`), both have concrete resolutions using `type.h` values.
+This is now **closed** — see §2.0 audit. Only 2 gaps exist (`HNSW_RABITQ=4`, `RABITQ=4`), both have concrete resolutions using `type.h` values.
 
 ---
 
@@ -2217,15 +2217,15 @@ This is now **closed** â€” see Â§2.0 audit. Only 2 gaps exist (`HNSW_RABI
 |-----------|--------------|-------------|
 | **M1: Native MVP** | Week 3 | Upstream `c_api.h` wired; win-x64 + linux-x64 binaries; mock library started |
 | **M2: P/Invoke Layer** | Week 5 | `NativeMethods` + SafeHandles + version gate + VectorMarshaller; unit tests |
-| **M3: Public SDK Alpha** | Week 8â€“9 | DI + sync/async CRUD/Query/FTS/DDL + RW lock; integration tests |
-| **M4: Cross-Platform Pack** | Week 10â€“11 | CI builds 6 RIDs; NuGet pack (license expression, snupkg, README) |
-| **M5: Benchmark & Release** | Week 11â€“12 | Performance targets validated; alpha `ZVec.NET` published |
+| **M3: Public SDK Alpha** | Week 8–9 | DI + sync/async CRUD/Query/FTS/DDL + RW lock; integration tests |
+| **M4: Cross-Platform Pack** | Week 10–11 | CI builds 6 RIDs; NuGet pack (license expression, snupkg, README) |
+| **M5: Benchmark & Release** | Week 11–12 | Performance targets validated; alpha `ZVec.NET` published |
 
 ---
 
-## Appendix A â€” ZVec Enum Reference
+## Appendix A — ZVec Enum Reference
 
-> **Sole numeric enum / error-code table in this document.** Do not reintroduce parallel enum lists in Â§5/Â§6.
+> **Sole numeric enum / error-code table in this document.** Do not reintroduce parallel enum lists in §5/§6.
 >
 > **Source of truth for numeric values:** `src/Native/ZVec.Native/external/zvec/src/include/zvec/db/type.h`
 > (and matching macros in `c_api.h` when present). Prefer `type.h` if the C header lags
@@ -2233,15 +2233,15 @@ This is now **closed** â€” see Â§2.0 audit. Only 2 gaps exist (`HNSW_RABI
 >
 > **Public docs subset:** [zvec.org Data Types](https://zvec.org/en/docs/db/concepts/data-modeling/) /
 > [llms-full.txt](https://zvec.org/llms-full.txt) (local audit snapshot: [`docs/llms-full.txt`](docs/llms-full.txt)) document the product-facing types
-> (`STRING`â€¦`DOUBLE`, `ARRAY_*`, `VECTOR_FP16`/`FP32`/`INT8`, `SPARSE_VECTOR_*`).
+> (`STRING`…`DOUBLE`, `ARRAY_*`, `VECTOR_FP16`/`FP32`/`INT8`, `SPARSE_VECTOR_*`).
 > The full ABI enum below is a **superset** (includes `BINARY`, `VECTOR_FP64`, `VECTOR_INT4`/`INT16`,
-> `ARRAY_BINARY`, etc.) for P/Invoke fidelity â€” nothing from the public docs set was removed.
+> `ARRAY_BINARY`, etc.) for P/Invoke fidelity — nothing from the public docs set was removed.
 
 ### ZVecDataType (from `DataType` / `ZVEC_DATA_TYPE_*`)
 
 | Value | Name | C# Member | In public docs? |
 |-------|------|-----------|-----------------|
-| 0 | `UNDEFINED` | `ZVecDataType.Undefined` | â€” |
+| 0 | `UNDEFINED` | `ZVecDataType.Undefined` | — |
 | 1 | `BINARY` | `ZVecDataType.Binary` | ABI-only |
 | 2 | `STRING` | `ZVecDataType.String` | yes |
 | 3 | `BOOL` | `ZVecDataType.Bool` | yes |
@@ -2289,7 +2289,7 @@ This is now **closed** â€” see Â§2.0 audit. Only 2 gaps exist (`HNSW_RABI
 | 1 | `HNSW` | `ZVecIndexType.Hnsw` | |
 | 2 | `IVF` | `ZVecIndexType.Ivf` | First-class in v1 |
 | 3 | `FLAT` | `ZVecIndexType.Flat` | |
-| 4 | `HNSW_RABITQ` | `ZVecIndexType.HnswRabitq` | In `type.h`; missing `#define` in `c_api.h` â€” use `4`. x86_64/AVX2 only |
+| 4 | `HNSW_RABITQ` | `ZVecIndexType.HnswRabitq` | In `type.h`; missing `#define` in `c_api.h` — use `4`. x86_64/AVX2 only |
 | 5 | `DISKANN` | `ZVecIndexType.DiskAnn` | |
 | 6 | `VAMANA` | `ZVecIndexType.Vamana` | |
 | 10 | `INVERT` | `ZVecIndexType.Invert` | |
@@ -2323,7 +2323,7 @@ This is now **closed** â€” see Â§2.0 audit. Only 2 gaps exist (`HNSW_RABI
 
 ### ZVecLogLevel / ZVecLogType
 
-Match `zvec_log_level_t` / `zvec_log_type_t` in `c_api.h`: `Debug=0` â€¦ `Fatal=4`; `Console=0` / `File=1`.
+Match `zvec_log_level_t` / `zvec_log_type_t` in `c_api.h`: `Debug=0` … `Fatal=4`; `Console=0` / `File=1`.
 
 Match `ZVEC_QUANTIZE_TYPE_*` / `QuantizeType` in `type.h`: `Undefined=0`, `Fp16=1`, `Int8=2`, `Int4=3`, `Rabitq=4`.
 
@@ -2395,7 +2395,7 @@ Match `ZVEC_QUANTIZE_TYPE_*` / `QuantizeType` in `type.h`: `Undefined=0`, `Fp16=
 
 ---
 
-## Appendix B â€” ZVec Method Signature Reference
+## Appendix B — ZVec Method Signature Reference
 
 Complete method signatures extracted from the official Python and Node.js SDK documentation, serving as the ground truth for C# wrapper implementation.
 

@@ -13,10 +13,10 @@ public class ZVecFactoryTests
     [Fact]
     public void Factory_Initialize_SecondCall_IsNoOp()
     {
-        // Arrange â€” reset state to a known starting point by calling Shutdown first.
+        // Arrange — reset state to a known starting point by calling Shutdown first.
         using var factory = new ZVecFactory();
 
-        // Act â€” first Initialize will attempt native call (may fail without native DLL)
+        // Act — first Initialize will attempt native call (may fail without native DLL)
         // but the state-machine no-op behaviour is observable before native involvement
         // by verifying the second call does not throw even in an already-initialized state.
         // Full native round-trip tested in E18 integration tests.
@@ -30,7 +30,7 @@ public class ZVecFactoryTests
     public void Factory_Shutdown_WhenNotInitialized_IsNoOp()
     {
         var factory = new ZVecFactory();
-        // Shutdown before Initialize â€” must be a no-op, not an exception.
+        // Shutdown before Initialize — must be a no-op, not an exception.
         var act = () => factory.Shutdown();
         act.Should().NotThrow();
     }
@@ -68,8 +68,8 @@ public class ZVecFactoryTests
     public void Factory_Initialize_ConcurrentCalls_ExactlyOneWins()
     {
         // Validates the Interlocked.CompareExchange state machine: even with N concurrent
-        // callers, exactly one transitions Uninitializedâ†’Initialized. The rest no-op.
-        // This test does NOT require native binaries â€” it intercepts at the CAS level.
+        // callers, exactly one transitions Uninitialized→Initialized. The rest no-op.
+        // This test does NOT require native binaries — it intercepts at the CAS level.
         // Native calls may throw DllNotFoundException; we only assert no race-corruption.
         int successCount = 0;
         int exceptionCount = 0;

@@ -1,13 +1,13 @@
 namespace ZVec.NET;
 
 /// <summary>
-/// Defines a ZVec vector collection â€” lifecycle, CRUD, query, and DDL operations.
+/// Defines a ZVec vector collection — lifecycle, CRUD, query, and DDL operations.
 /// </summary>
 /// <remarks>
 /// Dispose/DisposeAsync perform a <c>zvec_collection_close</c> (safe to call multiple times;
 /// internally idempotent). <see cref="Destroy"/> and <see cref="DestroyAsync"/> first call
 /// <c>zvec_collection_destroy</c> (deletes on-disk data) then close. All idempotency and
-/// mutual exclusion is achieved via <see cref="Interlocked"/> â€” no custom locks.
+/// mutual exclusion is achieved via <see cref="Interlocked"/> — no custom locks.
 /// </remarks>
 public interface IZvecCollection : IDisposable, IAsyncDisposable
 {
@@ -22,7 +22,7 @@ public interface IZvecCollection : IDisposable, IAsyncDisposable
 
     /// <summary>
     /// Destroys the collection: deletes all on-disk data, then closes the handle.
-    /// Idempotent â€” subsequent calls are no-ops.
+    /// Idempotent — subsequent calls are no-ops.
     /// </summary>
     void Destroy();
 
@@ -32,7 +32,7 @@ public interface IZvecCollection : IDisposable, IAsyncDisposable
     ValueTask DestroyAsync(CancellationToken ct = default);
 
     // =========================================================================
-    // Epic E12 â€” CRUD
+    // Epic E12 — CRUD
     // =========================================================================
 
     ZVecStatus Insert(ZVecDoc doc);
@@ -56,7 +56,7 @@ public interface IZvecCollection : IDisposable, IAsyncDisposable
     ValueTask<ZVecDoc?> FetchAsync(string pk, bool includeVector = false, CancellationToken ct = default);
 
     // =========================================================================
-    // Epic E13 â€” Query
+    // Epic E13 — Query
     // =========================================================================
 
     IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk = 10, string? filter = null);
@@ -64,7 +64,7 @@ public interface IZvecCollection : IDisposable, IAsyncDisposable
     ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(ZVecQuery query, int topk = 10, string? filter = null, CancellationToken ct = default);
 
     // =========================================================================
-    // Epic E14 â€” DDL
+    // Epic E14 — DDL
     // =========================================================================
 
     void AddColumn(ZVecFieldSchema field, string? defaultExpression = null);

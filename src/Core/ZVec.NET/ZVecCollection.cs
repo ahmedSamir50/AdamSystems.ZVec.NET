@@ -10,18 +10,18 @@ namespace ZVec.NET;
 /// <remarks>
 /// <para>
 /// <b>Dispose vs Destroy semantics:</b><br/>
-/// <see cref="Dispose"/>/<see cref="DisposeAsync"/> â†’ <c>zvec_collection_close</c> (data is preserved).<br/>
-/// <see cref="Destroy"/>/<see cref="DestroyAsync"/> â†’ <c>zvec_collection_destroy</c> then close (data is deleted).
+/// <see cref="Dispose"/>/<see cref="DisposeAsync"/> → <c>zvec_collection_close</c> (data is preserved).<br/>
+/// <see cref="Destroy"/>/<see cref="DestroyAsync"/> → <c>zvec_collection_destroy</c> then close (data is deleted).
 /// </para>
 /// <para>
 /// <b>Thread safety:</b> Idempotency and mutual exclusion for all disposal paths are achieved
-/// with <see cref="Interlocked.Exchange(ref int, ref int)"/> on <c>int</c> flags â€” no custom lock.
+/// with <see cref="Interlocked.Exchange(ref int, ref int)"/> on <c>int</c> flags — no custom lock.
 /// This mirrors the BCL <see cref="SafeHandle"/> pattern.
 /// </para>
 /// </remarks>
 public sealed class ZVecCollection : IZvecCollection
 {
-    // Raw native handle â€” we manage it manually (not via SafeHandle) so we can
+    // Raw native handle — we manage it manually (not via SafeHandle) so we can
     // control close-vs-destroy ordering precisely.
     private readonly nint _handle;
 
@@ -53,20 +53,20 @@ public sealed class ZVecCollection : IZvecCollection
     }
 
     // =========================================================================
-    // Lifecycle â€” Dispose / DisposeAsync
+    // Lifecycle — Dispose / DisposeAsync
     // =========================================================================
 
     /// <summary>
-    /// Closes the collection. Idempotent â€” safe to call multiple times and
+    /// Closes the collection. Idempotent — safe to call multiple times and
     /// concurrently with <see cref="DisposeAsync"/>.
     /// </summary>
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return; // Already closed â€” no-op.
+            return; // Already closed — no-op.
 
         // Capture result but don't throw during disposal per .NET conventions.
-        // Only call native close if the factory is initialized â€” otherwise the native
+        // Only call native close if the factory is initialized — otherwise the native
         // library resources are invalid and calling close would cause an Access Violation.
         // This mirrors the documented guard in SafeZvecHandle.ReleaseHandle().
         if (_factory.IsInitialized)
@@ -84,20 +84,20 @@ public sealed class ZVecCollection : IZvecCollection
     }
 
     // =========================================================================
-    // Lifecycle â€” Destroy / DestroyAsync
+    // Lifecycle — Destroy / DestroyAsync
     // =========================================================================
 
     /// <inheritdoc/>
     /// <remarks>
     /// Calls <c>zvec_collection_destroy</c> (deletes on-disk data) first, then
-    /// <c>zvec_collection_close</c>. The destroy â†’ close ordering is required by the
+    /// <c>zvec_collection_close</c>. The destroy → close ordering is required by the
     /// native C API contract. Subsequent calls (including <see cref="Dispose"/>) are no-ops.
     /// </remarks>
     public void Destroy()
     {
         // Guard: only one caller can execute the destroy path.
         if (Interlocked.Exchange(ref _destroyed, 1) != 0)
-            return; // Already destroyed â€” no-op.
+            return; // Already destroyed — no-op.
 
         // Atomically claim the right to clean up the native handle.
         // If Dispose() already ran, we cannot safely call native destroy.
@@ -129,7 +129,7 @@ public sealed class ZVecCollection : IZvecCollection
     }
 
     // =========================================================================
-    // Epic E12 â€” CRUD
+    // Epic E12 — CRUD
     // =========================================================================
 
     public ZVecStatus Insert(ZVecDoc doc)
@@ -480,7 +480,7 @@ public sealed class ZVecCollection : IZvecCollection
     }
 
     // =========================================================================
-    // Epic E13 â€” Query (Stubs)
+    // Epic E13 — Query (Stubs)
     // =========================================================================
 
     public IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk = 10, string? filter = null)
@@ -532,7 +532,7 @@ public sealed class ZVecCollection : IZvecCollection
     }
 
     // =========================================================================
-    // Epic E14 â€” DDL (Stubs)
+    // Epic E14 — DDL (Stubs)
     // =========================================================================
 
     public void AddColumn(ZVecFieldSchema field, string? defaultExpression = null)

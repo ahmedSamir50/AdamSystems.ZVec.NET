@@ -47,7 +47,7 @@ public sealed class ZVecFtsExtraParams
 
     /// <summary>
     /// stemmer filter only. Snowball language/algorithm (native default "english";
-    /// e.g. "porter" for ES-like behaviour). Kept as string â€” Snowball set is large/open.
+    /// e.g. "porter" for ES-like behaviour). Kept as string — Snowball set is large/open.
     /// </summary>
     public string? StemmerLang { get; init; }
 

@@ -5,12 +5,12 @@ First off, thank you for considering contributing to ZVec.NET! Our goal is to br
 ## Repository Architecture
 
 This repository contains two main components:
-1. **ZVec.NET (C#):** The managed .NET SDK â€” DI-first (`IZvecFactory` / `IZvecCollection`), async APIs, zero-allocation vector paths.
+1. **ZVec.NET (C#):** The managed .NET SDK — DI-first (`IZvecFactory` / `IZvecCollection`), async APIs, zero-allocation vector paths.
 2. **ZVec.Native (C++):** CMake wrapper that builds Alibaba's official fat C API (`zvec_c_api`) from the `external/zvec` submodule.
 
 Native code lives at `src/Native/ZVec.Native` (header: `external/zvec/src/include/zvec/c_api.h`). Windows build steps: [`src/Native/ZVec.Native/steps.md`](src/Native/ZVec.Native/steps.md).
 
-Design details (Factory/Builder, DI, LINQ-on-results, concurrency gates): [`ZVec.NET-Project-Plan.md`](ZVec.NET-Project-Plan.md) Â§Â§3, 7, 8.4.
+Design details (Factory/Builder, DI, LINQ-on-results, concurrency gates): [`ZVec.NET-Project-Plan.md`](ZVec.NET-Project-Plan.md) §§3, 7, 8.4.
 
 ## Local Development Setup
 
@@ -36,11 +36,11 @@ Because this project relies on a native C++ engine, you cannot simply press "Run
 
 1. **Branching:** Never work directly on `main`. Create a feature branch off the `dev` branch (e.g., `feature/add-hybrid-search`).
 2. **Pull Requests:** Submit all Pull Requests against the `dev` branch.
-3. **API shape:** Prefer interfaces + `AddZVec*` DI registration over new static entry points. Use `ZVecCollectionSchemaBuilder` and fluent `ZVecFilterBuilder` for schemas/filters. Implement **complete** `type.h` enums and **all** index-param types (Hnsw, HnswRabitq, Ivf, Flat, DiskAnn, Vamana, Invert, Fts) â€” do not defer indexes.
-4. **Coverage target:** Wrap the **Vector Database** C++ / `zvec_c_api` surface and match DB sections of [llms-full](https://zvec.org/llms-full.txt) (see plan Â§2.0). Do **not** implement AI Integration (embeddings, MCP, skills, model rerankers) in this package. Snapshot used for audits: `docs/llms-full.txt`.
-5. **Async & concurrency:** Public surface is async-first. P/Invoke is sync â€” always go through collection read/write gates; never add unbounded `Task.Run` around native calls. Honor `CancellationToken` while waiting on gates.
+3. **API shape:** Prefer interfaces + `AddZVec*` DI registration over new static entry points. Use `ZVecCollectionSchemaBuilder` and fluent `ZVecFilterBuilder` for schemas/filters. Implement **complete** `type.h` enums and **all** index-param types (Hnsw, HnswRabitq, Ivf, Flat, DiskAnn, Vamana, Invert, Fts) — do not defer indexes.
+4. **Coverage target:** Wrap the **Vector Database** C++ / `zvec_c_api` surface and match DB sections of [llms-full](https://zvec.org/llms-full.txt) (see plan §2.0). Do **not** implement AI Integration (embeddings, MCP, skills, model rerankers) in this package. Snapshot used for audits: `docs/llms-full.txt`.
+5. **Async & concurrency:** Public surface is async-first. P/Invoke is sync — always go through collection read/write gates; never add unbounded `Task.Run` around native calls. Honor `CancellationToken` while waiting on gates.
 6. **Zero allocation:** On hot paths (`Query` / `Insert`), use `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` and `MemoryHandle`. Do not introduce `new float[]` copies on vector passing paths.
-7. **Enums / ABI:** Match numeric values to upstream `zvec/db/type.h` and `c_api.h`. If the C header omits a define (e.g. `HNSW_RABITQ = 4`), use the `type.h` value â€” do not invent new numbers. Document every enum in the project plan Appendix A.
+7. **Enums / ABI:** Match numeric values to upstream `zvec/db/type.h` and `c_api.h`. If the C header omits a define (e.g. `HNSW_RABITQ = 4`), use the `type.h` value — do not invent new numbers. Document every enum in the project plan Appendix A.
 8. **LINQ:** Apply LINQ to **results** only. Do not add a custom `IQueryable` provider over the engine.
 9. **Testing:** Run the `ZVec.NET.Tests` project. We use a mock native library under `src/Mock/ZVec.Native.Mock` for unit testing so tests stay fast without a full native rebuild on every change.
 

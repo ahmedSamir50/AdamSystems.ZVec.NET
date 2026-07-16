@@ -18,7 +18,7 @@ public class ZVecRealNativeFixture : IDisposable
             NativeLibraryResolver.UseRealLibrary();
             NativeLibraryResolver.EnsureLoaded();
 
-            // THEN: Try to get version â€” simplest check
+            // THEN: Try to get version — simplest check
             var version = NativeMethods.GetVersionString();
             IsRealNativeAvailable = !string.IsNullOrEmpty(version) 
                                    && !version.Contains("mock", StringComparison.OrdinalIgnoreCase);
@@ -58,10 +58,10 @@ public class ZVecRealNativeFixture : IDisposable
             {
                 col = _factory.CreateAndOpen(_testPath, schema);
                 
-                // âœ… CORRECT: Check WHILE collection is open
+                // ✅ CORRECT: Check WHILE collection is open
                 bool pathExists = Directory.Exists(_testPath) || File.Exists(_testPath);
                 
-                // âœ… Try to insert a document to verify it's functional
+                // ✅ Try to insert a document to verify it's functional
                 if (pathExists)
                 {
                     try
@@ -88,7 +88,7 @@ public class ZVecRealNativeFixture : IDisposable
             }
             finally
             {
-                // âœ… Proper cleanup order
+                // ✅ Proper cleanup order
                 col?.Destroy(); // Deletes data and closes
             }
         }
@@ -106,7 +106,7 @@ public class ZVecRealNativeFixture : IDisposable
         {
             IsRealNativeAvailable = false;
             Console.WriteLine($"[ZVecRealNativeFixture] Detection failed: {ex.GetType().Name}: {ex.Message}");
-            // âœ… DON'T THROW - allow tests to skip gracefully
+            // ✅ DON'T THROW - allow tests to skip gracefully
         }
         finally
         {

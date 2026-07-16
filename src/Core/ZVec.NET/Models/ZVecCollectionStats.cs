@@ -1,7 +1,7 @@
 namespace ZVec.NET;
 
 /// <summary>
-/// Collection statistics: document count and per-index build completeness (0.0â€“1.0).
+/// Collection statistics: document count and per-index build completeness (0.0–1.0).
 /// Maps to Python/Node <c>collection.stats</c> (<c>doc_count</c>, <c>index_completeness</c>).
 /// </summary>
 public sealed class ZVecCollectionStats

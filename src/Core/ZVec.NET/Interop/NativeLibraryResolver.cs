@@ -10,7 +10,7 @@ namespace ZVec.NET.Interop;
 internal static class NativeLibraryResolver
 {
     /// <summary>
-    /// Atomic resolver state â€” all mutable fields are bundled into a single
+    /// Atomic resolver state — all mutable fields are bundled into a single
     /// reference that is swapped via <see cref="Interlocked.Exchange(ref object?, object)"/>
     /// to prevent torn reads across threads.
     /// </summary>
@@ -113,10 +113,10 @@ internal static class NativeLibraryResolver
     {
         if (name != NativeMethods.LibraryName) return IntPtr.Zero;
 
-        // Single volatile read â€” always consistent snapshot.
+        // Single volatile read — always consistent snapshot.
         var state = _resolverState;
 
-        // Mock path takes priority â€” when mock is set, never fall through to real library.
+        // Mock path takes priority — when mock is set, never fall through to real library.
         if (state.UseMock && state.MockLibraryPath is not null)
         {
             if (NativeLibrary.TryLoad(state.MockLibraryPath, out var handle))

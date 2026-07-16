@@ -348,8 +348,8 @@ internal static partial class NativeMethods
         IntPtr doc,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
         int dataType, // zvec_data_type_t
-        IntPtr value,          // const void* value â€” raw typed payload
-        nuint valueSize);      // size_t value_size â€” byte size of value
+        IntPtr value,          // const void* value — raw typed payload
+        nuint valueSize);      // size_t value_size — byte size of value
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_doc_add_sparse_vector_field(
@@ -364,16 +364,16 @@ internal static partial class NativeMethods
         IntPtr doc,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
         int dataType,
-        out IntPtr value,        // void** â€” allocated by native, must be freed via zvec_free
-        out nuint valueSize);    // size_t* â€” byte count of the returned buffer
+        out IntPtr value,        // void** — allocated by native, must be freed via zvec_free
+        out nuint valueSize);    // size_t* — byte count of the returned buffer
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_doc_get_field_value_pointer(
         IntPtr doc,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
         int dataType,
-        out IntPtr value,        // const void** â€” points into document-owned memory, do NOT free
-        out nuint valueSize);    // size_t* â€” byte count of the returned buffer
+        out IntPtr value,        // const void** — points into document-owned memory, do NOT free
+        out nuint valueSize);    // size_t* — byte count of the returned buffer
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_doc_get_field_names(

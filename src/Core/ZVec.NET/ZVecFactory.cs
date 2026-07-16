@@ -21,7 +21,7 @@ namespace ZVec.NET;
 public sealed class ZVecFactory : IZvecFactory
 {
     // =========================================================================
-    // State machine â€” transitions only go forward: Uninitialized â†’ Initialized â†’ ShutDown.
+    // State machine — transitions only go forward: Uninitialized → Initialized → ShutDown.
     // =========================================================================
     private int _state = FactoryState.Uninitialized;
     private static int _globalNativeInitCount = 0;
@@ -53,14 +53,14 @@ public sealed class ZVecFactory : IZvecFactory
     }
 
     // =========================================================================
-    // Open collection tracking â€” weak references so GC can still finalize
+    // Open collection tracking — weak references so GC can still finalize
     // collections independently if the user forgets to dispose them.
     // ConcurrentDictionary provides lock-free reads; write locks are per-slot.
     // =========================================================================
     internal readonly ConcurrentDictionary<nint, ZVecCollection> OpenCollections
         = new();
 
-    // Shutdown cancellation â€” signalled when Shutdown() is called.
+    // Shutdown cancellation — signalled when Shutdown() is called.
     private CancellationTokenSource _shutdownCts = new();
 
     // =========================================================================
@@ -74,7 +74,7 @@ public sealed class ZVecFactory : IZvecFactory
         {
             if (_state != FactoryState.Uninitialized)
             {
-                return; // Already initialized or shut down â€” no-op.
+                return; // Already initialized or shut down — no-op.
             }
 
             try
@@ -117,7 +117,7 @@ public sealed class ZVecFactory : IZvecFactory
         {
             if (_state != FactoryState.Initialized)
             {
-                return; // Not initialized, or already shut down â€” no-op.
+                return; // Not initialized, or already shut down — no-op.
             }
 
             // Signal all tracked collections that the factory is shutting down.
@@ -252,7 +252,7 @@ public sealed class ZVecFactory : IZvecFactory
     {
         if (options is null)
         {
-            // Use default native config (NULL â†’ native uses its own defaults).
+            // Use default native config (NULL → native uses its own defaults).
             ZVecError.ThrowIfFailed((ZVecErrorCode)NativeMethods.zvec_initialize(IntPtr.Zero), nameof(Initialize));
             return;
         }

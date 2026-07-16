@@ -2,7 +2,7 @@ namespace ZVec.NET;
 
 /// <summary>
 /// HNSW + RaBitQ. Maps to <c>IndexType::HNSW_RABITQ = 4</c> in <c>type.h</c>.
-/// <c>c_api.h</c> may omit the macro â€” pass value 4 until upstream adds it. x86_64/AVX2 only.
+/// <c>c_api.h</c> may omit the macro — pass value 4 until upstream adds it. x86_64/AVX2 only.
 /// </summary>
 public sealed class ZVecHnswRabitqIndexParam : ZVecIndexParam
 {

@@ -133,7 +133,7 @@ internal static class NativeDocUnmarshaller
                     fields[fieldName] = string.Empty;
                 break;
             case ZVecDataType.VectorFp32:
-                // valuePtr is float*, valueSize is byte count â†’ element count = valueSize / 4
+                // valuePtr is float*, valueSize is byte count → element count = valueSize / 4
                 if (valuePtr != IntPtr.Zero && valueSize > 0)
                 {
                     int floatCount = (int)(valueSize / sizeof(float));

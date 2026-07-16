@@ -2,7 +2,7 @@ namespace ZVec.NET.Internal;
 
 /// <summary>
 /// Maps managed enums to exact native C API string literals.
-/// Not part of the public SDK surface â€” used by interop/marshalling only.
+/// Not part of the public SDK surface — used by interop/marshalling only.
 /// </summary>
 internal static class ZVecNativeStrings
 {

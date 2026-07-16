@@ -189,6 +189,88 @@ public static class ZVecDefaults
         public const ZVecFtsDefaultOperator DefaultOperator = ZVecFtsDefaultOperator.Or;
     }
 
+    /// <summary>Filter expression tokens and formatting characters for <c>ZVecFilterBuilder</c>.</summary>
+    public static class Filter
+    {
+        /// <summary>Logical AND keyword.</summary>
+        public const string And = "AND";
+
+        /// <summary>Logical OR keyword.</summary>
+        public const string Or = "OR";
+
+        /// <summary>Logical NOT keyword.</summary>
+        public const string Not = "NOT";
+
+        /// <summary>IN membership keyword.</summary>
+        public const string In = "IN";
+
+        /// <summary>LIKE pattern keyword.</summary>
+        public const string Like = "LIKE";
+
+        /// <summary>CONTAIN_ANY array-intersection keyword.</summary>
+        public const string ContainAny = "CONTAIN_ANY";
+
+        /// <summary>CONTAIN_ALL array-subset keyword.</summary>
+        public const string ContainAll = "CONTAIN_ALL";
+
+        /// <summary>Equality operator.</summary>
+        public const string Eq = "=";
+
+        /// <summary>Inequality operator.</summary>
+        public const string Ne = "!=";
+
+        /// <summary>Greater-than operator.</summary>
+        public const string Gt = ">";
+
+        /// <summary>Less-than operator.</summary>
+        public const string Lt = "<";
+
+        /// <summary>Greater-than-or-equal operator.</summary>
+        public const string Ge = ">=";
+
+        /// <summary>Less-than-or-equal operator.</summary>
+        public const string Le = "<=";
+
+        /// <summary>Boolean true literal.</summary>
+        public const string True = "true";
+
+        /// <summary>Boolean false literal.</summary>
+        public const string False = "false";
+
+        /// <summary>Null literal.</summary>
+        public const string Null = "null";
+
+        /// <summary>Space separator between tokens.</summary>
+        public const string Space = " ";
+
+        /// <summary>Comma separator between list values.</summary>
+        public const string Comma = ",";
+
+        /// <summary>Comma followed by space between list values.</summary>
+        public const string CommaSpace = ", ";
+
+        /// <summary>Opening parenthesis.</summary>
+        public const string OpenParen = "(";
+
+        /// <summary>Closing parenthesis.</summary>
+        public const string CloseParen = ")";
+
+        /// <summary>Opening square bracket.</summary>
+        public const string OpenBracket = "[";
+
+        /// <summary>Closing square bracket.</summary>
+        public const string CloseBracket = "]";
+
+        /// <summary>Double-quote character used to delimit string literals.</summary>
+        public const char DoubleQuote = '"';
+
+        /// <summary>Single-quote character that must be escaped inside string literals.</summary>
+        public const char SingleQuote = '\'';
+
+        /// <summary>Backslash escape character.</summary>
+        public const char Backslash = '\\';
+    }
+
     /// <summary>Default parameters for Reranking.</summary>
     public static class Rerank
     {
@@ -256,5 +338,30 @@ public static class ZVecDefaults
 
         /// <summary>Message shown when the native library fails to allocate an FTS query handle.</summary>
         public const string NativeFtsQueryCreateFailed = "Failed to create native FTS query handle.";
+
+        /// <summary>Message shown when a collection/field/vector name is null, empty, or whitespace.</summary>
+        public const string NameRequired = "Name cannot be empty or whitespace.";
+
+        /// <summary>Message shown when a vector dimension is not strictly positive.</summary>
+        public const string VectorDimensionMustBePositive = "Vector dimension must be strictly positive.";
+
+        /// <summary>Message shown when max document count per segment is not strictly positive.</summary>
+        public const string MaxDocCountPerSegmentMustBePositive = "Max document count per segment must be strictly positive.";
+
+        /// <summary>Message shown when <c>ZVecFilterBuilder.Where</c> receives an unsupported compare operator.</summary>
+        public const string UnsupportedCompareOp = "Unsupported compare operator {0}.";
+
+        /// <summary>Message shown when a filter field name is null, empty, or whitespace.</summary>
+        public const string FilterFieldNameRequired = "Filter field name cannot be empty or whitespace.";
+
+        /// <summary>Message shown when a LIKE pattern is null.</summary>
+        public const string FilterLikePatternRequired = "LIKE pattern cannot be null.";
+
+        /// <summary>Message shown when an IN/CONTAIN values array is null.</summary>
+        public const string FilterValuesRequired = "Values cannot be null.";
+
+        /// <summary>Message shown when Not() cannot rewrite an expression into a native-supported form.</summary>
+        public const string FilterNotUnsupported =
+            "Unary NOT is not supported by the native ZVec filter engine. Use !=, NOT IN, or NOT CONTAIN_* forms, or pass a simple comparison/In/Contain expression to Not().";
     }
 }
