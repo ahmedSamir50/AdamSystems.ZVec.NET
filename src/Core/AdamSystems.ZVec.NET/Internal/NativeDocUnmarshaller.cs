@@ -62,6 +62,9 @@ internal static class NativeDocUnmarshaller
         }
         finally
         {
+            // CRITICAL: zvec_doc_get_field_names allocates an array of string pointers (char**) where EACH inner string is also allocated.
+            // Using a plain zvec_free(namesPtr) would leak all the inner strings and corrupt heap tracking.
+            // We MUST use zvec_free_str_array to properly free both the outer array and the inner strings.
             NativeMethods.zvec_free_str_array(namesPtr, count);
         }
 

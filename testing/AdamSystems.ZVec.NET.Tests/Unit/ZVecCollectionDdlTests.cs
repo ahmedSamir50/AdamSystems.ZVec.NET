@@ -58,7 +58,7 @@ public class ZVecCollectionDdlTests
     [Fact]
     public void AddColumn_WithNullField_ThrowsArgumentNullException()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return; // Native library not available
+        if (_factory is null || !_factory.IsInitialized) return; // Native library not available
         var col = CreateTestCollection();
         var act = () => col.AddColumn(null!);
         act.Should().Throw<ArgumentNullException>();
@@ -67,7 +67,7 @@ public class ZVecCollectionDdlTests
     [Fact]
     public void AddColumn_WhenDisposed_ThrowsObjectDisposedException()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return; // Native library not available
+        if (_factory is null || !_factory.IsInitialized) return; // Native library not available
         var col = CreateTestCollection();
         try { col.Dispose(); } catch { }
         var act = () => col.AddColumn(new ZVecFieldSchema { Name = "title", DataType = ZVecDataType.String });

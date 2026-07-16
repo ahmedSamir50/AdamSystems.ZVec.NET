@@ -16,8 +16,9 @@ internal sealed class SafeZvecDocHandle : SafeHandle
     protected override bool ReleaseHandle()
     {
         // If the factory is not initialized (or already shut down), the native library
-        // resources are no longer valid, so calling destroy would cause an Access Violation.
-        if (!ZVecFactory.IsInitialized)
+        // Wait! ZVecFactory.Shutdown() might have unloaded the library.
+        // Calling into an unloaded DLL causes 0xC0000005 Access Violation.
+        if (!ZVecFactory.IsNativeLibraryInitialized)
         {
             return true;
         }

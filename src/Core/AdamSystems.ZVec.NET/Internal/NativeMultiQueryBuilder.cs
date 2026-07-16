@@ -17,7 +17,7 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
     {
         _handle = NativeMethods.zvec_multi_query_create();
         if (_handle == IntPtr.Zero)
-            throw new InvalidOperationException("Failed to create native multi-query.");
+            throw new InvalidOperationException(ZVecDefaults.Errors.NativeMultiQueryCreateFailed);
 
         try
         {
@@ -28,7 +28,7 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
             {
                 nint subQuery = NativeMethods.zvec_sub_query_create();
                 if (subQuery == IntPtr.Zero)
-                    throw new InvalidOperationException("Failed to create native sub-query.");
+                    throw new InvalidOperationException(ZVecDefaults.Errors.NativeSubQueryCreateFailed);
                 _subQueries.Add(subQuery);
 
                 NativeMethods.zvec_sub_query_set_field_name(subQuery, query.FieldName);
@@ -51,7 +51,7 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
                 {
                     nint ftsHandle = NativeMethods.zvec_fts_create();
                     if (ftsHandle == IntPtr.Zero)
-                        throw new InvalidOperationException("Failed to create native FTS query handle.");
+                        throw new InvalidOperationException(ZVecDefaults.Errors.NativeFtsQueryCreateFailed);
                     
                     _unmanagedAllocations.Add(ftsHandle); // Will be freed on dispose
                     

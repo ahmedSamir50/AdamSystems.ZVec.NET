@@ -10,10 +10,8 @@ namespace AdamSystems.ZVec.NET;
 /// <remarks>
 /// <para>
 /// Thread safety: Lifecycle state transitions (<c>Initialize</c>, <c>Shutdown</c>)
-/// are guarded by <see cref="Interlocked.CompareExchange(ref int, int, int)"/> — a
-/// lock-free, atomic CAS. No custom reader-writer lock is used because the native
-/// <c>GlobalConfig</c> singleton already guards initialization with
-/// <c>std::atomic&lt;bool&gt;</c> internally, making a managed lock redundant.
+/// are guarded by a standard process-wide lock. This ensures safe initialization
+/// of the native singleton even under highly concurrent test runners.
 /// </para>
 /// <para>
 /// Open collection handles are tracked in a <see cref="ConcurrentDictionary{TKey,TValue}"/>
@@ -24,9 +22,10 @@ public sealed class ZVecFactory : IZvecFactory
 {
     // =========================================================================
     // State machine — transitions only go forward: Uninitialized → Initialized → ShutDown.
-    // Using int so Interlocked.CompareExchange can operate on it.
     // =========================================================================
-    private static int _state = FactoryState.Uninitialized;
+    private int _state = FactoryState.Uninitialized;
+    private static int _globalNativeInitCount = 0;
+    private static readonly object _globalInitLock = new();
 
     private static class FactoryState
     {
@@ -36,19 +35,33 @@ public sealed class ZVecFactory : IZvecFactory
     }
 
     /// <summary>Returns <c>true</c> if the factory has been successfully initialized.</summary>
-    public static bool IsInitialized =>
-        Volatile.Read(ref _state) == FactoryState.Initialized;
+    public bool IsInitialized
+    {
+        get
+        {
+            lock (_globalInitLock) return _state == FactoryState.Initialized;
+        }
+    }
+
+    /// <summary>Returns <c>true</c> if the native library is currently loaded and initialized globally.</summary>
+    internal static bool IsNativeLibraryInitialized
+    {
+        get
+        {
+            lock (_globalInitLock) return _globalNativeInitCount > 0;
+        }
+    }
 
     // =========================================================================
     // Open collection tracking — weak references so GC can still finalize
     // collections independently if the user forgets to dispose them.
     // ConcurrentDictionary provides lock-free reads; write locks are per-slot.
     // =========================================================================
-    internal static readonly ConcurrentDictionary<nint, ZVecCollection> OpenCollections
+    internal readonly ConcurrentDictionary<nint, ZVecCollection> OpenCollections
         = new();
 
     // Shutdown cancellation — signalled when Shutdown() is called.
-    private static CancellationTokenSource _shutdownCts = new();
+    private CancellationTokenSource _shutdownCts = new();
 
     // =========================================================================
     // Initialization
@@ -57,27 +70,30 @@ public sealed class ZVecFactory : IZvecFactory
     /// <inheritdoc/>
     public void Initialize(ZVecOptions? options = null)
     {
-        // Atomic CAS: only the first caller transitions Uninitialized → Initialized.
-        // All subsequent callers (including concurrent ones) find the state is already
-        // Initialized or ShutDown and return immediately — the native library handles
-        // its own idempotency with std::atomic<bool> internally.
-        if (Interlocked.CompareExchange(ref _state, FactoryState.Initialized, FactoryState.Uninitialized)
-            != FactoryState.Uninitialized)
+        lock (_globalInitLock)
         {
-            return; // Already initialized or shut down — no-op.
-        }
+            if (_state != FactoryState.Uninitialized)
+            {
+                return; // Already initialized or shut down — no-op.
+            }
 
-        try
-        {
-            NativeLibraryResolver.EnsureLoaded();
-            CheckAbiVersion();
-            ApplyNativeConfig(options);
-        }
-        catch
-        {
-            // Roll back state so the caller can retry.
-            Interlocked.Exchange(ref _state, FactoryState.Uninitialized);
-            throw;
+            try
+            {
+                // Only initialize the native library on the very first factory globally.
+                if (_globalNativeInitCount == 0)
+                {
+                    NativeLibraryResolver.EnsureLoaded();
+                    CheckAbiVersion();
+                    ApplyNativeConfig(options);
+                }
+                _globalNativeInitCount++;
+                _state = FactoryState.Initialized;
+            }
+            catch
+            {
+                // Throw and leave state as Uninitialized
+                throw;
+            }
         }
     }
 
@@ -97,29 +113,35 @@ public sealed class ZVecFactory : IZvecFactory
     /// <inheritdoc/>
     public void Shutdown()
     {
-        // Only transition from Initialized → ShutDown exactly once.
-        if (Interlocked.CompareExchange(ref _state, FactoryState.ShutDown, FactoryState.Initialized)
-            != FactoryState.Initialized)
+        lock (_globalInitLock)
         {
-            return; // Not initialized, or already shut down — no-op.
-        }
+            if (_state != FactoryState.Initialized)
+            {
+                return; // Not initialized, or already shut down — no-op.
+            }
 
-        // Signal all tracked collections that the factory is shutting down.
-        _shutdownCts.Cancel();
-        OpenCollections.Clear();
+            // Signal all tracked collections that the factory is shutting down.
+            _shutdownCts.Cancel();
+            OpenCollections.Clear();
 
-        try
-        {
-            NativeMethods.zvec_shutdown();
-        }
-        catch (DllNotFoundException)
-        {
-            // Native library already unloaded or resolver poisoned — state is still reset below.
-        }
+            // Only shutdown the native library when the last factory is shut down.
+            _globalNativeInitCount--;
+            if (_globalNativeInitCount == 0)
+            {
+                try
+                {
+                    NativeMethods.zvec_shutdown();
+                }
+                catch (DllNotFoundException)
+                {
+                    // Native library already unloaded or resolver poisoned.
+                }
+            }
 
-        // State goes back to Uninitialized so it can be re-initialized if needed (especially for tests)
-        _shutdownCts = new CancellationTokenSource();
-        Interlocked.Exchange(ref _state, FactoryState.Uninitialized);
+            // State goes back to Uninitialized so it can be re-initialized if needed (especially for tests)
+            _shutdownCts = new CancellationTokenSource();
+            _state = FactoryState.Uninitialized;
+        }
     }
 
     /// <inheritdoc/>
@@ -148,7 +170,7 @@ public sealed class ZVecFactory : IZvecFactory
             path, nativeSchema.Handle, nativeOptions?.Handle ?? IntPtr.Zero, out IntPtr handle);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(CreateAndOpen));
 
-        var collection = new ZVecCollection(handle, path, schema, _shutdownCts.Token);
+        var collection = new ZVecCollection(handle, path, schema, _shutdownCts.Token, this);
         TrackCollection(collection, handle);
         return collection;
     }
@@ -175,7 +197,7 @@ public sealed class ZVecFactory : IZvecFactory
         var rc = NativeMethods.zvec_collection_open(path, nativeOptions?.Handle ?? IntPtr.Zero, out IntPtr handle);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Open));
 
-        var collection = new ZVecCollection(handle, path, schema: null, _shutdownCts.Token);
+        var collection = new ZVecCollection(handle, path, schema: null, _shutdownCts.Token, this);
         TrackCollection(collection, handle);
         return collection;
     }
@@ -271,14 +293,14 @@ public sealed class ZVecFactory : IZvecFactory
         }
     }
 
-    private static void TrackCollection(ZVecCollection col, nint handle)
+    private void TrackCollection(ZVecCollection col, nint handle)
     {
         OpenCollections.TryAdd(handle, col);
     }
 
-    private static void ThrowIfNotInitialized()
+    private void ThrowIfNotInitialized()
     {
-        if (Volatile.Read(ref _state) != FactoryState.Initialized)
+        if (!IsInitialized)
             throw new InvalidOperationException(ZVecDefaults.Errors.FactoryNotInitialized);
     }
 }

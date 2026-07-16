@@ -78,6 +78,8 @@ public class ZVecFactoryTests
         var barrier = new Barrier(threadCount);
         var threads = new List<Thread>();
 
+        var sharedFactory = new ZVecFactory();
+
         for (int i = 0; i < threadCount; i++)
         {
             var t = new Thread(() =>
@@ -85,8 +87,7 @@ public class ZVecFactoryTests
                 barrier.SignalAndWait(); // All threads start simultaneously
                 try
                 {
-                    var factory = new ZVecFactory();
-                    factory.Initialize();
+                    sharedFactory.Initialize();
                     Interlocked.Increment(ref successCount);
                 }
                 catch (Exception)
@@ -108,9 +109,8 @@ public class ZVecFactoryTests
     [Fact]
     public void Factory_CreateAndOpen_WhenNotInitialized_ThrowsInvalidOperation()
     {
-        // Ensure factory is in uninitialized state (Shutdown resets it).
+        // Ensure factory is in uninitialized state (new instance).
         var factory = new ZVecFactory();
-        factory.Shutdown(); // Ensure state is Uninitialized
 
         var act = () => factory.CreateAndOpen("some/path", new ZVecCollectionSchema
         {
@@ -127,7 +127,6 @@ public class ZVecFactoryTests
     public void Factory_Open_WhenNotInitialized_ThrowsInvalidOperation()
     {
         var factory = new ZVecFactory();
-        factory.Shutdown();
 
         var act = () => factory.Open("some/path");
         act.Should().Throw<InvalidOperationException>()

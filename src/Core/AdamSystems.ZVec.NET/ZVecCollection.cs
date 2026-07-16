@@ -40,14 +40,16 @@ public sealed class ZVecCollection : IZvecCollection
 
     // Token cancelled when ZVecFactory.Shutdown() is called.
     private readonly CancellationToken _factoryShutdownToken;
+    private readonly ZVecFactory _factory;
 
-    internal ZVecCollection(nint handle, string path, ZVecCollectionSchema? schema, CancellationToken factoryShutdownToken)
+    internal ZVecCollection(nint handle, string path, ZVecCollectionSchema? schema, CancellationToken factoryShutdownToken, ZVecFactory factory)
     {
         ArgumentOutOfRangeException.ThrowIfZero(handle, nameof(handle));
         _handle = handle;
         Path = path;
         Schema = schema;
         _factoryShutdownToken = factoryShutdownToken;
+        _factory = factory;
     }
 
     // =========================================================================
@@ -67,9 +69,9 @@ public sealed class ZVecCollection : IZvecCollection
         // Only call native close if the factory is initialized — otherwise the native
         // library resources are invalid and calling close would cause an Access Violation.
         // This mirrors the documented guard in SafeZvecHandle.ReleaseHandle().
-        if (ZVecFactory.IsInitialized)
+        if (_factory.IsInitialized)
             _ = NativeMethods.zvec_collection_close(_handle);
-        ZVecFactory.OpenCollections.TryRemove(_handle, out _);
+        _factory.OpenCollections.TryRemove(_handle, out _);
     }
 
     /// <summary>
@@ -101,12 +103,12 @@ public sealed class ZVecCollection : IZvecCollection
         // If Dispose() already ran, we cannot safely call native destroy.
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
-            if (ZVecFactory.IsInitialized)
+            if (_factory.IsInitialized)
             {
                 _ = NativeMethods.zvec_collection_destroy(_handle);
                 _ = NativeMethods.zvec_collection_close(_handle);
             }
-            ZVecFactory.OpenCollections.TryRemove(_handle, out _);
+            _factory.OpenCollections.TryRemove(_handle, out _);
         }
     }
 
@@ -266,6 +268,7 @@ public sealed class ZVecCollection : IZvecCollection
 
         unsafe
         {
+            // CRITICAL: We MUST append \0 before GetBytes because the native C API expects null-terminated const char*.
             var utf8Pk = System.Text.Encoding.UTF8.GetBytes(pk + "\0");
             fixed (byte* pPk = utf8Pk)
             {
@@ -293,6 +296,7 @@ public sealed class ZVecCollection : IZvecCollection
             {
                 for (int i = 0; i < pks.Length; i++)
                 {
+                    // CRITICAL: We MUST append \0 before GetBytes because the native C API expects null-terminated const char*.
                     utf8Pks[i] = System.Text.Encoding.UTF8.GetBytes(pks[i] + "\0");
                     handles[i] = GCHandle.Alloc(utf8Pks[i], GCHandleType.Pinned);
                     ptrs[i] = handles[i].AddrOfPinnedObject();
@@ -328,6 +332,7 @@ public sealed class ZVecCollection : IZvecCollection
             {
                 for (int i = 0; i < pks.Length; i++)
                 {
+                    // CRITICAL: We MUST append \0 before GetBytes because the native C API expects null-terminated const char*.
                     utf8Pks[i] = System.Text.Encoding.UTF8.GetBytes(pks[i] + "\0");
                     handles[i] = GCHandle.Alloc(utf8Pks[i], GCHandleType.Pinned);
                     ptrs[i] = handles[i].AddrOfPinnedObject();
@@ -393,6 +398,7 @@ public sealed class ZVecCollection : IZvecCollection
             {
                 for (int i = 0; i < pks.Length; i++)
                 {
+                    // CRITICAL: We MUST append \0 before GetBytes because the native C API expects null-terminated const char*.
                     utf8Pks[i] = System.Text.Encoding.UTF8.GetBytes(pks[i] + "\0");
                     handles[i] = GCHandle.Alloc(utf8Pks[i], GCHandleType.Pinned);
                     ptrs[i] = handles[i].AddrOfPinnedObject();
@@ -426,6 +432,9 @@ public sealed class ZVecCollection : IZvecCollection
         var list = new List<ZVecWriteResult>((int)count);
         try
         {
+            // CRITICAL: resultsPtr is an array of structs (zvec_write_result_t*), NOT an array of pointers (zvec_write_result_t**).
+            // It must be read by calculating the offset of each struct using its size, rather than copying pointers.
+            // Treating it as an array of pointers will dereference garbage memory and cause catastrophic access violations.
             int structSize = Marshal.SizeOf<ZVecWriteResultNative>();
             for (int i = 0; i < (int)count; i++)
             {

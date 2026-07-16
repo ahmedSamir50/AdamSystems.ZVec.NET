@@ -44,7 +44,7 @@ public class ZVecCollectionCrudTests : IDisposable
     [Fact]
     public void Insert_WithNullDoc_ThrowsArgumentNullException()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         var act = () => col.Insert((ZVecDoc)null!);
         act.Should().Throw<ArgumentNullException>();
@@ -53,7 +53,7 @@ public class ZVecCollectionCrudTests : IDisposable
     [Fact]
     public void Insert_WhenDisposed_ThrowsObjectDisposedException()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         try { col.Dispose(); } catch { }
         var act = () => col.Insert(ZVecDoc.Create("id1"));
@@ -64,7 +64,7 @@ public class ZVecCollectionCrudTests : IDisposable
     [Fact]
     public async Task InsertAsync_CancelledToken_ThrowsOperationCanceledException()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -75,7 +75,7 @@ public class ZVecCollectionCrudTests : IDisposable
     [Fact]
     public void Fetch_WithNullKey_ThrowsArgumentNullException()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         var act = () => col.Fetch((string)null!);
         act.Should().Throw<ArgumentException>();

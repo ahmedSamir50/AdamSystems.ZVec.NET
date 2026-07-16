@@ -17,7 +17,7 @@ internal sealed class SafeZvecSchemaHandle : SafeZvecHandleBase
     {
         // If the factory is not initialized (or already shut down), the native library
         // resources are no longer valid, so calling destroy would cause an Access Violation.
-        if (!ZVecFactory.IsInitialized)
+        if (!ZVecFactory.IsNativeLibraryInitialized)
         {
             return true;
         }

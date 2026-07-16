@@ -6,6 +6,11 @@ namespace AdamSystems.ZVec.NET;
 public interface IZvecFactory : IAsyncDisposable, IDisposable
 {
     /// <summary>
+    /// Returns true if this factory instance has been successfully initialized.
+    /// </summary>
+    bool IsInitialized { get; }
+
+    /// <summary>
     /// Initializes the ZVec process-wide native state (first-init-wins).
     /// Subsequent calls from any thread are no-ops.
     /// </summary>

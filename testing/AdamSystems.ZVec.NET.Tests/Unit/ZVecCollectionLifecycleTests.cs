@@ -47,15 +47,15 @@ public class ZVecCollectionLifecycleTests : IDisposable
     [Fact]
     public void Collection_Path_ReturnsConstructedValue()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         col.Path.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
-    public void Collection_Schema_NullWhenNotProvided()
+    public void Collection_Schema_NotNullWhenProvided()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         // Schema is actually provided in the new CreateCollection
         var col = CreateCollection();
         col.Schema.Should().NotBeNull();
@@ -64,7 +64,7 @@ public class ZVecCollectionLifecycleTests : IDisposable
     [Fact]
     public void Collection_DisposeAsync_DoesNotThrow()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         var act = async () => { await col.DisposeAsync(); };
         act.Should().NotThrowAsync<InvalidOperationException>();
@@ -73,7 +73,7 @@ public class ZVecCollectionLifecycleTests : IDisposable
     [Fact]
     public void Collection_Dispose_CalledTwice_IsIdempotent()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         try { col.Dispose(); } catch { }
 
@@ -84,7 +84,7 @@ public class ZVecCollectionLifecycleTests : IDisposable
     [Fact]
     public async Task Collection_ConcurrentDisposeAndDisposeAsync_CloseCalledOnce()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
 
         var task1 = Task.Run(() => { try { col.Dispose(); } catch { } }, TestContext.Current.CancellationToken);
@@ -98,7 +98,7 @@ public class ZVecCollectionLifecycleTests : IDisposable
     [Fact]
     public void Collection_Destroy_CalledTwice_IsIdempotent()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         try { col.Destroy(); } catch { }
 
@@ -109,7 +109,7 @@ public class ZVecCollectionLifecycleTests : IDisposable
     [Fact]
     public void Collection_DestroyAsync_CancelledToken_Throws()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -120,7 +120,7 @@ public class ZVecCollectionLifecycleTests : IDisposable
     [Fact]
     public void Collection_Constructor_ZeroHandle_Throws()
     {
-        var act = () => new ZVecCollection(nint.Zero, "/tmp/test", null, CancellationToken.None);
+        var act = () => new ZVecCollection(nint.Zero, "/tmp/test", null, CancellationToken.None, null!);
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 }

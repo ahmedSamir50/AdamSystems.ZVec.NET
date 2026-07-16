@@ -43,7 +43,7 @@ public class ZVecCollectionQueryTests : IDisposable
     [Fact]
     public void Query_WithNullQuery_ThrowsArgumentNullException()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         var act = () => col.Query((ZVecQuery)null!);
         act.Should().Throw<ArgumentNullException>();
@@ -52,7 +52,7 @@ public class ZVecCollectionQueryTests : IDisposable
     [Fact]
     public void Query_WhenDisposed_ThrowsObjectDisposedException()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         try { col.Dispose(); } catch { }
         var act = () => col.Query(new ZVecQuery { FieldName = "vec" });
@@ -63,7 +63,7 @@ public class ZVecCollectionQueryTests : IDisposable
     [Fact]
     public async Task QueryAsync_CancelledToken_ThrowsOperationCanceledException()
     {
-        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        if (_factory is null || !_factory.IsInitialized) return;
         var col = CreateCollection();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
