@@ -15,8 +15,8 @@ public class VectorAllocationTests : IDisposable
         _schema = new ZVecCollectionSchema
         {
             Name = "alloc_test",
-            Vectors = new[]
-            {
+            Vectors =
+            [
                 new ZVecVectorSchema
                 {
                     Name = "embedding",
@@ -24,7 +24,7 @@ public class VectorAllocationTests : IDisposable
                     Dimension = 4,
                     IndexParam = new ZVecFlatIndexParam()
                 }
-            }
+            ]
         };
 
         _factory = new ZVecFactory();
@@ -35,6 +35,8 @@ public class VectorAllocationTests : IDisposable
     [Fact]
     public void Query_WithReadOnlyMemory_DoesNotAllocateVectorArrayCopy()
     {
+        if (_collection is null) return; // Native library not available
+
         var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
         var memory = new ReadOnlyMemory<float>(vector);
 

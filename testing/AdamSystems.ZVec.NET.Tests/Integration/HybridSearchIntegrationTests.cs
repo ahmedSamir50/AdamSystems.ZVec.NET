@@ -17,8 +17,8 @@ public class HybridSearchIntegrationTests : IClassFixture<ZVecRealNativeFixture>
         _schema = new ZVecCollectionSchema
         {
             Name = "hybrid_integration",
-            Vectors = new[]
-            {
+            Vectors =
+            [
                 new ZVecVectorSchema
                 {
                     Name = "vector1",
@@ -33,7 +33,7 @@ public class HybridSearchIntegrationTests : IClassFixture<ZVecRealNativeFixture>
                     Dimension = 4,
                     IndexParam = new ZVecHnswIndexParam { MetricType = ZVecMetricType.Cosine }
                 }
-            }
+            ]
         };
     }
 
@@ -84,7 +84,7 @@ public class HybridSearchIntegrationTests : IClassFixture<ZVecRealNativeFixture>
             }
         };
 
-        var results = _collection.Query(new[] { q1, q2 }, topk: 2, reranker: reranker);
+        var results = _collection.Query([q1, q2], topk: 2, reranker: reranker);
 
         results.Should().HaveCount(2);
         // doc1 matches vector1 (weight 0.8) and doc2 matches vector2 (weight 0.2)

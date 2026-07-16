@@ -17,8 +17,8 @@ public class SchemaEvolutionIntegrationTests : IClassFixture<ZVecRealNativeFixtu
         _schema = new ZVecCollectionSchema
         {
             Name = "evolution_integration",
-            Vectors = new[]
-            {
+            Vectors =
+            [
                 new ZVecVectorSchema
                 {
                     Name = "embedding",
@@ -26,7 +26,7 @@ public class SchemaEvolutionIntegrationTests : IClassFixture<ZVecRealNativeFixtu
                     Dimension = 4,
                     IndexParam = new ZVecHnswIndexParam()
                 }
-            }
+            ]
         };
     }
 

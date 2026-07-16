@@ -247,7 +247,37 @@ internal static partial class NativeMethods
     internal static partial IntPtr zvec_multi_query_create();
 
     [LibraryImport(LibraryName)]
-    internal static partial int zvec_multi_query_add_query(IntPtr multiQuery, IntPtr query);
+    internal static partial int zvec_multi_query_add_sub_query(IntPtr query, IntPtr subQuery);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_multi_query_set_topk(IntPtr query, int topk);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_multi_query_set_filter(IntPtr query, [MarshalAs(UnmanagedType.LPUTF8Str)] string filter);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_multi_query_set_rerank_rrf(IntPtr query, int rankConstant);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_multi_query_set_rerank_weighted(IntPtr query, IntPtr weights, nuint weightCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_sub_query_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_sub_query_destroy(IntPtr query);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_field_name(IntPtr query, [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_query_vector(IntPtr query, IntPtr data, nuint size);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_fts(IntPtr query, IntPtr fts);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_fts_params(IntPtr query, IntPtr paramsPtr);
 
     [LibraryImport(LibraryName)]
     internal static partial void zvec_docs_free(IntPtr documents, nuint count);
@@ -352,6 +382,9 @@ internal static partial class NativeMethods
         out nuint count);
 
     [LibraryImport(LibraryName)]
+    internal static partial void zvec_free_str_array(IntPtr array, nuint count);
+
+    [LibraryImport(LibraryName)]
     internal static partial int zvec_doc_get_sparse_vector_field(
         IntPtr doc,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
@@ -403,6 +436,29 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial int zvec_vector_query_set_query_params(IntPtr query, IntPtr queryParams);
 
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_fts_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_fts_destroy(IntPtr fts);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_fts_set_query_string(IntPtr fts, [MarshalAs(UnmanagedType.LPUTF8Str)] string queryString);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_fts_set_match_string(IntPtr fts, [MarshalAs(UnmanagedType.LPUTF8Str)] string matchString);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_fts(IntPtr query, IntPtr fts);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_query_params_fts_create([MarshalAs(UnmanagedType.LPUTF8Str)] string defaultOperator);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_fts_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_fts_params(IntPtr query, IntPtr paramsPtr);
 
 
     [LibraryImport(LibraryName)]

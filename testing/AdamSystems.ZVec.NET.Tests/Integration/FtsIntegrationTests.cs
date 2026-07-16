@@ -17,8 +17,8 @@ public class FtsIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDispos
         _schema = new ZVecCollectionSchema
         {
             Name = "fts_integration",
-            Vectors = new[]
-            {
+            Vectors =
+            [
                 new ZVecVectorSchema
                 {
                     Name = "content",
@@ -27,10 +27,10 @@ public class FtsIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDispos
                     IndexParam = new ZVecFtsIndexParam
                     {
                         Tokenizer = ZVecFtsTokenizer.Standard,
-                        Filters = new[] { ZVecFtsTokenFilter.Lowercase }
+                        Filters = [ZVecFtsTokenFilter.Lowercase]
                     }
                 }
-            }
+            ]
         };
     }
 
@@ -63,7 +63,7 @@ public class FtsIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDispos
         var query = new ZVecQuery
         {
             FieldName = "content",
-            Fts = new ZVecFtsQuery { QueryString = "vector database" }
+            Fts = new ZVecFtsQuery { QueryString = "vector database", DefaultOperator = ZVecFtsDefaultOperator.And }
         };
 
         var results = _collection.Query(query, topk: 5);

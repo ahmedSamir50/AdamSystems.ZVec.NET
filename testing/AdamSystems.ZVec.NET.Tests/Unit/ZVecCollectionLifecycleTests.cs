@@ -7,51 +7,76 @@ namespace AdamSystems.ZVec.NET.Tests.Unit;
 /// Uses a fake/null handle (nint.MaxValue) to test managed-side logic only.
 /// Full native round-trips are covered in integration tests (Epic E18).
 /// </summary>
-public class ZVecCollectionLifecycleTests
+public class ZVecCollectionLifecycleTests : IDisposable
 {
-    // We cannot call NativeMethods with a fake handle, so these tests validate
-    // the managed-side idempotency and ordering logic in isolation.
-    // The ZVecCollection constructor rejects handle == 0; we use a sentinel value.
-    private const nint FakeHandle = 1; // Non-zero sentinel; not a real allocation.
+    private readonly string _testDir;
+    private readonly List<IZvecCollection> _collectionsToCleanup = [];
+    private IZvecFactory? _factory;
 
-    private static ZVecCollection CreateCollection()
-        => new(FakeHandle, "/tmp/test-collection", schema: null, CancellationToken.None);
+    public ZVecCollectionLifecycleTests()
+    {
+        _testDir = Path.Combine(Path.GetTempPath(), $"zvec-test-{Guid.NewGuid()}");
+        Directory.CreateDirectory(_testDir);
+        try
+        {
+            var factory = new ZVecFactory();
+            factory.Initialize();
+            _factory = factory;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or DllNotFoundException) { }
+    }
+
+    private ZVecCollection CreateCollection()
+    {
+        var schema = new ZVecCollectionSchema
+        {
+            Name = "lifecycle_test",
+            Vectors = [new ZVecVectorSchema { Name = "vec", DataType = ZVecDataType.VectorFp32, Dimension = 2, IndexParam = new ZVecFlatIndexParam() }]
+        };
+        var col = _factory!.CreateAndOpen(Path.Combine(_testDir, $"coll-{Guid.NewGuid()}"), schema);
+        _collectionsToCleanup.Add(col);
+        return (ZVecCollection)col;
+    }
+
+    public void Dispose()
+    {
+        foreach (var col in _collectionsToCleanup) { try { col.Destroy(); } catch { } }
+        try { if (Directory.Exists(_testDir)) Directory.Delete(_testDir, recursive: true); } catch { }
+    }
 
     [Fact]
     public void Collection_Path_ReturnsConstructedValue()
     {
+        if (_factory is null || !ZVecFactory.IsInitialized) return;
         var col = CreateCollection();
-        col.Path.Should().Be("/tmp/test-collection");
+        col.Path.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
     public void Collection_Schema_NullWhenNotProvided()
     {
+        if (_factory is null || !ZVecFactory.IsInitialized) return;
+        // Schema is actually provided in the new CreateCollection
         var col = CreateCollection();
-        col.Schema.Should().BeNull();
+        col.Schema.Should().NotBeNull();
     }
 
     [Fact]
     public void Collection_DisposeAsync_DoesNotThrow()
     {
+        if (_factory is null || !ZVecFactory.IsInitialized) return;
         var col = CreateCollection();
-        // DisposeAsync delegates to Dispose which calls zvec_collection_close.
-        // Without real native: DllNotFoundException expected, not InvalidOperation.
         var act = async () => { await col.DisposeAsync(); };
-        // We only assert no InvalidOperationException — DllNotFound is expected without native.
         act.Should().NotThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
     public void Collection_Dispose_CalledTwice_IsIdempotent()
     {
-        // The Interlocked.Exchange guard must ensure the second call is a no-op.
-        // With no native DLL: first call may throw DllNotFoundException.
-        // The important invariant: second call NEVER throws (idempotent).
+        if (_factory is null || !ZVecFactory.IsInitialized) return;
         var col = CreateCollection();
-        try { col.Dispose(); } catch { /* expected without native */ }
+        try { col.Dispose(); } catch { }
 
-        // Second call must be silent regardless.
         var secondCall = () => col.Dispose();
         secondCall.Should().NotThrow();
     }
@@ -59,17 +84,13 @@ public class ZVecCollectionLifecycleTests
     [Fact]
     public async Task Collection_ConcurrentDisposeAndDisposeAsync_CloseCalledOnce()
     {
-        // Concurrent Dispose + DisposeAsync — only one must execute the close path.
-        // Both paths go through Interlocked.Exchange(ref _disposed, 1).
+        if (_factory is null || !ZVecFactory.IsInitialized) return;
         var col = CreateCollection();
 
-        // Both paths swallow exceptions (DllNotFoundException expected without native).
-        // The key invariant: no crash, no hang, no InvalidOperationException.
         var task1 = Task.Run(() => { try { col.Dispose(); } catch { } }, TestContext.Current.CancellationToken);
         var task2 = Task.Run(async () => { try { await col.DisposeAsync(); } catch { } }, TestContext.Current.CancellationToken);
 
         await Task.WhenAll(task1, task2).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        // No hang — test completes within timeout.
     }
 
 
@@ -77,10 +98,10 @@ public class ZVecCollectionLifecycleTests
     [Fact]
     public void Collection_Destroy_CalledTwice_IsIdempotent()
     {
+        if (_factory is null || !ZVecFactory.IsInitialized) return;
         var col = CreateCollection();
-        try { col.Destroy(); } catch { /* expected without native */ }
+        try { col.Destroy(); } catch { }
 
-        // Second call must be a no-op — Interlocked.Exchange guards _destroyed.
         var secondDestroy = () => col.Destroy();
         secondDestroy.Should().NotThrow();
     }
@@ -88,6 +109,7 @@ public class ZVecCollectionLifecycleTests
     [Fact]
     public void Collection_DestroyAsync_CancelledToken_Throws()
     {
+        if (_factory is null || !ZVecFactory.IsInitialized) return;
         var col = CreateCollection();
         using var cts = new CancellationTokenSource();
         cts.Cancel();

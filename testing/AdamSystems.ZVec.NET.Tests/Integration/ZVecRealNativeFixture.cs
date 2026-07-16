@@ -14,10 +14,11 @@ public class ZVecRealNativeFixture : IDisposable
 
         try
         {
+            // Ensure mock is disabled, then probe via cached handle path.
             NativeLibraryResolver.UseRealLibrary();
             NativeLibraryResolver.EnsureLoaded();
 
-            // FIRST: Try to get version - simplest check
+            // THEN: Try to get version — simplest check
             var version = NativeMethods.GetVersionString();
             IsRealNativeAvailable = !string.IsNullOrEmpty(version) 
                                    && !version.Contains("mock", StringComparison.OrdinalIgnoreCase);
@@ -35,8 +36,8 @@ public class ZVecRealNativeFixture : IDisposable
             var schema = new ZVecCollectionSchema
             {
                 Name = "detect_schema",
-                Vectors = new[]
-                {
+                Vectors =
+                [
                     new ZVecVectorSchema
                     {
                         Name = "embedding",
@@ -44,7 +45,12 @@ public class ZVecRealNativeFixture : IDisposable
                         Dimension = 4,
                         IndexParam = new ZVecHnswIndexParam()
                     }
-                }
+                ],
+                Fields =
+                [
+                    new ZVecFieldSchema { Name = "name", DataType = ZVecDataType.String },
+                    new ZVecFieldSchema { Name = "age", DataType = ZVecDataType.Int32 }
+                ]
             };
 
             IZvecCollection? col = null;

@@ -108,7 +108,14 @@ public sealed class ZVecFactory : IZvecFactory
         _shutdownCts.Cancel();
         OpenCollections.Clear();
 
-        NativeMethods.zvec_shutdown();
+        try
+        {
+            NativeMethods.zvec_shutdown();
+        }
+        catch (DllNotFoundException)
+        {
+            // Native library already unloaded or resolver poisoned — state is still reset below.
+        }
 
         // State goes back to Uninitialized so it can be re-initialized if needed (especially for tests)
         _shutdownCts = new CancellationTokenSource();

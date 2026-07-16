@@ -62,9 +62,7 @@ internal static class NativeDocUnmarshaller
         }
         finally
         {
-            // Note: c_api.h doesn't define zvec_string_array_free.
-            // Typically zvec_free handles array pointers if the inner strings are owned by the doc.
-            NativeMethods.zvec_free(namesPtr);
+            NativeMethods.zvec_free_str_array(namesPtr, count);
         }
 
         return new ZVecDoc { Id = pk, Score = score, Fields = fields, DenseVectors = denseVectors, SparseVectors = sparseVectors };

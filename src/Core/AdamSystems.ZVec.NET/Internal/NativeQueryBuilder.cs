@@ -7,6 +7,8 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
 {
     private readonly nint _handle;
     private bool _disposed;
+    private IntPtr _ftsHandle;
+    private IntPtr _ftsParamsHandle;
     private readonly List<MemoryHandle> _pinnedHandles = [];
 
     public nint Handle => _handle;
@@ -48,6 +50,40 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
             ZVecError.ThrowIfFailed(
                 (ZVecErrorCode)NativeMethods.zvec_vector_query_set_include_vector(_handle, true), 
                 nameof(NativeMethods.zvec_vector_query_set_include_vector));
+
+            if (query.Fts != null)
+            {
+                _ftsHandle = NativeMethods.zvec_fts_create();
+                if (_ftsHandle == IntPtr.Zero)
+                    throw new InvalidOperationException("Failed to create native FTS query handle.");
+
+                if (!string.IsNullOrWhiteSpace(query.Fts.QueryString))
+                {
+                    ZVecError.ThrowIfFailed(
+                        (ZVecErrorCode)NativeMethods.zvec_fts_set_query_string(_ftsHandle, query.Fts.QueryString),
+                        nameof(NativeMethods.zvec_fts_set_query_string));
+                }
+
+                if (!string.IsNullOrWhiteSpace(query.Fts.MatchString))
+                {
+                    ZVecError.ThrowIfFailed(
+                        (ZVecErrorCode)NativeMethods.zvec_fts_set_match_string(_ftsHandle, query.Fts.MatchString),
+                        nameof(NativeMethods.zvec_fts_set_match_string));
+                }
+
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_vector_query_set_fts(_handle, _ftsHandle),
+                    nameof(NativeMethods.zvec_vector_query_set_fts));
+
+                string op = query.Fts.DefaultOperator == ZVecFtsDefaultOperator.And ? "AND" : "OR";
+                _ftsParamsHandle = NativeMethods.zvec_query_params_fts_create(op);
+                if (_ftsParamsHandle != IntPtr.Zero)
+                {
+                    ZVecError.ThrowIfFailed(
+                        (ZVecErrorCode)NativeMethods.zvec_vector_query_set_fts_params(_handle, _ftsParamsHandle),
+                        nameof(NativeMethods.zvec_vector_query_set_fts_params));
+                }
+            }
         }
         catch
         {
@@ -64,6 +100,19 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
         if (_handle != IntPtr.Zero)
         {
             NativeMethods.zvec_vector_query_destroy(_handle);
+        }
+        
+        if (_ftsHandle != IntPtr.Zero)
+        {
+            NativeMethods.zvec_fts_destroy(_ftsHandle);
+            _ftsHandle = IntPtr.Zero;
+        }
+
+        if (_ftsParamsHandle != IntPtr.Zero)
+        {
+            // zvec_vector_query_set_fts_params takes ownership of the ftsParams struct.
+            // Do NOT call zvec_query_params_fts_destroy on it, otherwise it causes a double free!
+            _ftsParamsHandle = IntPtr.Zero;
         }
 
         foreach (var pinned in _pinnedHandles)

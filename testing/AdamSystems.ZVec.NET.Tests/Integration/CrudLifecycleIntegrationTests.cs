@@ -17,13 +17,13 @@ public class CrudLifecycleIntegrationTests : IClassFixture<ZVecRealNativeFixture
         _schema = new ZVecCollectionSchema
         {
             Name = "crud_integration",
-            Fields = new[]
-            {
+            Fields =
+            [
                 new ZVecFieldSchema { Name = "name", DataType = ZVecDataType.String },
                 new ZVecFieldSchema { Name = "age", DataType = ZVecDataType.Int32 }
-            },
-            Vectors = new[]
-            {
+            ],
+            Vectors =
+            [
                 new ZVecVectorSchema
                 {
                     Name = "embedding",
@@ -31,7 +31,7 @@ public class CrudLifecycleIntegrationTests : IClassFixture<ZVecRealNativeFixture
                     Dimension = 4,
                     IndexParam = new ZVecHnswIndexParam()
                 }
-            }
+            ]
         };
     }
 

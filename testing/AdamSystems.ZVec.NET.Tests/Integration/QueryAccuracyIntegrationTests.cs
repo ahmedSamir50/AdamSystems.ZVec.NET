@@ -17,8 +17,8 @@ public class QueryAccuracyIntegrationTests : IClassFixture<ZVecRealNativeFixture
         _schema = new ZVecCollectionSchema
         {
             Name = "accuracy_integration",
-            Vectors = new[]
-            {
+            Vectors =
+            [
                 new ZVecVectorSchema
                 {
                     Name = "embedding",
@@ -26,7 +26,7 @@ public class QueryAccuracyIntegrationTests : IClassFixture<ZVecRealNativeFixture
                     Dimension = 4,
                     IndexParam = new ZVecHnswIndexParam { MetricType = ZVecMetricType.L2 }
                 }
-            }
+            ]
         };
     }
 

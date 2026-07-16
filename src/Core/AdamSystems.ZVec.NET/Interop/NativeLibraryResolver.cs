@@ -1,4 +1,3 @@
-using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -10,10 +9,21 @@ namespace AdamSystems.ZVec.NET.Interop;
 /// </summary>
 internal static class NativeLibraryResolver
 {
-    private static bool _useMock = false;
-    private static string? _mockLibraryPath = null;
+    /// <summary>
+    /// Atomic resolver state — all mutable fields are bundled into a single
+    /// reference that is swapped via <see cref="Interlocked.Exchange(ref object?, object)"/>
+    /// to prevent torn reads across threads.
+    /// </summary>
+    private sealed class ResolverState
+    {
+        public bool UseMock;
+        public string? MockLibraryPath;
+    }
+
+    private static volatile ResolverState _resolverState = new();
     private static bool _isRegistered = false;
     private static IntPtr _cachedHandle = IntPtr.Zero;
+    internal static bool IsLoaded => _cachedHandle != IntPtr.Zero;
     private static readonly object _lock = new();
 
 #pragma warning disable CA2255
@@ -40,19 +50,24 @@ internal static class NativeLibraryResolver
 
     /// <summary>
     /// Switches the resolver to use a mock library path for testing.
+    /// Atomic swap ensures concurrent readers never see a torn state.
     /// </summary>
     internal static void SetMockLibrary(string? libraryPath)
     {
-        _mockLibraryPath = libraryPath;
-        _useMock = libraryPath != null;
+        Interlocked.Exchange(ref _resolverState, new ResolverState
+        {
+            UseMock = libraryPath != null,
+            MockLibraryPath = libraryPath
+        });
     }
 
     /// <summary>
     /// Restores the resolver to load the real native library.
+    /// Atomic swap ensures concurrent readers never see a torn state.
     /// </summary>
     internal static void UseRealLibrary()
     {
-        _useMock = false;
+        Interlocked.Exchange(ref _resolverState, new ResolverState());
     }
 
     /// <summary>
@@ -98,14 +113,17 @@ internal static class NativeLibraryResolver
     {
         if (name != NativeMethods.LibraryName) return IntPtr.Zero;
 
+        // Single volatile read — always consistent snapshot.
+        var state = _resolverState;
+
         // Mock path takes priority — when mock is set, never fall through to real library.
-        if (_useMock && _mockLibraryPath is not null)
+        if (state.UseMock && state.MockLibraryPath is not null)
         {
-            if (NativeLibrary.TryLoad(_mockLibraryPath, out var handle))
+            if (NativeLibrary.TryLoad(state.MockLibraryPath, out var handle))
                 return handle;
 
             throw new DllNotFoundException(
-                $"ZVec native library not found: mock library path '{_mockLibraryPath}' does not exist.");
+                $"ZVec native library not found: mock library path '{state.MockLibraryPath}' does not exist.");
         }
 
         // Return cached handle if already loaded.

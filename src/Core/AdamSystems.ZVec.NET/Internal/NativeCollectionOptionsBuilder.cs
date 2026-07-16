@@ -11,7 +11,7 @@ internal sealed class NativeCollectionOptionsBuilder : IDisposable
 
     public NativeCollectionOptionsBuilder(ZVecCollectionOptions options)
     {
-        if (options == null) throw new ArgumentNullException(nameof(options));
+        ArgumentNullException.ThrowIfNull(options);
 
         _handle = NativeMethods.zvec_collection_options_create();
         if (_handle == IntPtr.Zero)

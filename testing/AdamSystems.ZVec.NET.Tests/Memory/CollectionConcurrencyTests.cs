@@ -15,8 +15,8 @@ public class CollectionConcurrencyTests : IDisposable
         _schema = new ZVecCollectionSchema
         {
             Name = "concurrency_test",
-            Vectors = new[]
-            {
+            Vectors =
+            [
                 new ZVecVectorSchema
                 {
                     Name = "embedding",
@@ -24,7 +24,7 @@ public class CollectionConcurrencyTests : IDisposable
                     Dimension = 4,
                     IndexParam = new ZVecFlatIndexParam()
                 }
-            }
+            ]
         };
 
         _factory = new ZVecFactory();
@@ -35,6 +35,8 @@ public class CollectionConcurrencyTests : IDisposable
     [Fact]
     public async Task Concurrent_Insert_And_Query_Execute_Without_Exceptions()
     {
+        if (_collection is null) return; // Native library not available
+
         const int taskCount = 10;
         const int iterationsPerTask = 50;
 

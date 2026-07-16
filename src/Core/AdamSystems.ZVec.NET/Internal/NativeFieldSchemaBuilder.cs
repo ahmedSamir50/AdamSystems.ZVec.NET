@@ -12,8 +12,7 @@ internal sealed class NativeFieldSchemaBuilder : IDisposable
 
     public NativeFieldSchemaBuilder(ZVecFieldSchema field)
     {
-        if (field == null)
-            throw new ArgumentNullException(nameof(field));
+        ArgumentNullException.ThrowIfNull(field);
 
         _handle = NativeMethods.zvec_field_schema_create(field.Name, (int)field.DataType, field.Nullable, 0);
         if (_handle == IntPtr.Zero)
@@ -38,8 +37,7 @@ internal sealed class NativeFieldSchemaBuilder : IDisposable
 
     public NativeFieldSchemaBuilder(ZVecVectorSchema vector)
     {
-        if (vector == null)
-            throw new ArgumentNullException(nameof(vector));
+        ArgumentNullException.ThrowIfNull(vector);
 
         _handle = NativeMethods.zvec_field_schema_create(vector.Name, (int)vector.DataType, false, (uint)vector.Dimension);
         if (_handle == IntPtr.Zero)
