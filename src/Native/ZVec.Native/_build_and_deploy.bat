@@ -1,16 +1,26 @@
 @echo off
 setlocal
 
-call "C:\Program Files\Microsoft Visual Studio\18\Professional\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if exist "%VSWHERE%" (
+    for /f "usebackq tokens=*" %%i in ("%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath) do (
+        set "VS_DIR=%%i"
+    )
+)
+if defined VS_DIR (
+    call "%VS_DIR%\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
+) else (
+    echo WARNING: Visual Studio not found automatically.
+)
 if errorlevel 1 exit /b 1
 
 set CMAKE_GENERATOR=Ninja
 set CMAKE_POLICY_VERSION_MINIMUM=3.5
-set "PATH=%PATH%;C:\Program Files\Git\usr\bin;%USERPROFILE%\scoop\shims;%USERPROFILE%\scoop\apps\mingw\current\bin"
+set "PATH=%PATH%;%ProgramFiles%\Git\usr\bin;%USERPROFILE%\scoop\shims;%USERPROFILE%\scoop\apps\mingw\current\bin"
 
-set "CMAKE=C:\Program Files\Microsoft Visual Studio\18\Professional\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-set "ROOT=D:\A_S\ZVec.Net_SLN\ZVec.Net\src\Native\ZVec.Native"
-set "RUNTIMES=D:\A_S\ZVec.Net_SLN\ZVec.Net\src\Core\AdamSystems.ZVec.NET\runtimes\win-x64\native"
+set "CMAKE=cmake"
+set "ROOT=%~dp0."
+set "RUNTIMES=%~dp0..\..\Core\ZVec.NET\runtimes\win-x64\native"
 
 echo ============================================
 echo Step 1: Build zvec_c_api.dll
