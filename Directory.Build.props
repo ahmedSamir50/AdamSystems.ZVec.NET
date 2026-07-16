@@ -7,11 +7,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <SignAssembly>true</SignAssembly>
     <!-- .snk = Strong-Name Key. An identity key (NOT a security secret) committed to the repo.
-         Generated once: sn -k AdamSystems.ZVec.NET.snk → placed in build/.
+         Generated once: sn -k ZVec.NET.snk → placed in build/.
          Lets enterprise consumers with strong-named assemblies reference our package.
          Same approach as SQLitePCLRaw.
          Key stays in build/; props file is at repo root so path must include build/. -->
-    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)build\AdamSystems.ZVec.NET.snk</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)build\ZVec.NET.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <PropertyGroup>

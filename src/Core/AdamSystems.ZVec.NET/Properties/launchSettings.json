@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "AdamSystems.ZVec.NET": {
-      "commandName": "Project",
-      "nativeDebugging": true
-    }
-  }
-}

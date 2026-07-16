@@ -26,8 +26,8 @@ compile_commands.json
 *.so
 *.dll
 # Native DLLs in runtimes/ are tracked (required for NuGet packaging)
-!/src/Core/AdamSystems.ZVec.NET/runtimes/**
-!/src/Core/AdamSystems.ZVec.NET/runtimes/**/
+!/src/Core/ZVec.NET/runtimes/**
+!/src/Core/ZVec.NET/runtimes/**/
 *.dylib
 *.exe
 *.pdb
@@ -46,7 +46,7 @@ build.ninja
 .DS_Store
 Thumbs.db
 /docs/llms-full.txt
-/AdamSystems.ZVec.NET-ProjectImplementation-Plan.md
-/AdamSystems.ZVecNET-Implementation-Plan.md
+/ZVec.NET-ProjectImplementation-Plan.md
+/ZVec.NET-Implementation-Plan.md
 /src/Mock/ZVec.Native.Mock/build_mock
 /.vscode
