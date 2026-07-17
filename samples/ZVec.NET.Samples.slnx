@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Shared/">
+    <Project Path="ZVec.NET.Samples.Shared/ZVec.NET.Samples.Shared.csproj" />
+  </Folder>
+  <Folder Name="/Apps/">
+    <Project Path="ZVec.NET.Samples.Console/ZVec.NET.Samples.Console.csproj" />
+    <Project Path="ZVec.NET.Samples.AspNet/ZVec.NET.Samples.AspNet.csproj" />
+    <Project Path="ZVec.NET.Samples.Maui/ZVec.NET.Samples.Maui.csproj" />
+  </Folder>
+</Solution>

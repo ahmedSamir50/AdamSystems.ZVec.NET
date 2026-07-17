@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ZVec.NET.Samples.AspNet</RootNamespace>
+    <AssemblyName>ZVec.NET.Samples.AspNet</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZVec.NET.Samples.Shared\ZVec.NET.Samples.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -149,6 +149,10 @@ public class TypedOdmIntegrationTests : IClassFixture<ZVecRealNativeFixture>, ID
             typed.Should().NotBeNull();
             typed.Path.Should().Be(_testPath);
 
+            // Keyed untyped shares the same underlying collection
+            var keyed = sp.GetRequiredKeyedService<IZvecCollection>("Product");
+            keyed.Should().BeSameAs(typed.Untyped);
+
             var vector = new float[] { 0.2f, 0.1f, 0.0f, 0.4f };
             typed.Insert(new Product
             {
@@ -162,6 +166,121 @@ public class TypedOdmIntegrationTests : IClassFixture<ZVecRealNativeFixture>, ID
         {
             ZVecDefaults.Version.BypassAbiCheck = previous;
         }
+    }
+
+    // Dynamic/string API coverage remains in E12–E18 suites (CrudLifecycle, FilterBuilder, SchemaEvolution, etc.).
+
+    [Fact]
+    public async Task Typed_Update_Upsert_Delete_QueryAsync_RoundTrip()
+    {
+        Setup();
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        await _collection!.InsertAsync(new Product
+        {
+            Id = "u1",
+            Title = "One",
+            Category = "a",
+            Embedding = vector
+        });
+
+        await _collection.UpdateAsync(new Product
+        {
+            Id = "u1",
+            Title = "Two",
+            Category = "a",
+            Embedding = vector
+        });
+        (await _collection.FetchAsync("u1"))!.Title.Should().Be("Two");
+
+        await _collection.UpsertAsync(new Product
+        {
+            Id = "u2",
+            Title = "Upserted",
+            Category = "b",
+            Embedding = vector
+        });
+        (await _collection.FetchAsync("u2"))!.Title.Should().Be("Upserted");
+
+        var hits = await _collection.QueryAsync(
+            p => p.Embedding,
+            vector,
+            topK: 5,
+            filter: p => p.Category == "b");
+        hits.Should().Contain(h => h.Record.Id == "u2");
+
+        await _collection.DeleteByFilterAsync(p => p.Category == "b");
+        (await _collection.FetchAsync("u2")).Should().BeNull();
+
+        await _collection.DeleteAsync("u1");
+        (await _collection.FetchAsync("u1")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Typed_Ddl_AddIndex_Optimize_Async()
+    {
+        _fixture.SkipIfNotAvailable();
+        _factory = new ZVecFactory();
+        _factory.Initialize();
+        var path = Path.Combine(Path.GetTempPath(), $"zvec_typed_ddl_{Guid.NewGuid():N}");
+        var untyped = _factory.CreateAndOpen(path, ZVecCollectionSchemaBuilder.From<Product>().Build());
+        var extended = new ZVecCollection<ExtendedProduct>(untyped);
+
+        await extended.EnsureSchemaAsync();
+        await extended.CreateIndexAsync(p => p.Year, new ZVecInvertIndexParam());
+        await extended.DropIndexAsync(p => p.Year);
+        await extended.OptimizeAsync();
+        await extended.DropColumnAsync(p => p.Year);
+        extended.Schema!.Fields.Select(f => f.Name).Should().NotContain("Year");
+
+        extended.Dispose();
+        try { Directory.Delete(path, true); } catch { /* best effort */ }
+    }
+
+    [Fact]
+    public void Typed_AlterColumn_RenamesStorage()
+    {
+        _fixture.SkipIfNotAvailable();
+        _factory = new ZVecFactory();
+        _factory.Initialize();
+        var path = Path.Combine(Path.GetTempPath(), $"zvec_typed_alter_{Guid.NewGuid():N}");
+        var untyped = _factory.CreateAndOpen(path, ZVecCollectionSchemaBuilder.From<Product>().Build());
+        var extended = new ZVecCollection<ExtendedProduct>(untyped);
+        extended.EnsureSchema();
+        extended.AlterColumn(p => p.Year, newName: "PubYear");
+        extended.Schema!.Fields.Should().Contain(f => f.Name == "PubYear");
+        extended.Untyped.DropColumn("PubYear");
+
+        extended.Dispose();
+        try { Directory.Delete(path, true); } catch { /* best effort */ }
+    }
+
+    [Fact]
+    public void Typed_AfterDrop_MapperIgnoresLeftoverWhenReadingLeanType()
+    {
+        _fixture.SkipIfNotAvailable();
+        _factory = new ZVecFactory();
+        _factory.Initialize();
+        var path = Path.Combine(Path.GetTempPath(), $"zvec_typed_leftover_{Guid.NewGuid():N}");
+        var untyped = _factory.CreateAndOpen(path, ZVecCollectionSchemaBuilder.From<ExtendedProduct>().Build());
+        var extended = new ZVecCollection<ExtendedProduct>(untyped);
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        extended.Insert(new ExtendedProduct
+        {
+            Id = "L1",
+            Title = "T",
+            Category = "c",
+            Year = 1999,
+            Embedding = vector
+        }).IsSuccess.Should().BeTrue();
+
+        // Native still has Year; lean Product type has no Year — FromDoc ignores leftover
+        var lean = new ZVecCollection<Product>(extended.Untyped);
+        var fetched = lean.Fetch("L1", includeVector: false);
+        fetched.Should().NotBeNull();
+        fetched!.Title.Should().Be("T");
+
+        extended.Dispose();
+        try { Directory.Delete(path, true); } catch { /* best effort */ }
     }
 
     public void Dispose()

@@ -49,12 +49,37 @@ public class ZVecMapperTests
         product.Title.Should().Be("X");
     }
 
+    [Fact]
+    public void FromDoc_UsesStorageNameOverride()
+    {
+        var doc = ZVecDoc.Create(
+            "p1",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
+            {
+                ["emb"] = new float[] { 1, 2, 3, 4 }
+            },
+            fields: new Dictionary<string, object> { ["cat"] = "sci" });
+
+        var product = ZVecMapper.FromDoc<NamedProduct>(doc);
+        product.Category.Should().Be("sci");
+        product.Embedding.ToArray().Should().Equal(1, 2, 3, 4);
+    }
+
     private sealed class Product
     {
         public string Id { get; set; } = "";
         public string Title { get; set; } = "";
         public string Category { get; set; } = "";
         [ZVecVector(4)]
+        public ReadOnlyMemory<float> Embedding { get; set; }
+    }
+
+    private sealed class NamedProduct
+    {
+        public string Id { get; set; } = "";
+        [ZVecField("cat")]
+        public string Category { get; set; } = "";
+        [ZVecVector("emb", 4)]
         public ReadOnlyMemory<float> Embedding { get; set; }
     }
 }

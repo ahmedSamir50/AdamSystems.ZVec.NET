@@ -1,0 +1,10 @@
+[
+  { "id": "m1", "title": "The Matrix", "category": "Sci-Fi, Action", "description": "A computer hacker learns about the true nature of reality and his role in the war against its controllers." },
+  { "id": "m2", "title": "Inception", "category": "Sci-Fi, Thriller", "description": "A thief who steals corporate secrets through dream-sharing technology is given the inverse task of planting an idea." },
+  { "id": "m3", "title": "Interstellar", "category": "Sci-Fi, Drama", "description": "Explorers travel through a wormhole in space in an attempt to ensure humanity's survival." },
+  { "id": "m4", "title": "The Godfather", "category": "Crime, Drama", "description": "The aging patriarch of an organized crime dynasty transfers control of his clandestine empire to his reluctant son." },
+  { "id": "m5", "title": "Spirited Away", "category": "Animation, Fantasy", "description": "A young girl enters a world ruled by gods, witches, and spirits where humans are changed into beasts." },
+  { "id": "m6", "title": "Mad Max: Fury Road", "category": "Action, Adventure", "description": "In a post-apocalyptic wasteland, a woman rebels against a tyrannical ruler in search of her homeland." },
+  { "id": "m7", "title": "Whiplash", "category": "Drama, Music", "description": "A promising young drummer enrolls at a cutthroat music conservatory where his dreams are mentored by an instructor." },
+  { "id": "m8", "title": "Arrival", "category": "Sci-Fi, Drama", "description": "A linguist works with the military to communicate with alien lifeforms after twelve mysterious spacecraft appear." }
+]

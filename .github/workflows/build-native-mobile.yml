@@ -1,0 +1,97 @@
+name: Build Native (mobile)
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "src/Native/**"
+      - "build/ci/**"
+      - ".github/workflows/build-native-mobile.yml"
+  pull_request:
+    paths:
+      - "src/Native/**"
+      - "build/ci/**"
+      - ".github/workflows/build-native-mobile.yml"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: android-${{ matrix.abi }}
+    runs-on: ubuntu-latest
+    # First NDK/CMake green may need iteration; do not block desktop pack.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            rid: android-arm64
+          - abi: x86_64
+            rid: android-x64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+          link-to-sdk: true
+
+      - name: Build Android native
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          chmod +x build/ci/build-android.sh build/ci/deploy-native.sh
+          ./build/ci/build-android.sh "${{ matrix.abi }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zvec-native-${{ matrix.rid }}
+          path: src/Core/ZVec.NET/runtimes/${{ matrix.rid }}/native/*
+          if-no-files-found: error
+          retention-days: 14
+
+  apple-mobile:
+    name: ${{ matrix.target }}
+    runs-on: macos-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - ios-arm64
+          - iossimulator-arm64
+          - maccatalyst-arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Build Apple mobile native
+        run: |
+          chmod +x build/ci/build-ios.sh build/ci/deploy-native.sh
+          ./build/ci/build-ios.sh "${{ matrix.target }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zvec-native-${{ matrix.target }}
+          path: src/Core/ZVec.NET/runtimes/${{ matrix.target }}/native/*
+          if-no-files-found: error
+          retention-days: 14

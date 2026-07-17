@@ -32,16 +32,29 @@ Because this project relies on a native C++ engine, you cannot simply press "Run
 
    The DLL is written under `src/Native/ZVec.Native/build\` (e.g. `build\external\zvec\bin\zvec_c_api.dll`).
 
+3. **Deploy win-x64 into runtimes (local):** use `src/Native/ZVec.Native/_build_and_deploy.bat` (or copy the DLL to `src/Core/ZVec.NET/runtimes/win-x64/native/`).
+4. **Other RIDs / mobile:** see `build/ci/` (`build-android.sh`, `build-ios.sh`, `deploy-native.sh`) and GitHub Actions workflows. MAUI embeds matching natives via `samples/ZVec.NET.Samples.Maui/ZVec.Native.targets`.
+
+## NuGet publish & upstream announce (maintainers)
+
+- PackageId **`ZVec.NET`** (not the GitHub repo name). nuget.org owner: **AdamSystems**.
+- Trusted Publishing policy must match workflow file `publish-nuget.yml` and repo `ahmedSamir50/AdamSystems.ZVec.NET`.
+- After the first package is live: open a Community SDK issue on [alibaba/zvec](https://github.com/alibaba/zvec) with NuGet + GitHub links (see Implementation Plan E21 / Project Plan §9.4).
+
 ## How to Contribute
 
 1. **Branching:** Never work directly on `main`. Create a feature branch off the `dev` branch (e.g., `feature/add-hybrid-search`).
 2. **Pull Requests:** Submit all Pull Requests against the `dev` branch.
-3. **API shape:** Prefer interfaces + `AddZVec*` DI registration over new static entry points. Use `ZVecCollectionSchemaBuilder` and fluent `ZVecFilterBuilder` for schemas/filters. Implement **complete** `type.h` enums and **all** index-param types (Hnsw, HnswRabitq, Ivf, Flat, DiskAnn, Vamana, Invert, Fts) — do not defer indexes.
+3. **API shape:** Prefer interfaces + `AddZVec*` DI registration over new static entry points.
+   - **Typed (preferred for app code):** `IZvecCollection<T>`, `ZVec.NET.Mapping` attributes, `ZVecCollectionSchemaBuilder.From<T>()`, expression filters, `AddZVecCollection<T>`. `EnsureSchema` is **additive only** (never auto-drop).
+   - **Dynamic (advanced):** `IZvecCollection`, `ZVecDoc`, string field names, fluent `ZVecFilterBuilder`, `AddZVecCollection(string key, …)`.
+   - Implement **complete** `type.h` enums and **all** index-param types (Hnsw, HnswRabitq, Ivf, Flat, DiskAnn, Vamana, Invert, Fts) — do not defer indexes.
 4. **Coverage target:** Wrap the **Vector Database** C++ / `zvec_c_api` surface and match DB sections of [llms-full](https://zvec.org/llms-full.txt) (see plan §2.0). Do **not** implement AI Integration (embeddings, MCP, skills, model rerankers) in this package. Snapshot used for audits: `docs/llms-full.txt`.
 5. **Async & concurrency:** Public surface is async-first. P/Invoke is sync — always go through collection read/write gates; never add unbounded `Task.Run` around native calls. Honor `CancellationToken` while waiting on gates.
-6. **Zero allocation:** On hot paths (`Query` / `Insert`), use `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` and `MemoryHandle`. Do not introduce `new float[]` copies on vector passing paths.
+6. **Zero allocation:** On hot paths (`Query` / `Insert`), use `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` and `MemoryHandle`. Do not introduce `new float[]` copies on vector passing paths. Typed ODM mapping is a managed edge cost — keep heavy work on the existing `ZVecDoc` native path.
 7. **Enums / ABI:** Match numeric values to upstream `zvec/db/type.h` and `c_api.h`. If the C header omits a define (e.g. `HNSW_RABITQ = 4`), use the `type.h` value — do not invent new numbers. Document every enum in the project plan Appendix A.
-8. **LINQ:** Apply LINQ to **results** only. Do not add a custom `IQueryable` provider over the engine.
-9. **Testing:** Run the `ZVec.NET.Tests` project. Unit tests cover pure managed logic; native-backed integration/memory tests use the real `zvec_c_api` binary and **Skip** when it is not available. `NativeLibraryResolver.SetMockLibrary` is reserved for missing-path / failure-path tests only (no mock C++ project).
+8. **LINQ:** Apply LINQ to **results** only. Expression filters on `IZvecCollection<T>` translate to native filter strings — do **not** add a custom `IQueryable` provider over the engine.
+9. **Testing:** Run the `ZVec.NET.Tests` project. Unit tests cover pure managed logic (including Mapping / typed façade); native-backed integration/memory tests use the real `zvec_c_api` binary and **Skip** when it is not available. `NativeLibraryResolver.SetMockLibrary` is reserved for missing-path / failure-path tests only (no mock C++ project). Typed ODM overhead: `TypedOdmOverheadBench` in `ZVec.NET.Benchmarks`.
 
-If you are unsure where to start, check the Issues tab for "good first issue" tags!
+If you are unsure where to start, check the Issues tab for "good first 
+issue" tags!

@@ -17,4 +17,12 @@
     <Project Path="testing/ZVec.NET.Benchmarks/ZVec.NET.Benchmarks.csproj" />
     <Project Path="testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj" />
   </Folder>
+  <!-- Optional listing only — prefer samples/ZVec.NET.Samples.slnx. MAUI not required for core builds. -->
+  <Folder Name="/samples/">
+    <Project Path="samples/ZVec.NET.Samples.Maui/ZVec.NET.Samples.Maui.csproj" />
+    <Project Path="samples/ZVec.NET.Samples.Shared/ZVec.NET.Samples.Shared.csproj" />
+    <Project Path="samples/ZVec.NET.Samples.Console/ZVec.NET.Samples.Console.csproj" />
+    <Project Path="samples/ZVec.NET.Samples.AspNet/ZVec.NET.Samples.AspNet.csproj" />
+  </Folder>
 </Solution>
+
