@@ -11,17 +11,22 @@ public class ZVecException : Exception
 }
 
 /// <summary>
-/// Thrown when the native library SemVer version mismatches what the C# wrapper expects.
+/// Thrown when the native library SemVer version fails the minimum + same-major ABI gate.
 /// </summary>
 public class ZVecAbiMismatchException : ZVecException
 {
     public string ExpectedVersion { get; }
     public string FoundVersion { get; }
 
-    public ZVecAbiMismatchException(string expected, string found)
-        : base($"ZVec ABI Version mismatch. Expected native library version: '{expected}', but found: '{found}'. Please update your native binaries.")
+    public ZVecAbiMismatchException(string expectedMinimum, int requiredMajor, string found)
+        : base(string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            ZVecDefaults.Errors.AbiMismatchRequiresMinSameMajor,
+            expectedMinimum,
+            requiredMajor,
+            found))
     {
-        ExpectedVersion = expected;
+        ExpectedVersion = expectedMinimum;
         FoundVersion = found;
     }
 }

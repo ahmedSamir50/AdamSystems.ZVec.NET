@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ZVec.NET.Query;
 
 namespace ZVec.NET.Tests.Integration;
 
@@ -80,6 +81,38 @@ public class SchemaEvolutionIntegrationTests : IClassFixture<ZVecRealNativeFixtu
         var fetchedAfterDrop = _collection.Fetch("doc1", includeVector: false);
         fetchedAfterDrop.Should().NotBeNull();
         fetchedAfterDrop!.Fields.Should().NotContainKey("stars");
+    }
+
+    [Fact]
+    public void Test_CreateIndex_Then_Query()
+    {
+        Setup();
+        _collection.Should().NotBeNull();
+
+        // AddColumn supports basic numeric types for default expressions — use Float + Invert index.
+        var priorityField = new ZVecFieldSchema { Name = "priority", DataType = ZVecDataType.Float, Nullable = true };
+        _collection!.AddColumn(priorityField, "0.0");
+
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        _collection.Insert(ZVecDoc.Create("idx1",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector },
+            fields: new Dictionary<string, object> { ["priority"] = 1.0f })).IsSuccess.Should().BeTrue();
+        _collection.Insert(ZVecDoc.Create("idx2",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector },
+            fields: new Dictionary<string, object> { ["priority"] = 9.0f })).IsSuccess.Should().BeTrue();
+
+        _collection.CreateIndex("priority", new ZVecInvertIndexParam());
+
+        var filter = ZVecFilterBuilder.Create()
+            .Where("priority", ZVecCompareOp.Eq, 1.0f)
+            .ToString();
+        var results = _collection.Query(
+            new ZVecQuery { FieldName = "embedding", Vector = vector },
+            topk: 5,
+            filter: filter);
+
+        results.Should().ContainSingle(r => r.Id == "idx1");
+        results.Select(r => r.Id).Should().NotContain("idx2");
     }
 
     public void Dispose()

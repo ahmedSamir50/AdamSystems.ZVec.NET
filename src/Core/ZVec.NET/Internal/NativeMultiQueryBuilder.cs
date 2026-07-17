@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Runtime.InteropServices;
 using ZVec.NET.Interop;
 
 namespace ZVec.NET.Internal;
@@ -10,10 +11,16 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
     private readonly List<nint> _subQueries = [];
     private readonly List<MemoryHandle> _pinnedHandles = [];
     private readonly List<nint> _unmanagedAllocations = [];
+    private readonly List<GCHandle> _sparsePins = [];
+    private readonly List<(int[] Indices, float[] Values)> _rentedSparse = [];
 
     public nint Handle => _handle;
 
-    public NativeMultiQueryBuilder(IReadOnlyList<ZVecQuery> queries, int topk, ZVecReranker? reranker)
+    public NativeMultiQueryBuilder(
+        IReadOnlyList<ZVecQuery> queries,
+        int topk,
+        ZVecReranker? reranker,
+        string? filter = null)
     {
         _handle = NativeMethods.zvec_multi_query_create();
         if (_handle == IntPtr.Zero)
@@ -22,6 +29,13 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
         try
         {
             NativeMethods.zvec_multi_query_set_topk(_handle, topk);
+
+            if (!string.IsNullOrWhiteSpace(filter))
+            {
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_multi_query_set_filter(_handle, filter),
+                    nameof(NativeMethods.zvec_multi_query_set_filter));
+            }
 
             // Add sub-queries
             foreach (var query in queries)
@@ -47,6 +61,26 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
                             nameof(NativeMethods.zvec_sub_query_set_query_vector));
                     }
                 }
+                else if (query.SparseVector is { } sparse)
+                {
+                    // Keep rented buffers pinned for the lifetime of this builder —
+                    // native sub-query may retain pointers until multi-query executes.
+                    VectorMarshaller.SerializeSparseVector(sparse, out int[] indices, out float[] values, out int count);
+                    _rentedSparse.Add((indices, values));
+
+                    var idxPin = GCHandle.Alloc(indices, GCHandleType.Pinned);
+                    var valPin = GCHandle.Alloc(values, GCHandleType.Pinned);
+                    _sparsePins.Add(idxPin);
+                    _sparsePins.Add(valPin);
+
+                    ZVecError.ThrowIfFailed(
+                        (ZVecErrorCode)NativeMethods.zvec_sub_query_set_sparse_vector(
+                            subQuery,
+                            idxPin.AddrOfPinnedObject(),
+                            valPin.AddrOfPinnedObject(),
+                            (nuint)count),
+                        nameof(NativeMethods.zvec_sub_query_set_sparse_vector));
+                }
                 else if (query.Fts != null)
                 {
                     nint ftsHandle = NativeMethods.zvec_fts_create();
@@ -65,7 +99,9 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
                     }
                     NativeMethods.zvec_sub_query_set_fts(subQuery, ftsHandle);
 
-                    string op = query.Fts.DefaultOperator == ZVecFtsDefaultOperator.And ? "AND" : "OR";
+                    string op = query.Fts.DefaultOperator == ZVecFtsDefaultOperator.And
+                        ? ZVecDefaults.Filter.And
+                        : ZVecDefaults.Filter.Or;
                     nint ftsParams = NativeMethods.zvec_query_params_fts_create(op);
                     if (ftsParams != IntPtr.Zero)
                     {
@@ -138,5 +174,18 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
         {
             pinned.Dispose();
         }
+
+        foreach (var pin in _sparsePins)
+        {
+            if (pin.IsAllocated)
+                pin.Free();
+        }
+        _sparsePins.Clear();
+
+        foreach (var (indices, values) in _rentedSparse)
+        {
+            VectorMarshaller.ReturnSparseArrays(indices, values);
+        }
+        _rentedSparse.Clear();
     }
 }

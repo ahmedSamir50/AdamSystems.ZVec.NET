@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ZVec.NET.Query;
 
 namespace ZVec.NET.Tests.Integration;
 
@@ -17,6 +18,10 @@ public class HybridSearchIntegrationTests : IClassFixture<ZVecRealNativeFixture>
         _schema = new ZVecCollectionSchema
         {
             Name = "hybrid_integration",
+            Fields =
+            [
+                new ZVecFieldSchema { Name = "category", DataType = ZVecDataType.String }
+            ],
             Vectors =
             [
                 new ZVecVectorSchema
@@ -28,10 +33,10 @@ public class HybridSearchIntegrationTests : IClassFixture<ZVecRealNativeFixture>
                 },
                 new ZVecVectorSchema
                 {
-                    Name = "vector2",
-                    DataType = ZVecDataType.VectorFp32,
-                    Dimension = 4,
-                    IndexParam = new ZVecHnswIndexParam { MetricType = ZVecMetricType.Cosine }
+                    Name = "sparse1",
+                    DataType = ZVecDataType.SparseVectorFp32,
+                    Dimension = 64,
+                    IndexParam = new ZVecFlatIndexParam { MetricType = ZVecMetricType.Ip }
                 }
             ]
         };
@@ -46,52 +51,69 @@ public class HybridSearchIntegrationTests : IClassFixture<ZVecRealNativeFixture>
     }
 
     [Fact]
-    public void Test_Hybrid_MultiVector_Weighted_Rerank()
+    public void Test_Hybrid_Dense_Sparse_Filter_Rerank()
     {
         Setup();
         _collection.Should().NotBeNull();
 
-        // Insert documents with 2 vectors
         var docs = new[]
         {
-            ZVecDoc.Create("doc1", denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
-            {
-                ["vector1"] = new float[] { 1.0f, 0.0f, 0.0f, 0.0f },
-                ["vector2"] = new float[] { 0.0f, 1.0f, 0.0f, 0.0f }
-            }),
-            ZVecDoc.Create("doc2", denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
-            {
-                ["vector1"] = new float[] { 0.0f, 1.0f, 0.0f, 0.0f },
-                ["vector2"] = new float[] { 1.0f, 0.0f, 0.0f, 0.0f }
-            })
+            ZVecDoc.Create("doc1",
+                denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
+                {
+                    ["vector1"] = new float[] { 1.0f, 0.0f, 0.0f, 0.0f }
+                },
+                sparseVectors: new Dictionary<string, IReadOnlyDictionary<int, float>>
+                {
+                    ["sparse1"] = new Dictionary<int, float> { [0] = 1.0f, [3] = 0.5f }
+                },
+                fields: new Dictionary<string, object> { ["category"] = "keep" }),
+            ZVecDoc.Create("doc2",
+                denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
+                {
+                    ["vector1"] = new float[] { 0.0f, 1.0f, 0.0f, 0.0f }
+                },
+                sparseVectors: new Dictionary<string, IReadOnlyDictionary<int, float>>
+                {
+                    ["sparse1"] = new Dictionary<int, float> { [1] = 1.0f, [4] = 0.5f }
+                },
+                fields: new Dictionary<string, object> { ["category"] = "drop" }),
+            ZVecDoc.Create("doc3",
+                denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
+                {
+                    ["vector1"] = new float[] { 0.9f, 0.1f, 0.0f, 0.0f }
+                },
+                sparseVectors: new Dictionary<string, IReadOnlyDictionary<int, float>>
+                {
+                    ["sparse1"] = new Dictionary<int, float> { [0] = 0.8f, [3] = 0.4f }
+                },
+                fields: new Dictionary<string, object> { ["category"] = "keep" })
         };
 
         var insertResult = _collection!.Insert(docs);
         insertResult.IsSuccess.Should().BeTrue();
 
-        // Query both fields
-        var q1 = new ZVecQuery { FieldName = "vector1", Vector = new float[] { 1.0f, 0.0f, 0.0f, 0.0f } };
-        var q2 = new ZVecQuery { FieldName = "vector2", Vector = new float[] { 1.0f, 0.0f, 0.0f, 0.0f } };
-
-        var reranker = new ZVecWeightedReranker
+        var denseQ = new ZVecQuery
         {
-            TopN = 2,
-            Metric = ZVecMetricType.Cosine,
-            Weights = new Dictionary<string, float>
-            {
-                ["vector1"] = 0.8f,
-                ["vector2"] = 0.2f
-            }
+            FieldName = "vector1",
+            Vector = new float[] { 1.0f, 0.0f, 0.0f, 0.0f }
+        };
+        var sparseQ = new ZVecQuery
+        {
+            FieldName = "sparse1",
+            SparseVector = new Dictionary<int, float> { [0] = 1.0f, [3] = 0.5f }
         };
 
-        var results = _collection.Query([q1, q2], topk: 2, reranker: reranker);
+        var filter = ZVecFilterBuilder.Create()
+            .Where("category", ZVecCompareOp.Eq, "keep")
+            .ToString();
 
-        results.Should().HaveCount(2);
-        // doc1 matches vector1 (weight 0.8) and doc2 matches vector2 (weight 0.2)
-        // doc2 matches vector1 (cosine similarity 0) and doc1 matches vector2 (cosine similarity 0)
-        // So doc1 should score higher than doc2
-        results[0].Id.Should().Be("doc1");
-        results[1].Id.Should().Be("doc2");
+        var reranker = new ZVecRrfReranker { TopN = 5, RankConstant = ZVecDefaults.Rerank.RankConstant };
+        var results = _collection.Query([denseQ, sparseQ], topk: 5, reranker: reranker, filter: filter);
+
+        results.Should().NotBeEmpty();
+        results.Select(r => r.Id).Should().NotContain("doc2");
+        results.Select(r => r.Id).Should().Contain("doc1");
     }
 
     public void Dispose()

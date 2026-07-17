@@ -1,18 +1,27 @@
 using FluentAssertions;
+using ZVec.NET.Tests.Integration;
 
 namespace ZVec.NET.Tests.Memory;
 
-public class VectorAllocationTests : IDisposable
+public class VectorAllocationTests : IClassFixture<ZVecRealNativeFixture>, IDisposable
 {
+    private readonly ZVecRealNativeFixture _fixture;
     private readonly string _testPath;
-    private readonly ZVecCollectionSchema _schema;
-    private readonly IZvecFactory _factory;
-    private readonly IZvecCollection _collection;
+    private IZvecFactory? _factory;
+    private IZvecCollection? _collection;
 
-    public VectorAllocationTests()
+    public VectorAllocationTests(ZVecRealNativeFixture fixture)
     {
+        _fixture = fixture;
         _testPath = Path.Combine(Path.GetTempPath(), $"zvec_alloc_{Guid.NewGuid():N}");
-        _schema = new ZVecCollectionSchema
+    }
+
+    private void Setup()
+    {
+        _fixture.SkipIfNotAvailable();
+        _factory = new ZVecFactory();
+        _factory.Initialize();
+        var schema = new ZVecCollectionSchema
         {
             Name = "alloc_test",
             Vectors =
@@ -26,24 +35,20 @@ public class VectorAllocationTests : IDisposable
                 }
             ]
         };
-
-        _factory = new ZVecFactory();
-        _factory.Initialize();
-        _collection = _factory.CreateAndOpen(_testPath, _schema);
+        _collection = _factory.CreateAndOpen(_testPath, schema);
     }
 
     [Fact]
     public void Query_WithReadOnlyMemory_DoesNotAllocateVectorArrayCopy()
     {
-        if (_collection is null) return; // Native library not available
+        Setup();
+        _collection.Should().NotBeNull();
 
         var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
         var memory = new ReadOnlyMemory<float>(vector);
 
-        // Warm up to initialize any lazy structures / JIT compilation
-        _collection.Query(new ZVecQuery { FieldName = "embedding", Vector = memory }, topk: 1);
+        _collection!.Query(new ZVecQuery { FieldName = "embedding", Vector = memory }, topk: 1);
 
-        // Measure allocations
         GC.Collect();
         GC.WaitForPendingFinalizers();
         long before = GC.GetAllocatedBytesForCurrentThread();
@@ -53,27 +58,18 @@ public class VectorAllocationTests : IDisposable
         long after = GC.GetAllocatedBytesForCurrentThread();
         long allocated = after - before;
 
-        // The query itself will allocate some small DTO objects (ZVecDoc, lists, results),
-        // but it must NOT allocate a copy of the float vector (which would be 4 * 4 = 16 bytes, or 768 * 4 = 3072 bytes for larger dimensions).
-        // Since we are using standard mock/P-Invoke pipelines, the allocation overhead must be low.
-        // We assert allocated bytes is reasonably small (< 4096 bytes total).
-        allocated.Should().BeLessThan(4096, "Vector query path should be optimized and avoid copying query vector arrays.");
+        // Result DTOs may allocate; the query vector itself must not be copied as float[].
+        allocated.Should().BeLessThan(4096, "Vector query path should avoid copying query vector arrays.");
     }
 
     public void Dispose()
     {
-        _collection.Dispose();
-        _factory.Dispose();
+        _collection?.Dispose();
+        _factory?.Dispose();
         if (Directory.Exists(_testPath))
         {
-            try
-            {
-                Directory.Delete(_testPath, true);
-            }
-            catch
-            {
-                // Ignore cleanup failures
-            }
+            try { Directory.Delete(_testPath, true); }
+            catch { /* ignore */ }
         }
     }
 }

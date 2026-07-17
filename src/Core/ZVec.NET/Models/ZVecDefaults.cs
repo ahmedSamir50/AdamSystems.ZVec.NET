@@ -6,20 +6,23 @@ namespace ZVec.NET;
 /// </summary>
 public static class ZVecDefaults
 {
-    /// <summary>Expected native library versions.</summary>
+    /// <summary>
+    /// Mutable ABI gate overrides for tests. Defaults forward to <see cref="ZVecNativeAbi"/>.
+    /// Production code should prefer <see cref="ZVecNativeAbi"/> constants.
+    /// </summary>
     public static class Version
     {
-        /// <summary>Expected major version.</summary>
-        public static int ExpectedMajor { get; set; } = 0;
+        /// <summary>Minimum major version required by the ABI gate. Defaults to <see cref="ZVecNativeAbi.MinimumMajor"/>.</summary>
+        public static int ExpectedMajor { get; set; } = ZVecNativeAbi.MinimumMajor;
 
-        /// <summary>Expected minor version.</summary>
-        public static int ExpectedMinor { get; set; } = 5;
+        /// <summary>Minimum minor version required by the ABI gate. Defaults to <see cref="ZVecNativeAbi.MinimumMinor"/>.</summary>
+        public static int ExpectedMinor { get; set; } = ZVecNativeAbi.MinimumMinor;
 
-        /// <summary>Expected patch version.</summary>
-        public static int ExpectedPatch { get; set; } = 1;
+        /// <summary>Minimum patch version required by the ABI gate. Defaults to <see cref="ZVecNativeAbi.MinimumPatch"/>.</summary>
+        public static int ExpectedPatch { get; set; } = ZVecNativeAbi.MinimumPatch;
 
-        /// <summary>If true, bypasses the strict ABI version check during initialization.</summary>
-        public static bool BypassAbiCheck { get; set; } = false;
+        /// <summary>If true, bypasses the ABI version check during initialization.</summary>
+        public static bool BypassAbiCheck { get; set; }
     }
 
     /// <summary>Default parameters for HNSW index.</summary>
@@ -162,7 +165,7 @@ public static class ZVecDefaults
         /// <summary>Default maximum documents per segment: 10,000,000.</summary>
         public const int MaxDocCountPerSegment = 10_000_000;
 
-        /// <summary>Default maximum concurrent reads: 0 (uses Environment.ProcessorCount at open time).</summary>
+        /// <summary>Default maximum concurrent reads: 0 (unlimited).</summary>
         public const int MaxConcurrentReads = 0;
     }
 
@@ -363,5 +366,21 @@ public static class ZVecDefaults
         /// <summary>Message shown when Not() cannot rewrite an expression into a native-supported form.</summary>
         public const string FilterNotUnsupported =
             "Unary NOT is not supported by the native ZVec filter engine. Use !=, NOT IN, or NOT CONTAIN_* forms, or pass a simple comparison/In/Contain expression to Not().";
+
+        /// <summary>
+        /// Platform gate: HNSW-RaBitQ requires x86_64 with AVX2 or higher (not available on ARM).
+        /// </summary>
+        public const string RabitqRequiresX64Avx2 =
+            "HNSW-RaBitQ is currently supported only on x86_64 with AVX2 or higher instruction set support. It is not available on ARM architectures.";
+
+        /// <summary>
+        /// Platform gate: DiskANN requires Linux and libaio.
+        /// </summary>
+        public const string DiskAnnRequiresLinuxLibaio =
+            "DiskANN is currently supported on Linux only and requires the libaio library (Linux asynchronous I/O) to be installed on the system.";
+
+        /// <summary>ABI mismatch message format: requires &gt;= min with major == requiredMajor. Args: minVersion, requiredMajor, foundVersion.</summary>
+        public const string AbiMismatchRequiresMinSameMajor =
+            "ZVec ABI version mismatch. Requires native library version >= '{0}' with major == {1}, but found: '{2}'. Please update your native binaries.";
     }
 }

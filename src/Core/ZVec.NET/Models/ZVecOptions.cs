@@ -14,7 +14,7 @@ public sealed class ZVecOptions
     /// <summary>The thread count for queries (-1 = auto).</summary>
     public int QueryThreads { get; set; } = ZVecDefaults.GlobalOptions.QueryThreads;
 
-    /// <summary>Maximum concurrent native calls.</summary>
+    /// <summary>Maximum concurrent native calls across collections from this factory. 0 = unlimited.</summary>
     public int MaxConcurrentNativeCalls { get; set; } = ZVecDefaults.GlobalOptions.MaxConcurrentNativeCalls;
 
     /// <summary>

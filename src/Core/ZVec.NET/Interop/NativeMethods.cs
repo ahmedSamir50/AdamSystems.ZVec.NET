@@ -352,14 +352,6 @@ internal static partial class NativeMethods
         nuint valueSize);      // size_t value_size — byte size of value
 
     [LibraryImport(LibraryName)]
-    internal static partial int zvec_doc_add_sparse_vector_field(
-        IntPtr doc,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
-        IntPtr indices,
-        IntPtr values,
-        nuint count);
-
-    [LibraryImport(LibraryName)]
     internal static partial int zvec_doc_get_field_value_copy(
         IntPtr doc,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
@@ -427,14 +419,14 @@ internal static partial class NativeMethods
         [MarshalAs(UnmanagedType.U1)] bool include);
 
     [LibraryImport(LibraryName)]
-    internal static partial int zvec_vector_query_set_sparse_vector(
+    internal static partial int zvec_vector_query_set_query_params(IntPtr query, IntPtr queryParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_sparse_vector(
         IntPtr query,
         IntPtr indices,
         IntPtr values,
         nuint count);
-
-    [LibraryImport(LibraryName)]
-    internal static partial int zvec_vector_query_set_query_params(IntPtr query, IntPtr queryParams);
 
     [LibraryImport(LibraryName)]
     internal static partial IntPtr zvec_fts_create();

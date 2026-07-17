@@ -60,7 +60,7 @@ public interface IZvecCollection : IDisposable, IAsyncDisposable
     // =========================================================================
 
     IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk = 10, string? filter = null);
-    IReadOnlyList<ZVecDoc> Query(IReadOnlyList<ZVecQuery> queries, int topk = 10, ZVecReranker? reranker = null);
+    IReadOnlyList<ZVecDoc> Query(IReadOnlyList<ZVecQuery> queries, int topk = 10, ZVecReranker? reranker = null, string? filter = null);
     ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(ZVecQuery query, int topk = 10, string? filter = null, CancellationToken ct = default);
 
     // =========================================================================

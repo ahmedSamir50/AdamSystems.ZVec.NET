@@ -55,7 +55,7 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
             {
                 _ftsHandle = NativeMethods.zvec_fts_create();
                 if (_ftsHandle == IntPtr.Zero)
-                    throw new InvalidOperationException("Failed to create native FTS query handle.");
+                    throw new InvalidOperationException(ZVecDefaults.Errors.NativeFtsQueryCreateFailed);
 
                 if (!string.IsNullOrWhiteSpace(query.Fts.QueryString))
                 {
@@ -75,7 +75,9 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
                     (ZVecErrorCode)NativeMethods.zvec_vector_query_set_fts(_handle, _ftsHandle),
                     nameof(NativeMethods.zvec_vector_query_set_fts));
 
-                string op = query.Fts.DefaultOperator == ZVecFtsDefaultOperator.And ? "AND" : "OR";
+                string op = query.Fts.DefaultOperator == ZVecFtsDefaultOperator.And
+                    ? ZVecDefaults.Filter.And
+                    : ZVecDefaults.Filter.Or;
                 _ftsParamsHandle = NativeMethods.zvec_query_params_fts_create(op);
                 if (_ftsParamsHandle != IntPtr.Zero)
                 {

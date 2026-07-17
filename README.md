@@ -18,20 +18,21 @@
 | **Zero-allocation vector pipelines** | `ReadOnlyMemory<float>` on all vector hot paths — no `float[]` copies, no GC pressure on queries |
 | **Sync + Async APIs** | Lowest-latency sync path for batch jobs; bounded async offload for ASP.NET Core |
 | **DI-first design** | `AddZVec()` / `AddZVecCollection()` — works with ASP.NET Core, MAUI, Blazor Server out of the box |
-| **SafeHandle guarantees** | Every native pointer wrapped in `SafeHandle`; `Dispose` / `await using` is the primary path; finalizer is a safety net |
-| **Cross-platform single NuGet** | One package with native binaries for win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 |
+| **Safe native lifecycle** | Collection handles use `nint` + `Interlocked` dispose/destroy; query/doc helpers use `SafeHandle` where ownership is short-lived |
+| **Cross-platform NuGet (planned)** | Target RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 — full multi-RID packaging is Epic E21 |
 | **Full ZVec DB coverage** | HNSW, Flat, IVF, HNSW-RaBitQ, DiskANN, Vamana, Invert, FTS indexes; hybrid search; schema evolution; in-DB RRF/Weighted rerankers |
-| **Idiomatic C#** | .NET naming guidelines, `ValueTask`, `CancellationToken`, fluent builders — feels like it was written by Microsoft |
+| **Idiomatic C#** | .NET naming guidelines, `ValueTask`, `CancellationToken`, fluent builders |
 
 ---
 
 ## Architecture & Concurrency
 
-ZVec.NET guarantees extreme performance and thread safety through its core architectural decisions:
+ZVec.NET is built for thread-safe use against the native engine:
 
-1. **Instance-Based Factory:** `ZVecFactory` tracks its own state and collection handles. A standard managed `lock` ensures exactly-once native library initialization globally (`zvec_initialize`), completely eliminating cross-test interference and access violation race conditions.
-2. **SafeHandle Disposal:** Every native pointer is wrapped in a `SafeHandle`. When a factory shuts down, a `CancellationToken` signals all open collections to safely abort operations and dispose of their memory gracefully.
-3. **Zero-Copy Pipelines:** The hot path (`Insert`, `Query`) avoids `float[]` array allocations. The SDK pins `ReadOnlyMemory<float>` buffers using `MemoryHandle` and passes raw pointers directly to the native DB via P/Invoke. Our `BenchmarkDotNet` suite confirms query execution in **~500ns** (0.0005 ms) with less than 250 bytes of overhead!
+1. **Instance-based factory:** `ZVecFactory` tracks its own state and open collection handles. A process-wide `lock` ensures exactly-once native library initialization (`zvec_initialize`).
+2. **Collection lifecycle:** Open collections hold a raw `nint` handle. `Dispose` / `Destroy` use `Interlocked` flags (idempotent). Short-lived query/doc native objects use `SafeHandle` helpers.
+3. **Optional throttles:** `MaxConcurrentNativeCalls` / `MaxConcurrentReads` use `SemaphoreSlim` when &gt; 0; `0` means unlimited. The canceled managed RW lock (E9) is not used — native ZVec is already thread-safe.
+4. **Zero-copy pipelines:** Hot paths pin `ReadOnlyMemory<float>` and pass pointers to native code. Performance targets are below (not published latency claims until benchmarks stabilize).
 
 ---
 
@@ -43,7 +44,7 @@ ZVec.NET guarantees extreme performance and thread safety through its core archi
 dotnet add package ZVec.NET
 ```
 
-> **Requires .NET 8.0+ (LTS).** Native binaries for all 6 RIDs are bundled — no separate native package needed.
+> **Requires .NET 8.0+ (LTS).** Pre-alpha: native binaries for your current RID must be present locally (or tests Skip). Multi-RID NuGet bundling is planned in Epic E21.
 
 ### ASP.NET Core / Blazor Server
 
@@ -99,8 +100,8 @@ public class ProductService(IZvecCollection products)
 using ZVec.NET;
 using ZVec.NET.Query;
 
-using var factory = new ZVecFactory(new ZVecOptions { LogLevel = ZVecLogLevel.Warn });
-factory.Initialize();
+using var factory = new ZVecFactory();
+factory.Initialize(new ZVecOptions { LogLevel = ZVecLogLevel.Warn });
 
 var schema = new ZVecCollectionSchemaBuilder("docs")
     .AddVector("vec", ZVecDataType.VectorFp32, 768, new ZVecHnswIndexParam())
@@ -138,12 +139,12 @@ foreach (var hit in results)
 └───────────────────────┬────────────────────────────┘
                         │
           ┌─────────────▼──────────────┐
-          │   ZVec.NET SDK  │
+          │   ZVec.NET SDK             │
           │  IZvecFactory / IZvecCollection  │
           │  Builders / DTOs / DI        │
           ├──────────────────────────────┤
-           │  Interlocked lifecycle gate   │
-          │  SafeHandle Layer            │
+          │  Interlocked lifecycle gate   │
+          │  SafeHandle helpers (query/doc)│
           │  [LibraryImport] P/Invoke    │
           └─────────────┬──────────────┘
                         │  Flat C ABI
@@ -163,22 +164,22 @@ foreach (var hit in results)
 
 ### Index Types
 
-| Index | Use Case | SDK Type |
-|-------|----------|----------|
-| **HNSW** | General-purpose ANN | `ZVecHnswIndexParam` |
-| **Flat** | Exact search (small datasets) | `ZVecFlatIndexParam` |
-| **IVF** | Clustered ANN | `ZVecIvfIndexParam` |
-| **HNSW-RaBitQ** | Quantized HNSW (x86_64/AVX2) | `ZVecHnswRabitqIndexParam` |
-| **DiskANN** | Disk-based ANN (Linux) | `ZVecDiskAnnIndexParam` |
-| **Vamana** | Graph-based ANN | `ZVecVamanaIndexParam` |
-| **Invert** | Scalar field index | `ZVecInvertIndexParam` |
-| **FTS** | Full-text search | `ZVecFtsIndexParam` |
+| Index | Use Case | SDK Type | Platform notes |
+|-------|----------|----------|----------------|
+| **HNSW** | General-purpose ANN | `ZVecHnswIndexParam` | All supported RIDs |
+| **Flat** | Exact search (small datasets) | `ZVecFlatIndexParam` | All supported RIDs |
+| **IVF** | Clustered ANN | `ZVecIvfIndexParam` | All supported RIDs |
+| **HNSW-RaBitQ** | Quantized HNSW | `ZVecHnswRabitqIndexParam` | **x86_64 with AVX2 or higher only** — not available on ARM. SDK throws `PlatformNotSupportedException` on Arm/Arm64. |
+| **DiskANN** | Disk-based ANN | `ZVecDiskAnnIndexParam` | **Linux only**, requires **libaio**. SDK throws `PlatformNotSupportedException` on non-Linux. |
+| **Vamana** | Graph-based ANN | `ZVecVamanaIndexParam` | All supported RIDs |
+| **Invert** | Scalar field index | `ZVecInvertIndexParam` | All supported RIDs |
+| **FTS** | Full-text search | `ZVecFtsIndexParam` | All supported RIDs |
 
 ### Query Modes
 
 - **Single vector** — `col.Query(new ZVecQuery { FieldName = "vec", Vector = myVec }, topk: 10)`
 - **Multi-vector** — `col.Query(queries, topk: 10, reranker: new ZVecRrfReranker { TopN = 10 })`
-- **Hybrid** (dense + sparse) — `ZVecQuery` with both `Vector` and `SparseVector`
+- **Hybrid** (dense + sparse) — multi-query with dense + sparse sub-queries and optional `filter`
 - **Full-text** — `new ZVecQuery { FieldName = "content", Fts = new ZVecFtsQuery { QueryString = "search terms" } }`
 - **Group-by** — `col.QueryGroupBy(new ZVecGroupByQuery { Query = q, GroupByField = "category", GroupSize = 5 })`
 - **Filtered** — `col.Query(query, topk: 10, filter: ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020).ToString())`
@@ -188,7 +189,7 @@ foreach (var hit in results)
 ```csharp
 // Insert / Upsert / Update
 col.Insert(doc);              // single
-col.Insert(docList);          // batch -> IReadOnlyList<ZVecStatus>
+col.Insert(docList);          // batch
 col.Upsert(doc);
 col.Update(doc);
 
@@ -199,7 +200,7 @@ col.DeleteByFilter("category = \"expired\"");
 
 // Fetch
 ZVecDoc? single = col.Fetch("doc1");
-IReadOnlyDictionary<string, ZVecDoc> batch = col.Fetch(idList);
+IReadOnlyList<ZVecDoc> batch = col.Fetch(idList);
 ```
 
 ### Schema Evolution (DDL)
@@ -207,7 +208,7 @@ IReadOnlyDictionary<string, ZVecDoc> batch = col.Fetch(idList);
 ```csharp
 col.AddColumn(new ZVecFieldSchema { Name = "rating", DataType = ZVecDataType.Float }, "0.0");
 col.DropColumn("legacy_field");
-col.AlterColumnRename("old_name", "new_name");
+col.AlterColumn("old_name", newName: "new_name");
 col.CreateIndex("embedding", new ZVecHnswIndexParam { M = 32 });
 col.DropIndex("embedding");
 col.Optimize();
@@ -241,12 +242,12 @@ var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
 
 ## Performance
 
-| Metric | Target | Baseline |
-|--------|--------|----------|
-| Sync P/Invoke overhead (768-dim) | < 50 us | DllImport float[] ~ 30 us |
-| Single-vector query (10k docs, topk=10) | < 1 ms | Python ZVec ~ 1.2 ms |
-| Batch insert (1000 docs) | > 50k docs/sec | Python ZVec ~ 40k docs/sec |
-| GC allocation per query (vector path) | < 256 B | float[] copy ~ 3 KB |
+| Metric | Target | Notes |
+|--------|--------|-------|
+| Sync P/Invoke overhead (768-dim) | &lt; 50 µs | Target; measure with BenchmarkDotNet |
+| Single-vector query (10k docs, topk=10) | &lt; 1 ms | Target vs Python ZVec baseline |
+| Batch insert (1000 docs) | &gt; 50k docs/sec | Target |
+| GC allocation per query (vector path) | &lt; 256 B | Intermediate + result objects only |
 
 The zero-allocation vector pipeline uses `ReadOnlyMemory<float>` + `Memory.Pin()` for the native call duration only — no intermediate `float[]` copies.
 
@@ -257,12 +258,17 @@ The zero-allocation vector pipeline uses `ReadOnlyMemory<float>` + `Memory.Pin()
 | What | Format | Example |
 |------|--------|---------|
 | **SDK version** | SemVer | `1.0.0-alpha.1` |
-| **ZVec native pin** | Build metadata after `+` | `+zvec.1.2.3` |
+| **ZVec native pin** | Build metadata after `+` | `+zvec.0.5.1` |
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
+| **ABI floor** | `ZVecNativeAbi` | Minimum `0.5.1`, same major |
 
-NuGet version: `1.0.0-alpha.1+zvec.1.2.3` — our SDK `1.0.0-alpha.1` wrapping ZVec C++ `1.2.3`, targeting .NET 8.0+.
+NuGet version example: `1.0.0-alpha.1+zvec.0.5.1` — SDK `1.0.0-alpha.1` wrapping ZVec C++ `0.5.1`.
 
-The version gate (`zvec_check_version`) validates the native ABI at startup — a mismatch throws `ZVecAbiMismatchException` immediately.
+At startup the ABI gate requires:
+1. `zvec_check_version(MinimumMajor, MinimumMinor, MinimumPatch)` (native ≥ minimum), **and**
+2. `zvec_get_version_major() == MinimumMajor` (same major).
+
+A mismatch throws `ZVecAbiMismatchException`.
 
 ---
 
@@ -273,23 +279,23 @@ ZVec.NET/
 ├── src/
 │   ├── Native/ZVec.Native/           # CMake -> upstream zvec_c_api
 │   │   └── external/zvec/            # Git submodule (alibaba/zvec)
-│   ├── Core/ZVec.NET/    # Published assembly (PackageId: ZVec.NET)
-│   │   ├── Abstractions/             # IZvecFactory, IZvecCollection
-│   │   ├── DependencyInjection/      # AddZVec, AddZVecCollection, ZVecOptions
-│   │   ├── Builders/                 # SchemaBuilder, FilterBuilder
-│   │   ├── Interop/                  # NativeMethods, SafeHandles, NativeLibraryResolver
-│   │   ├── Internal/                 # NativeDocBuilder, NativeQueryBuilder, etc.
-│   │   ├── Models/                   # ZVecDoc, ZVecStatus, enums
-│   │   ├── IndexParams/              # All 8 index param types
-│   │   ├── Query/                    # ZVecQuery, ZVecFtsQuery, ZVecReranker
-│   │   ├── ZVecFactory.cs
-│   │   └── ZVecCollection.cs
-│   └── Mock/ZVec.Native.Mock/       # Mock native library (outside main Core code)
+│   └── Core/ZVec.NET/                # Published assembly (PackageId: ZVec.NET)
+│       ├── Abstractions/              # IZvecFactory, IZvecCollection
+│       ├── DependencyInjection/      # AddZVec, AddZVecCollection, ZVecOptions
+│       ├── Builders/                 # SchemaBuilder
+│       ├── Interop/                  # NativeMethods, SafeHandles, NativeLibraryResolver
+│       ├── Internal/                 # NativeDocBuilder, NativeQueryBuilder, etc.
+│       ├── Models/                   # ZVecDoc, ZVecStatus, enums
+│       ├── IndexParams/              # All 8 index param types
+│       ├── Query/                    # ZVecQuery, ZVecFtsQuery, ZVecReranker, FilterBuilder
+│       ├── ZVecFactory.cs
+│       ├── ZVecCollection.cs
+│       └── ZVecNativeAbi.cs
 ├── testing/
-│   ├── ZVec.NET.Tests/  # xUnit + FluentAssertions
-│   └── ZVec.NET.Benchmarks/  # BenchmarkDotNet
-├── build/                           # .snk + CI scripts
-├── ZVec.NET.slnx        # Solution (VS .slnx)
+│   ├── ZVec.NET.Tests/               # xUnit + FluentAssertions (real native + Skip)
+│   └── ZVec.NET.Benchmarks/          # BenchmarkDotNet
+├── build/                            # .snk + CI scripts
+├── ZVec.NET.slnx                     # Solution (VS .slnx)
 ├── Directory.Build.props
 └── Directory.Packages.props
 ```
@@ -304,7 +310,7 @@ We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Branching strategy (`feature/*` off `dev`)
 - API shape guidelines (DI-first, Builder pattern, full `type.h` enum coverage)
 - Zero-allocation rules on hot paths
-- Testing approach (mock native library for fast unit tests)
+- Testing approach (real native library; tests Skip when the DLL is unavailable)
 
 ---
 

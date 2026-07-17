@@ -2,7 +2,7 @@
 
 > **ZVec** is Alibaba's open-source, in-process vector database — the "SQLite of Vector DBs" — built on the battle-tested Proxima search engine. Written in C++, it delivers sub-millisecond HNSW search, hybrid scalar+vector filtering, full-text search, WAL durability, and memory-mapped I/O with zero network overhead.
 >
-> **ZVec.NET** is Adam Systems' .NET NuGet package that wraps ZVec's C++ core via the official `zvec_c_api` and exposes an idiomatic C# API (sync + async) with zero-allocation vector pipelines. Public identity follows the Newtonsoft-style pattern: **company (AdamSystems) + product (ZVec) + framework (.NET)**.
+> **ZVec.NET** is the .NET NuGet package that wraps ZVec's C++ core via the official `zvec_c_api` and exposes an idiomatic C# API (sync + async) with zero-allocation vector pipelines. Public identity is **ZVec.NET only** (PackageId / namespace / assembly) — no company prefix.
 
 ---
 
@@ -71,7 +71,7 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 | License | MIT via `<PackageLicenseExpression>` | Correct NuGet metadata property (not `<License>`) |
 | Strong-naming | Yes, open signing key (`.snk` committed to repo) | Enterprise / strong-named consumer compatibility. The `.snk` is an **identity key** (not a security secret) — like SQLitePCLRaw's approach. Generated once via `sn -k ZVec.NET.snk` and placed in `build/`. It lets strong-named consumers reference our assembly |
 | Test Framework | xUnit + FluentAssertions | User decision |
-| Mock Strategy | C++ mock C-API DLL (primary); managed `SetDllImportResolver` mock optional | Unit tests without full native rebuild; integration uses real binaries |
+| Test Strategy | Real native + Skip when DLL missing; `SetMockLibrary` only for missing-path failure tests | Mock C++ project retired (E17 canceled) |
 | NuGet Layout | Single `.nupkg` with `runtimes/{rid}/native/` | Runtime resolves RID natives; no custom `build/*.props` for RID packing |
 | P/Invoke Style | `[LibraryImport]` (source generator) | Compile-time marshalling; faster than `[DllImport]` |
 | Public API style | DI-first (`IZvecFactory` / `IZvecCollection`) + selective builders | Hostable in ASP.NET Core, MAUI, Blazor Server |
@@ -359,11 +359,6 @@ ZVec.NET/                    # repo / product root
 │   │       ├── ZVecFactory.cs
 │   │       └── ZVecCollection.cs
 │   │
-│   └── Mock/
-│       └── ZVec.Native.Mock/          # Mock native library for testing (C++ primary; outside main Core code)
-│           ├── CMakeLists.txt
-│           └── src/
-│               └── zvec_c_api_mock.cpp # In-memory mock matching upstream C API surface
 │
 ├── testing/
 │   ├── ZVec.NET.Tests/
@@ -1251,7 +1246,8 @@ No `build/*.props` for RID native packing — the .NET runtime resolves `runtime
          The .NET target is NOT in the version — it lives in TargetFrameworks + lib/ folder.
          NuGet already shows "net8.0" as the dependency framework. -->
     <Version>1.0.0-alpha.1+zvec.1.2.3</Version>
-    <Authors>Adam Systems</Authors>
+     <Authors>Ahmed Samir https://github.com/ahmedSamir50</Authors>
+     <Company>Adam Systems EGY</Company>
     <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (win/linux/mac, x64/arm64).</Description>
     <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -1306,19 +1302,21 @@ Once the alpha NuGet package is published:
 
 | Category | Scope | Native Library | Count (est.) |
 |----------|-------|---------------|-------------|
-| **Unit** | DTO serialization, filter building, enum mapping, SafeHandle lifecycle | Mock | ~60 |
-| **Integration** | Full CRUD lifecycle, query accuracy, FTS, hybrid search, schema evolution | Real | ~40 |
-| **Memory** | Zero-allocation vector verification, SafeHandle leak detection, ArrayPool recycling | Real + Mock | ~15 |
-| **Concurrency** | Multi-threaded read/write under RW lock | Real | ~10 |
+| **Unit** | DTO serialization, filter building, enum mapping, SafeHandle lifecycle, ABI/platform gates | None (pure managed) | ~60 |
+| **Integration** | Full CRUD lifecycle, query accuracy, FTS, hybrid search, schema evolution | Real (Skip if missing) | ~40 |
+| **Memory** | Zero-allocation vector verification, SafeHandle leak detection, ArrayPool recycling | Real (Skip if missing) | ~15 |
+| **Concurrency** | Multi-threaded read/write; SemaphoreSlim when MaxConcurrent* &gt; 0 | Real (Skip if missing) | ~10 |
 
-### 10.2 Mock Native Library — Full Specification
+### 10.2 Mock Native Library — 🗑️ Canceled
 
-#### 10.2.1 Design Goals
+> **Canceled with Epic E17.** The C++ mock project is retired. Historical design notes below are archive-only. Prefer real native + Skip; use `SetMockLibrary` only for missing-path failure tests.
 
-- Implements the **entire** `c_api.h` surface (every exported function)
-- Builds as `zvec_c_api` shared library (same name as real binary)
-- Unit tests link against mock; integration tests link against real
-- Switching via `NativeLibrary.SetDllImportResolver` or `LD_LIBRARY_PATH`
+#### 10.2.1 Design Goals (archive)
+
+- ~~Implements the entire `c_api.h` surface~~ — canceled
+- ~~Builds as `zvec_c_api` shared library~~ — canceled
+- Unit tests are pure managed; integration tests link against real
+- `NativeLibrary.SetDllImportResolver` / `SetMockLibrary` remain for failure-path tests only
 
 #### 10.2.2 Architecture
 
@@ -1759,7 +1757,10 @@ public class QueryThroughputBench
 ### Recently Completed Epics
 - **Epic E14 (Schema DDL)**: Fully implemented DDL methods in `ZVecCollection` (`AddColumn`, `DropColumn`, `AlterColumn`, etc.) and validated with tests.
 - **Epic E16 (Dependency Injection)**: Integrated `Microsoft.Extensions.DependencyInjection` with `AddZVec` and `AddZVecCollection` using keyed singletons and DI options.
-- **Epic E17 (Mock Native Library)**: Created `zvec_c_api_mock.cpp` and `mock_structs.h` using CMake, removing the legacy C# mock and establishing a cross-platform mock matching the C API.
+- **Epic E18 (Integration Tests)** / **Epic E19 (Memory & Concurrency)**: Real-native coverage with Skip; ABI min+same-major (`ZVecNativeAbi`); platform gates; SemaphoreSlim throttles.
+
+### Canceled Epics
+- **Epic E17 (Mock Native Library)**: 🗑️ Canceled — mock C++ project retired; real native + Skip is the test strategy.
 
 ### Phase 1: Native Layer (upstream `zvec_c_api`) — ~2.5 weeks
 
@@ -2207,7 +2208,7 @@ This is now **closed** — see §2.0 audit. Only 2 gaps exist (`HNSW_RABITQ=4`, 
 
 1. The native library is named `zvec_c_api` (upstream's choice). If another NuGet package also ships `zvec_c_api.dll`, the .NET runtime loads only one.
 2. Mitigation: Use `NativeLibrary.SetDllImportResolver` to load from our package's `runtimes/` path explicitly.
-3. Future option: If conflict occurs, rename the native binary to `adamsystems_zvec_c_api` and add a `DllImportResolver` alias. This is a breaking change and only done if a real conflict is reported.
+3. Future option: If conflict occurs, ship a uniquely named native binary and add a `DllImportResolver` alias. This is a breaking change and only done if a real conflict is reported.
 
 ---
 

@@ -1,40 +1,56 @@
-using ZVec.NET.Interop;
 using FluentAssertions;
+using ZVec.NET.Interop;
 
 namespace ZVec.NET.Tests.Unit.Interop;
 
 public class VectorMarshallerTests
 {
     [Fact]
-    public void PinVector_ReturnsValidPointerAndPin()
+    public void SerializeSparseVector_SortsIndices_And_ReturnSparseArrays_DoesNotThrow()
     {
-        // US-E7.1: Pin dynamic vectors without copying
-        var vec = new ReadOnlyMemory<float>([1.5f, 2.5f, 3.5f]);
-        var (ptr, pin) = VectorMarshaller.PinVector(vec);
+        var sparse = new Dictionary<int, float>
+        {
+            [5] = 0.5f,
+            [1] = 1.0f,
+            [3] = 0.3f
+        };
 
-        ptr.Should().NotBe(IntPtr.Zero);
-        pin.Dispose(); // must not throw
+        VectorMarshaller.SerializeSparseVector(sparse, out int[] indices, out float[] values, out int count);
+        try
+        {
+            count.Should().Be(3);
+            indices.Take(count).Should().Equal(1, 3, 5);
+            values.Take(count).Should().Equal(1.0f, 0.3f, 0.5f);
+        }
+        finally
+        {
+            VectorMarshaller.ReturnSparseArrays(indices, values);
+        }
+
+        // Second rent/return cycle verifies pool recycle path.
+        VectorMarshaller.SerializeSparseVector(sparse, out indices, out values, out count);
+        try
+        {
+            count.Should().Be(3);
+        }
+        finally
+        {
+            VectorMarshaller.ReturnSparseArrays(indices, values);
+        }
     }
 
     [Fact]
-    public void SerializeSparseVector_SortsByIndex()
+    public void PinVector_ReturnsPointer_ForReadOnlyMemory()
     {
-        // US-E7.2: Serialize sparse vectors sorted by indices
-        var sparse = new Dictionary<int, float> { [5] = 0.5f, [1] = 0.1f, [3] = 0.3f };
-        
-        VectorMarshaller.SerializeSparseVector(sparse, out var indices, out var values, out var count);
-        
-        count.Should().Be(3);
-        indices[0].Should().Be(1);
-        indices[1].Should().Be(3);
-        indices[2].Should().Be(5);
-
-        values[0].Should().Be(0.1f);
-        values[1].Should().Be(0.3f);
-        values[2].Should().Be(0.5f);
-
-        VectorMarshaller.ReturnSparseArrays(indices, values);
+        var memory = new ReadOnlyMemory<float>([0.1f, 0.2f, 0.3f, 0.4f]);
+        var (ptr, pin) = VectorMarshaller.PinVector(memory);
+        try
+        {
+            ptr.Should().NotBe(IntPtr.Zero);
+        }
+        finally
+        {
+            pin.Dispose();
+        }
     }
-
-
 }
