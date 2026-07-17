@@ -1,0 +1,6 @@
+cache/
+*.zip
+*.tsv
+*.csv
+*.jsonl
+!fixtures/**

@@ -1,0 +1,15 @@
+<Project>
+  <!-- Samples are user demos only — never packed, never part of E21 NuGet/CI. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <SignAssembly>false</SignAssembly>
+    <!-- Clear multi-TFM from repo-root Directory.Build.props; samples are .NET 10 only. -->
+    <TargetFrameworks></TargetFrameworks>
+    <!-- Samples are .NET 10 only (not multi-targeted like the core library). -->
+    <TargetFramework Condition="'$(TargetFramework)' == '' and '$(MSBuildProjectName)' != 'ZVec.NET.Samples.Maui'">net10.0</TargetFramework>
+    <!-- Prefer CPM from repo root for Shared/Console/AspNet. MAUI templates may set local versions. -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+</Project>

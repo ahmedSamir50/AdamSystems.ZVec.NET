@@ -1,0 +1,10 @@
+[
+  { "id": "q1", "text": "How do I open a ZVec collection in .NET?" },
+  { "id": "q2", "text": "What is the difference between Dispose and Destroy?" },
+  { "id": "q3", "text": "How do typed ODM attributes map to schema?" },
+  { "id": "q4", "text": "How can I run semantic search offline on a device?" },
+  { "id": "q5", "text": "What LM Studio models are used for embeddings and chat?" },
+  { "id": "q6", "text": "How do I register ZVec with dependency injection?" },
+  { "id": "q7", "text": "What is content-based recommendation with vectors?" },
+  { "id": "q8", "text": "How do I ingest markdown files into a RAG collection?" }
+]

@@ -373,6 +373,16 @@ ZVec.NET/                    # repo / product root
 │   └── ZVec.NET.Benchmarks/
 │       └── ZVec.NET.Benchmarks.csproj
 │
+├── samples/                         # USER DEMOS ONLY — never packed (Epic E25)
+│   ├── Directory.Build.props        # IsPackable=false; sample TFMs; no SignAssembly
+│   ├── ZVec.NET.Samples.slnx        # Preferred entrypoint for sample work
+│   ├── README.md                    # Prerequisites, LM Studio, MB datasets, E21 isolation
+│   ├── datasets/                    # T0 fixtures committed; T1 cache gitignored (≤ ~100 MB/pack)
+│   ├── ZVec.NET.Samples.Shared/     # RAG/search/recommend helpers + LM Studio clients (.NET 10)
+│   ├── ZVec.NET.Samples.Console/    # net10.0
+│   ├── ZVec.NET.Samples.AspNet/     # net10.0
+│   └── ZVec.NET.Samples.Maui/       # Flagship offline/edge Blazor Hybrid RAG (net10.0-*)
+│
 ├── build/
 │   ├── ZVec.NET.snk   # Strong-name identity key (not a secret)
 │   └── ci/
@@ -380,13 +390,15 @@ ZVec.NET/                    # repo / product root
 │       ├── build-managed.yml
 │       └── publish-nuget.yml
 │
-├── ZVec.NET.slnx      # Solution at repo root (VS .slnx)
+├── ZVec.NET.slnx      # Solution at repo root (VS .slnx) — core + tests; samples optional
 ├── Directory.Build.props         # Auto-imported by MSBuild (must be at root / ancestor of projects)
 ├── Directory.Packages.props      # Central Package Management (must be at root)
 └── README.md
 ```
 
 > **Consumer rule:** all imports are `using ZVec.NET;` (plus `.DependencyInjection` / `.Query` as needed). The `Core/` folder is repo layout only — it must not appear in PackageId, assembly name, or public namespaces.
+>
+> **Samples rule:** `samples/` is for users learning the SDK. Projects are `IsPackable=false` and must not appear in NuGet packages or block E21 CI when packaging is added.
 
 ### 4.2 Multi-Targeting Strategy
 

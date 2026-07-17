@@ -47,6 +47,16 @@ dotnet add package ZVec.NET
 
 > **Requires .NET 8.0+ (LTS).** Pre-alpha: native binaries for your current RID must be present locally (or tests Skip). Multi-RID NuGet bundling is planned in Epic E21.
 
+### Samples (Epic E25 — .NET 10 only)
+
+Live demos live under [`samples/`](samples/) (Console, ASP.NET Minimal API, **MAUI Blazor Hybrid** flagship for offline/edge RAG with LM Studio + Gemma 4). They are **not** part of the NuGet package and never gate packaging CI.
+
+```bash
+dotnet build samples/ZVec.NET.Samples.slnx
+```
+
+See [`samples/README.md`](samples/README.md) for prerequisites, MB-only datasets, and a manual smoke checklist.
+
 ### Two APIs
 
 | API | When to use |
