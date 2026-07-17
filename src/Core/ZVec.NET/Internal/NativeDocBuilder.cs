@@ -86,31 +86,39 @@ internal sealed class NativeDocBuilder : IDisposable
 
     private unsafe void AddSparseVectorField(string name, IReadOnlyDictionary<int, float> vector)
     {
-        var count = vector.Count;
-        var indicesPtr = Marshal.AllocHGlobal(count * sizeof(int));
-        var valuesPtr = Marshal.AllocHGlobal(count * sizeof(float));
-        _unmanagedAllocations.Add(indicesPtr);
-        _unmanagedAllocations.Add(valuesPtr);
-
-        var indices = new Span<int>((void*)indicesPtr, count);
-        var values = new Span<float>((void*)valuesPtr, count);
-
-        int i = 0;
-        foreach (var kvp in vector)
+        // Upstream extract_sparse_vector expects: [nnz(uint32)][uint32 indices...][float values...]
+        // via zvec_doc_add_field_by_value (there is no dedicated sparse-add export).
+        VectorMarshaller.SerializeSparseVector(vector, out int[] indices, out float[] values, out int count);
+        try
         {
-            indices[i] = kvp.Key;
-            values[i] = kvp.Value;
-            i++;
+            uint nnz = (uint)count;
+            int bufferSize = sizeof(uint) + (count * sizeof(uint)) + (count * sizeof(float));
+            byte[] buffer = new byte[bufferSize];
+            fixed (byte* pBuf = buffer)
+            fixed (int* pIdx = indices)
+            fixed (float* pVal = values)
+            {
+                *(uint*)pBuf = nnz;
+                uint* pIndices = (uint*)(pBuf + sizeof(uint));
+                for (int i = 0; i < count; i++)
+                    pIndices[i] = (uint)pIdx[i];
+                float* pValues = (float*)(pIndices + count);
+                Buffer.MemoryCopy(pVal, pValues, count * sizeof(float), count * sizeof(float));
+
+                int rc = NativeMethods.zvec_doc_add_field_by_value(
+                    _handle,
+                    name,
+                    (int)ZVecDataType.SparseVectorFp32,
+                    (nint)pBuf,
+                    (nuint)bufferSize);
+
+                ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddSparseVectorField));
+            }
         }
-
-        int rc = NativeMethods.zvec_doc_add_sparse_vector_field(
-            _handle,
-            name,
-            indicesPtr,
-            valuesPtr,
-            (nuint)count);
-
-        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddSparseVectorField));
+        finally
+        {
+            VectorMarshaller.ReturnSparseArrays(indices, values);
+        }
     }
 
     private unsafe void AddScalarField(string name, object value)

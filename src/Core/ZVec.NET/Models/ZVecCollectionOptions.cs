@@ -9,6 +9,6 @@ public sealed class ZVecCollectionOptions
     /// <summary>Whether to enable memory-mapped files (mmap) for querying. Default is true.</summary>
     public bool EnableMmap { get; init; } = ZVecDefaults.CollectionOptions.EnableMmap;
 
-    /// <summary>Maximum concurrent read calls allowed. 0 = use <see cref="Environment.ProcessorCount"/> at open time.</summary>
+    /// <summary>Maximum concurrent read calls allowed. 0 = unlimited (no managed throttle).</summary>
     public int MaxConcurrentReads { get; init; } = ZVecDefaults.Collection.MaxConcurrentReads;
 }

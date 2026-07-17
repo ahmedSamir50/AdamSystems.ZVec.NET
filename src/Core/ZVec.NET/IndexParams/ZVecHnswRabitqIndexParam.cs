@@ -2,8 +2,17 @@ namespace ZVec.NET;
 
 /// <summary>
 /// HNSW + RaBitQ. Maps to <c>IndexType::HNSW_RABITQ = 4</c> in <c>type.h</c>.
-/// <c>c_api.h</c> may omit the macro — pass value 4 until upstream adds it. x86_64/AVX2 only.
+/// <c>c_api.h</c> may omit the macro — pass value 4 until upstream adds it.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Platform requirement:</b> HNSW-RaBitQ is currently supported only on x86_64 with AVX2 or higher
+/// instruction set support. It is not available on ARM architectures.
+/// </para>
+/// <para>
+/// The SDK throws <see cref="PlatformNotSupportedException"/> on Arm/Arm64 before calling native APIs.
+/// </para>
+/// </remarks>
 public sealed class ZVecHnswRabitqIndexParam : ZVecIndexParam
 {
     /// <summary>Distance metric type. Default is Cosine.</summary>

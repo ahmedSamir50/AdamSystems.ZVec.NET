@@ -63,6 +63,11 @@ public sealed class ZVecFactory : IZvecFactory
     // Shutdown cancellation — signalled when Shutdown() is called.
     private CancellationTokenSource _shutdownCts = new();
 
+    /// <summary>
+    /// Optional process-wide throttle for native calls when <see cref="ZVecOptions.MaxConcurrentNativeCalls"/> &gt; 0.
+    /// </summary>
+    private SemaphoreSlim? _nativeCallGate;
+
     // =========================================================================
     // Initialization
     // =========================================================================
@@ -86,6 +91,12 @@ public sealed class ZVecFactory : IZvecFactory
                     CheckAbiVersion();
                     ApplyNativeConfig(options);
                 }
+
+                int maxNative = options?.MaxConcurrentNativeCalls
+                    ?? ZVecDefaults.GlobalOptions.MaxConcurrentNativeCalls;
+                if (maxNative > 0)
+                    _nativeCallGate = new SemaphoreSlim(maxNative, maxNative);
+
                 _globalNativeInitCount++;
                 _state = FactoryState.Initialized;
             }
@@ -138,6 +149,9 @@ public sealed class ZVecFactory : IZvecFactory
                 }
             }
 
+            _nativeCallGate?.Dispose();
+            _nativeCallGate = null;
+
             // State goes back to Uninitialized so it can be re-initialized if needed (especially for tests)
             _shutdownCts = new CancellationTokenSource();
             _state = FactoryState.Uninitialized;
@@ -170,7 +184,7 @@ public sealed class ZVecFactory : IZvecFactory
             path, nativeSchema.Handle, nativeOptions?.Handle ?? IntPtr.Zero, out IntPtr handle);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(CreateAndOpen));
 
-        var collection = new ZVecCollection(handle, path, schema, _shutdownCts.Token, this);
+        var collection = new ZVecCollection(handle, path, schema, _shutdownCts.Token, this, options);
         TrackCollection(collection, handle);
         return collection;
     }
@@ -197,7 +211,7 @@ public sealed class ZVecFactory : IZvecFactory
         var rc = NativeMethods.zvec_collection_open(path, nativeOptions?.Handle ?? IntPtr.Zero, out IntPtr handle);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Open));
 
-        var collection = new ZVecCollection(handle, path, schema: null, _shutdownCts.Token, this);
+        var collection = new ZVecCollection(handle, path, schema: null, _shutdownCts.Token, this, options);
         TrackCollection(collection, handle);
         return collection;
     }
@@ -235,17 +249,31 @@ public sealed class ZVecFactory : IZvecFactory
         if (ZVecDefaults.Version.BypassAbiCheck)
             return;
 
-        bool compatible = NativeMethods.zvec_check_version(
-            ZVecDefaults.Version.ExpectedMajor,
-            ZVecDefaults.Version.ExpectedMinor,
-            ZVecDefaults.Version.ExpectedPatch);
+        int requiredMajor = ZVecDefaults.Version.ExpectedMajor;
+        int requiredMinor = ZVecDefaults.Version.ExpectedMinor;
+        int requiredPatch = ZVecDefaults.Version.ExpectedPatch;
 
-        if (!compatible)
+        bool meetsMinimum = NativeMethods.zvec_check_version(requiredMajor, requiredMinor, requiredPatch);
+        int foundMajor = NativeMethods.zvec_get_version_major();
+
+        if (!ZVecNativeAbi.IsCompatible(meetsMinimum, foundMajor, requiredMajor))
         {
             string found = NativeMethods.GetVersionString();
-            string expected = $"{ZVecDefaults.Version.ExpectedMajor}.{ZVecDefaults.Version.ExpectedMinor}.{ZVecDefaults.Version.ExpectedPatch}";
-            throw new ZVecAbiMismatchException(expected, found);
+            string minimum = $"{requiredMajor}.{requiredMinor}.{requiredPatch}";
+            throw new ZVecAbiMismatchException(minimum, requiredMajor, found);
         }
+    }
+
+    /// <summary>Acquires the optional native-call throttle (no-op when unlimited).</summary>
+    internal void EnterNativeCall(CancellationToken cancellationToken = default)
+    {
+        _nativeCallGate?.Wait(cancellationToken);
+    }
+
+    /// <summary>Releases the optional native-call throttle (no-op when unlimited).</summary>
+    internal void ExitNativeCall()
+    {
+        _nativeCallGate?.Release();
     }
 
     private static void ApplyNativeConfig(ZVecOptions? options)

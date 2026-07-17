@@ -44,30 +44,39 @@ public class QueryAccuracyIntegrationTests : IClassFixture<ZVecRealNativeFixture
         Setup();
         _collection.Should().NotBeNull();
 
-        var docs = new[]
+        // ≥100 docs with known distances from the query vector (ascending scale).
+        const int docCount = 100;
+        var docs = new ZVecDoc[docCount];
+        for (int i = 0; i < docCount; i++)
         {
-            ZVecDoc.Create("doc1", denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = new float[] { 0.1f, 0.1f, 0.1f, 0.1f } }),
-            ZVecDoc.Create("doc2", denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = new float[] { 0.9f, 0.9f, 0.9f, 0.9f } }),
-            ZVecDoc.Create("doc3", denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = new float[] { 0.5f, 0.5f, 0.5f, 0.5f } }),
-            ZVecDoc.Create("doc4", denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = new float[] { 0.2f, 0.2f, 0.2f, 0.2f } }),
-            ZVecDoc.Create("doc5", denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = new float[] { 0.8f, 0.8f, 0.8f, 0.8f } }),
-        };
+            float v = i / (float)(docCount - 1); // 0 .. 1
+            docs[i] = ZVecDoc.Create($"doc{i:D3}",
+                denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
+                {
+                    ["embedding"] = new float[] { v, v, v, v }
+                });
+        }
 
         var insertResult = _collection!.Insert(docs);
         insertResult.IsSuccess.Should().BeTrue();
 
-        // Query with vector near doc2
-        var queryVector = new float[] { 0.95f, 0.95f, 0.95f, 0.95f };
+        // Query near the high end — closest should be doc099, then doc098, ...
+        var queryVector = new float[] { 1.0f, 1.0f, 1.0f, 1.0f };
         var query = new ZVecQuery { FieldName = "embedding", Vector = queryVector };
 
-        var results = _collection.Query(query, topk: 5);
+        var results = _collection.Query(query, topk: 10);
 
-        results.Should().HaveCount(5);
-        results[0].Id.Should().Be("doc2");
-        results[1].Id.Should().Be("doc5");
-        results[2].Id.Should().Be("doc3");
-        results[3].Id.Should().Be("doc4");
-        results[4].Id.Should().Be("doc1");
+        results.Should().HaveCount(10);
+        results[0].Id.Should().Be("doc099");
+        results[1].Id.Should().Be("doc098");
+        results[2].Id.Should().Be("doc097");
+        for (int i = 1; i < results.Count; i++)
+        {
+            // Scores for L2: lower is closer — ensure non-decreasing distance order via Id rank.
+            int prev = int.Parse(results[i - 1].Id!["doc".Length..]);
+            int curr = int.Parse(results[i].Id!["doc".Length..]);
+            curr.Should().BeLessThan(prev);
+        }
     }
 
     public void Dispose()

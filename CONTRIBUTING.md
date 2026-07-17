@@ -42,6 +42,6 @@ Because this project relies on a native C++ engine, you cannot simply press "Run
 6. **Zero allocation:** On hot paths (`Query` / `Insert`), use `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` and `MemoryHandle`. Do not introduce `new float[]` copies on vector passing paths.
 7. **Enums / ABI:** Match numeric values to upstream `zvec/db/type.h` and `c_api.h`. If the C header omits a define (e.g. `HNSW_RABITQ = 4`), use the `type.h` value — do not invent new numbers. Document every enum in the project plan Appendix A.
 8. **LINQ:** Apply LINQ to **results** only. Do not add a custom `IQueryable` provider over the engine.
-9. **Testing:** Run the `ZVec.NET.Tests` project. We use a mock native library under `src/Mock/ZVec.Native.Mock` for unit testing so tests stay fast without a full native rebuild on every change.
+9. **Testing:** Run the `ZVec.NET.Tests` project. Unit tests cover pure managed logic; native-backed integration/memory tests use the real `zvec_c_api` binary and **Skip** when it is not available. `NativeLibraryResolver.SetMockLibrary` is reserved for missing-path / failure-path tests only (no mock C++ project).
 
 If you are unsure where to start, check the Issues tab for "good first issue" tags!

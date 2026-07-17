@@ -12,6 +12,7 @@ internal sealed class NativeIndexParamBuilder : IDisposable
     public NativeIndexParamBuilder(ZVecIndexParam param)
     {
         ArgumentNullException.ThrowIfNull(param);
+        ZVecPlatformRequirements.ThrowIfUnsupported(param);
 
         ZVecIndexType type = param switch
         {

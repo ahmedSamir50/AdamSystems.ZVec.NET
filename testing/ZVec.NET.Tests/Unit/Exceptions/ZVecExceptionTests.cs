@@ -11,10 +11,10 @@ public class ZVecExceptionTests
     public void ZVecAbiMismatchException_ContainsVersionInfo()
     {
         // US-E6.2: Verify version mismatch serialization
-        var ex = new ZVecAbiMismatchException(expected: "1.2.0", found: "1.3.0");
+        var ex = new ZVecAbiMismatchException(expectedMinimum: "1.2.0", requiredMajor: 1, found: "1.3.0");
         ex.ExpectedVersion.Should().Be("1.2.0");
         ex.FoundVersion.Should().Be("1.3.0");
-        ex.Message.Should().Contain("1.2.0").And.Contain("1.3.0");
+        ex.Message.Should().Contain("1.2.0").And.Contain("1.3.0").And.Contain("major == 1");
     }
 
     [Fact]

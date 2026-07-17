@@ -1,6 +1,15 @@
 namespace ZVec.NET;
 
-/// <summary>DiskANN index parameters. Linux-only per upstream docs.</summary>
+/// <summary>DiskANN index parameters.</summary>
+/// <remarks>
+/// <para>
+/// <b>Platform requirement:</b> DiskANN is currently supported on Linux only and requires the
+/// libaio library (Linux asynchronous I/O) to be installed on the system.
+/// </para>
+/// <para>
+/// The SDK throws <see cref="PlatformNotSupportedException"/> on non-Linux platforms before calling native APIs.
+/// </para>
+/// </remarks>
 public sealed class ZVecDiskAnnIndexParam : ZVecIndexParam
 {
     /// <summary>Distance metric type. Default is L2.</summary>
