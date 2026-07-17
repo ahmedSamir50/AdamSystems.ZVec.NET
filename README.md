@@ -17,7 +17,8 @@
 |---------|----------------------|
 | **Pin-based vector pipelines** | `ReadOnlyMemory&lt;float&gt;` on hot paths — no intermediate `float[]` copies on the query pin path (measure with `MemoryDiagnosisBench`) |
 | **Sync + Async APIs** | Lowest-latency sync path for batch jobs; async `ValueTask` APIs for ASP.NET Core (cooperative cancel; no thread-pool offload today) |
-| **DI-first design** | `AddZVec()` / `AddZVecCollection()` — works with ASP.NET Core, MAUI, Blazor Server out of the box |
+| **DI-first design** | `AddZVec()` / `AddZVecCollection<T>()` — works with ASP.NET Core, MAUI, Blazor Server out of the box |
+| **Typed ODM** | Map POCOs with `ZVec.NET.Mapping` attributes — schema `From<T>()`, expression filters, typed CRUD/DDL without magic field strings |
 | **Safe native lifecycle** | Collection handles owned by `SafeZvecHandle` (close-only); `Dispose` closes, `Destroy` deletes then closes; `Shutdown` disposes all tracked open collections before `zvec_shutdown` |
 | **Cross-platform NuGet (planned)** | Target RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 — full multi-RID packaging is Epic E21 |
 | **Full ZVec DB coverage** | HNSW, Flat, IVF, HNSW-RaBitQ, DiskANN, Vamana, Invert, FTS indexes; hybrid search; schema evolution; in-DB RRF/Weighted rerankers |
@@ -46,11 +47,12 @@ dotnet add package ZVec.NET
 
 > **Requires .NET 8.0+ (LTS).** Pre-alpha: native binaries for your current RID must be present locally (or tests Skip). Multi-RID NuGet bundling is planned in Epic E21.
 
-### ASP.NET Core / Blazor Server
+### ASP.NET Core / Blazor Server (typed — recommended)
 
 ```csharp
 // Program.cs
 using ZVec.NET.DependencyInjection;
+using ZVec.NET.Mapping;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,71 +63,89 @@ builder.Services.AddZVec(options =>
     options.MemoryLimitMb = 512;
 });
 
-builder.Services.AddZVecCollection("products", options =>
+builder.Services.AddZVecCollection<Product>(options =>
 {
     options.Path = "/data/products";
-    options.Schema = new ZVecCollectionSchemaBuilder("products")
-        .AddField("title", ZVecDataType.String)
-        .AddField("category", ZVecDataType.String)
-        .AddVector("embedding", ZVecDataType.VectorFp32, 768,
-            new ZVecHnswIndexParam { MetricType = ZVecMetricType.Cosine, M = 32, EfConstruction = 256 })
-        .Build();
     options.EnableMmap = true;
+    // Schema defaults to ZVecCollectionSchemaBuilder.From<Product>()
 });
 
 var app = builder.Build();
 ```
 
 ```csharp
-// Inject anywhere
-public class ProductService(IZvecCollection products)
-{
-    public async Task<IReadOnlyList<ZVecDoc>> SearchAsync(ReadOnlyMemory<float> queryVector, string? category = null)
-    {
-        var filter = category is not null
-            ? ZVecFilterBuilder.Create().Where("category", ZVecCompareOp.Eq, category).Build()
-            : null;
+using ZVec.NET.Mapping;
 
+public sealed class Product
+{
+    public string Id { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Category { get; set; } = "";
+
+    [ZVecVector(768, Metric = ZVecMetricType.Cosine, M = 32, EfConstruction = 256)]
+    public ReadOnlyMemory<float> Embedding { get; set; }
+}
+
+// Inject anywhere
+public class ProductService(IZvecCollection<Product> products)
+{
+    public async Task<IReadOnlyList<ZVecHit<Product>>> SearchAsync(
+        ReadOnlyMemory<float> queryVector,
+        string? category = null)
+    {
         return await products.QueryAsync(
-            new ZVecQuery { FieldName = "embedding", Vector = queryVector },
-            topk: 10,
-            filter: filter);
+            p => p.Embedding,
+            queryVector,
+            topK: 10,
+            filter: category is null ? null : p => p.Category == category);
     }
 }
 ```
 
-### Console / Batch (no DI)
+### Console / Batch (typed, no DI)
 
 ```csharp
 using ZVec.NET;
-using ZVec.NET.Query;
+using ZVec.NET.Mapping;
 
 using var factory = new ZVecFactory();
 factory.Initialize(new ZVecOptions { LogLevel = ZVecLogLevel.Warn });
 
-var schema = new ZVecCollectionSchemaBuilder("docs")
+var schema = ZVecCollectionSchemaBuilder.From<Product>().Build();
+using var untyped = factory.CreateAndOpen("/tmp/products", schema);
+using IZvecCollection<Product> products = new ZVecCollection<Product>(untyped);
+
+products.Insert(new Product
+{
+    Id = "p1",
+    Title = "Hello ZVec",
+    Category = "demo",
+    Embedding = new float[768]
+});
+
+var hits = products.Query(p => p.Embedding, queryVec, topK: 10, filter: p => p.Category == "demo");
+foreach (var hit in hits)
+    Console.WriteLine($"{hit.Record.Id} (score: {hit.Score:F4})");
+```
+
+### Advanced / dynamic (`ZVecDoc`)
+
+String field names and `ZVecDoc` remain available for tooling and dynamic schemas:
+
+```csharp
+using var col = factory.CreateAndOpen("/tmp/docs", new ZVecCollectionSchemaBuilder("docs")
+    .AddField("title", ZVecDataType.String)
     .AddVector("vec", ZVecDataType.VectorFp32, 768, new ZVecHnswIndexParam())
-    .Build();
+    .Build());
 
-using var col = factory.CreateAndOpen("/tmp/docs", schema);
+col.Insert(ZVecDoc.Create("doc1",
+    denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["vec"] = queryVec },
+    fields: new Dictionary<string, object> { ["title"] = "Hello" }));
 
-// Insert
-var doc = ZVecDoc.Create("doc1",
-    denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
-    {
-        ["vec"] = new float[] { 0.1f, 0.2f, 0.3f, 0.4f }
-    },
-    fields: new Dictionary<string, object> { ["title"] = "Hello ZVec" });
-
-col.Insert(doc);
-
-// Query
-var results = col.Query(
+var docs = col.Query(
     new ZVecQuery { FieldName = "vec", Vector = queryVec },
-    topk: 10);
-
-foreach (var hit in results)
-    Console.WriteLine($"{hit.Id} (score: {hit.Score:F4})");
+    topk: 10,
+    filter: ZVecFilterBuilder.Create().Where("title", ZVecCompareOp.Eq, "Hello"));
 ```
 
 ---
@@ -135,12 +155,13 @@ foreach (var hit in results)
 ```
 ┌────────────────────────────────────────────────────┐
 │        Consumer (ASP.NET Core / MAUI / Console)     │
-│              DI: AddZVec / AddZVecCollection         │
+│     DI: AddZVec / AddZVecCollection<T> (typed ODM) │
 └───────────────────────┬────────────────────────────┘
                         │
           ┌─────────────▼──────────────┐
           │   ZVec.NET SDK             │
-          │  IZvecFactory / IZvecCollection │
+          │  IZvecFactory / IZvecCollection[T] │
+          │  Mapping (attrs, mapper, expr) │
           │  (+ Lifecycle/Writes/Queries/Ddl) │
           │  Builders / DTOs / DI        │
           ├──────────────────────────────┤
@@ -184,35 +205,32 @@ foreach (var hit in results)
 - **Hybrid** (dense + sparse) — multi-query with dense + sparse sub-queries and optional `filter`
 - **Full-text** — `new ZVecQuery { FieldName = "content", Fts = new ZVecFtsQuery { QueryString = "search terms" } }`
 - **Group-by** — `col.QueryGroupBy(new ZVecGroupByQuery { Query = q, GroupByField = "category", GroupSize = 5 })`
-- **Filtered** — `col.Query(query, topk: 10, filter: ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020))`
+- **Filtered (typed)** — `products.Query(p => p.Embedding, vec, topK: 10, filter: p => p.Year > 2020)`
+- **Filtered (dynamic)** — `col.Query(query, topk: 10, filter: ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020))`
 
-### CRUD
+### CRUD (typed)
 
 ```csharp
-// Insert / Upsert / Update
-col.Insert(doc);              // single
-col.Insert(docList);          // batch
-col.Upsert(doc);
-col.Update(doc);
-
-// Delete
-col.Delete("doc1");
-col.Delete(idList);
-col.DeleteByFilter("category = \"expired\"");
-
-// Fetch
-ZVecDoc? single = col.Fetch("doc1");
-IReadOnlyList<ZVecDoc> batch = col.Fetch(idList);
+products.Insert(product);
+products.Upsert(product);
+products.Update(product);
+products.Delete("p1");
+products.DeleteByFilter(p => p.Category == "expired");
+Product? single = products.Fetch("p1");
 ```
 
 ### Schema Evolution (DDL)
 
 ```csharp
-col.AddColumn(new ZVecFieldSchema { Name = "rating", DataType = ZVecDataType.Float }, "0.0");
+// Typed — EnsureSchema adds missing scalar columns only (never drops).
+// Native add_column supports nullable numeric types; string columns belong in create schema.
+await products.EnsureSchemaAsync();
+await products.DropColumnAsync(p => p.Year); // explicit destructive
+await products.CreateIndexAsync(p => p.Year, new ZVecInvertIndexParam());
+
+// Dynamic escape hatch
+col.AddColumn(new ZVecFieldSchema { Name = "rating", DataType = ZVecDataType.Float, Nullable = true }, "0.0");
 col.DropColumn("legacy_field");
-col.AlterColumn("old_name", newName: "new_name");
-col.CreateIndex("embedding", new ZVecHnswIndexParam { M = 32 });
-col.DropIndex("embedding");
 col.Optimize();
 ```
 

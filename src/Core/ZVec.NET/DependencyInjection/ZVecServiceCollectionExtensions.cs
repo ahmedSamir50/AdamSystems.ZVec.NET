@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using ZVec.NET.Mapping;
 
 namespace ZVec.NET.DependencyInjection;
 
@@ -66,24 +67,64 @@ public static class ZVecServiceCollectionExtensions
         services.AddKeyedSingleton(serviceKey, (sp, key) =>
         {
             var factory = sp.GetRequiredService<IZvecFactory>();
-
             var regOptions = new ZVecCollectionRegistrationOptions();
             configure(regOptions);
-
-            if (string.IsNullOrWhiteSpace(regOptions.Path))
-            {
-                throw new ArgumentException(ZVecDefaults.Errors.CollectionPathRequired, nameof(configure));
-            }
-
-            if (regOptions.Schema != null)
-            {
-                return factory.CreateAndOpen(regOptions.Path, regOptions.Schema, regOptions.Options);
-            }
-
-            return factory.Open(regOptions.Path, regOptions.Options);
+            return OpenCollection(factory, regOptions);
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="IZvecCollection{T}"/> as a singleton (and keyed by the mapped collection name).
+    /// Schema defaults to <see cref="ZVecCollectionSchemaBuilder.From{T}"/> when not supplied.
+    /// </summary>
+    /// <typeparam name="T">Mapped document type.</typeparam>
+    public static IServiceCollection AddZVecCollection<T>(
+        this IServiceCollection services,
+        Action<ZVecCollectionRegistrationOptions> configure)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var model = ZVecTypeModel.Get<T>();
+        var serviceKey = model.CollectionName;
+
+        services.AddSingleton<IZvecCollection<T>>(sp =>
+        {
+            var factory = sp.GetRequiredService<IZvecFactory>();
+            var regOptions = new ZVecCollectionRegistrationOptions();
+            configure(regOptions);
+
+            if (regOptions.Create)
+                regOptions.Schema ??= ZVecCollectionSchemaBuilder.From<T>().Build();
+            else
+                regOptions.Schema = null;
+
+            var untyped = OpenCollection(factory, regOptions);
+            return new ZVecCollection<T>(untyped);
+        });
+
+        services.AddKeyedSingleton<IZvecCollection<T>>(serviceKey, (sp, _) =>
+            sp.GetRequiredService<IZvecCollection<T>>());
+
+        services.AddKeyedSingleton<IZvecCollection>(serviceKey, (sp, _) =>
+            sp.GetRequiredService<IZvecCollection<T>>().Untyped);
+
+        return services;
+    }
+
+    private static IZvecCollection OpenCollection(IZvecFactory factory, ZVecCollectionRegistrationOptions regOptions)
+    {
+        if (string.IsNullOrWhiteSpace(regOptions.Path))
+            throw new ArgumentException(ZVecDefaults.Errors.CollectionPathRequired, nameof(regOptions));
+
+        var options = regOptions.ResolveOptions();
+        if (regOptions.Schema != null)
+            return factory.CreateAndOpen(regOptions.Path, regOptions.Schema, options);
+
+        return factory.Open(regOptions.Path, options);
     }
 
     private static IServiceCollection AddZVecCore(this IServiceCollection services)
