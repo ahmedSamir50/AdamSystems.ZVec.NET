@@ -79,22 +79,38 @@ internal static class NativeDocUnmarshaller
         Dictionary<string, ReadOnlyMemory<float>> denseVectors,
         Dictionary<string, IReadOnlyDictionary<int, float>> sparseVectors)
     {
-        // The real C API returns a raw pointer into document memory + the byte size of the value.
-        // For sparse vectors we use the dedicated sparse API instead.
+        // Sparse FP32: only zvec_doc_get_field_value_copy supports SPARSE_VECTOR_*.
+        // Layout from c_api.cc: [nnz:size_t][uint32 indices...][float values...] (caller frees).
         if (dataType == ZVecDataType.SparseVectorFp32)
         {
-            int rcSparse = NativeMethods.zvec_doc_get_sparse_vector_field(docPtr, fieldName, out nint indicesPtr, out nint valuesPtr, out nuint sparseCount);
-            if (rcSparse == 0 && sparseCount > 0)
+            var rcSparse = NativeMethods.zvec_doc_get_field_value_copy(
+                docPtr, fieldName, (int)dataType, out nint sparsePtr, out nuint sparseSize);
+            if (rcSparse != 0 || sparsePtr == IntPtr.Zero || sparseSize < (nuint)sizeof(nuint))
+                return;
+
+            try
             {
-                var dict = new Dictionary<int, float>((int)sparseCount);
-                int* indices = (int*)indicesPtr;
-                float* values = (float*)valuesPtr;
-                for (int i = 0; i < (int)sparseCount; i++)
+                byte* basePtr = (byte*)sparsePtr;
+                nuint nnz = *(nuint*)basePtr;
+                nuint required = (nuint)sizeof(nuint) + nnz * (nuint)(sizeof(uint) + sizeof(float));
+                if (sparseSize < required || nnz == 0)
                 {
-                    dict[indices[i]] = values[i];
+                    sparseVectors[fieldName] = new Dictionary<int, float>();
+                    return;
                 }
+
+                uint* indices = (uint*)(basePtr + sizeof(nuint));
+                float* values = (float*)(indices + nnz);
+                var dict = new Dictionary<int, float>((int)nnz);
+                for (nuint i = 0; i < nnz; i++)
+                    dict[(int)indices[i]] = values[i];
                 sparseVectors[fieldName] = dict;
             }
+            finally
+            {
+                NativeMethods.zvec_free(sparsePtr);
+            }
+
             return;
         }
 

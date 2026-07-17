@@ -251,6 +251,15 @@ var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
 
 The zero-allocation vector pipeline uses `ReadOnlyMemory<float>` + `Memory.Pin()` for the native call duration only — no intermediate `float[]` copies.
 
+**Measured** (2026-07-17, `win-x64`, .NET 8.0.29, Intel Core i7-8850H, Release BenchmarkDotNet, **128-dim Flat**, tiny/empty corpus — not the 768-dim / 10k-doc targets above):
+
+| Method | Mean | Allocated |
+|--------|------|----------:|
+| `InsertDocument` | 3.31 µs | 496 B |
+| `QueryVector` (topk=10) | 516 ns | 208 B |
+
+Query allocation is under the 256 B target on this path. Latency and insert allocation are **not** comparable to the aspirational rows (different dimension, corpus size, and workload). Re-run `dotnet run -c Release --project testing/ZVec.NET.Benchmarks` after meaningful corpus/index changes.
+
 ---
 
 ## Versioning

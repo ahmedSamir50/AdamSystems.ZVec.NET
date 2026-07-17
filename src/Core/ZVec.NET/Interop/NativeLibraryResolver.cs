@@ -24,6 +24,9 @@ internal static class NativeLibraryResolver
     private static bool _isRegistered = false;
     private static IntPtr _cachedHandle = IntPtr.Zero;
     internal static bool IsLoaded => _cachedHandle != IntPtr.Zero;
+
+    /// <summary>Returns the cached native module handle, or <see cref="IntPtr.Zero"/> if not loaded.</summary>
+    internal static IntPtr LoadedHandle => _cachedHandle;
     private static readonly object _lock = new();
 
 #pragma warning disable CA2255

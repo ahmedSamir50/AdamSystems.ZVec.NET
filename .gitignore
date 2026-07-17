@@ -50,3 +50,5 @@ Thumbs.db
 /ZVec.NET-Implementation-Plan.md
 /src/Mock/ZVec.Native.Mock/build_mock
 /.vscode
+/docs
+/tools
