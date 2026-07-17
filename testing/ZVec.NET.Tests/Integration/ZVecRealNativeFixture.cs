@@ -101,6 +101,29 @@ public class ZVecRealNativeFixture : IDisposable
         }
     }
 
+    /// <summary>
+    /// Releases the fixture-held native session so a test can re-run <see cref="ZVecFactory.Initialize"/>
+    /// (e.g. ABI version gate). Call <see cref="ResumeNativeSession"/> in <c>finally</c>.
+    /// </summary>
+    public void SuspendNativeSession()
+    {
+        SkipIfNotAvailable();
+        _factory?.Shutdown();
+    }
+
+    /// <summary>Re-initializes native after <see cref="SuspendNativeSession"/>.</summary>
+    public void ResumeNativeSession()
+    {
+        if (!IsRealNativeAvailable)
+            return;
+
+        if (_factory is { IsInitialized: true })
+            return;
+
+        _factory ??= new ZVecFactory();
+        _factory.Initialize();
+    }
+
     private void Cleanup()
     {
         try

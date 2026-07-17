@@ -106,7 +106,7 @@ public class HybridSearchIntegrationTests : IClassFixture<ZVecRealNativeFixture>
 
         var filter = ZVecFilterBuilder.Create()
             .Where("category", ZVecCompareOp.Eq, "keep")
-            .ToString();
+            .Build();
 
         var reranker = new ZVecRrfReranker { TopN = 5, RankConstant = ZVecDefaults.Rerank.RankConstant };
         var results = _collection.Query([denseQ, sparseQ], topk: 5, reranker: reranker, filter: filter);

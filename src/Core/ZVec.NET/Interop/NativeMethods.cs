@@ -32,12 +32,6 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial int zvec_get_version_major();
 
-    [LibraryImport(LibraryName)]
-    internal static partial int zvec_get_version_minor();
-
-    [LibraryImport(LibraryName)]
-    internal static partial int zvec_get_version_patch();
-
     // =========================================================================
     // Init & Error Retrieval
     // =========================================================================
@@ -123,9 +117,6 @@ internal static partial class NativeMethods
     internal static partial IntPtr zvec_collection_options_create();
 
     [LibraryImport(LibraryName)]
-    internal static partial int zvec_collection_stats(IntPtr collection, out IntPtr statsJson);
-
-    [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_options_set_read_only(
         IntPtr options,
         [MarshalAs(UnmanagedType.U1)] bool readOnly);
@@ -134,6 +125,26 @@ internal static partial class NativeMethods
     internal static partial int zvec_collection_options_set_enable_mmap(
         IntPtr options,
         [MarshalAs(UnmanagedType.U1)] bool enableMmap);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_get_stats(
+        IntPtr collection,
+        out IntPtr stats);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_collection_stats_destroy(IntPtr stats);
+
+    [LibraryImport(LibraryName)]
+    internal static partial ulong zvec_collection_stats_get_doc_count(IntPtr stats);
+
+    [LibraryImport(LibraryName)]
+    internal static partial nuint zvec_collection_stats_get_index_count(IntPtr stats);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_collection_stats_get_index_name(IntPtr stats, nuint index);
+
+    [LibraryImport(LibraryName)]
+    internal static partial float zvec_collection_stats_get_index_completeness(IntPtr stats, nuint index);
 
     // =========================================================================
     // CRUD Operations (DML)
@@ -305,12 +316,6 @@ internal static partial class NativeMethods
         IntPtr newSchema);
 
     [LibraryImport(LibraryName)]
-    internal static partial int zvec_collection_alter_column_rename(
-        IntPtr collection,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string oldName,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string newName);
-
-    [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_create_index(
         IntPtr collection,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string columnName,
@@ -352,20 +357,25 @@ internal static partial class NativeMethods
         nuint valueSize);      // size_t value_size — byte size of value
 
     [LibraryImport(LibraryName)]
-    internal static partial int zvec_doc_get_field_value_copy(
-        IntPtr doc,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
-        int dataType,
-        out IntPtr value,        // void** — allocated by native, must be freed via zvec_free
-        out nuint valueSize);    // size_t* — byte count of the returned buffer
-
-    [LibraryImport(LibraryName)]
     internal static partial int zvec_doc_get_field_value_pointer(
         IntPtr doc,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
         int dataType,
         out IntPtr value,        // const void** — points into document-owned memory, do NOT free
         out nuint valueSize);    // size_t* — byte count of the returned buffer
+
+    /// <summary>
+    /// Allocates a copy of the field value. Required for sparse vectors
+    /// (pointer accessor does not support SPARSE_VECTOR_*). Caller frees with <c>zvec_free</c>.
+    /// Sparse FP32 layout: <c>[nnz:size_t][uint32 indices…][float values…]</c>.
+    /// </summary>
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_doc_get_field_value_copy(
+        IntPtr doc,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
+        int dataType,
+        out IntPtr value,
+        out nuint valueSize);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_doc_get_field_names(
@@ -375,14 +385,6 @@ internal static partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial void zvec_free_str_array(IntPtr array, nuint count);
-
-    [LibraryImport(LibraryName)]
-    internal static partial int zvec_doc_get_sparse_vector_field(
-        IntPtr doc,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName,
-        out IntPtr indices,
-        out IntPtr values,
-        out nuint count);
 
     // =========================================================================
     // Query Builder (zvec_vector_query_t)
@@ -419,9 +421,6 @@ internal static partial class NativeMethods
         [MarshalAs(UnmanagedType.U1)] bool include);
 
     [LibraryImport(LibraryName)]
-    internal static partial int zvec_vector_query_set_query_params(IntPtr query, IntPtr queryParams);
-
-    [LibraryImport(LibraryName)]
     internal static partial int zvec_sub_query_set_sparse_vector(
         IntPtr query,
         IntPtr indices,
@@ -446,12 +445,41 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial IntPtr zvec_query_params_fts_create([MarshalAs(UnmanagedType.LPUTF8Str)] string defaultOperator);
 
-    [LibraryImport(LibraryName)]
-    internal static partial void zvec_query_params_fts_destroy(IntPtr paramsPtr);
+    // Intentionally no zvec_query_params_fts_destroy: set_fts_params takes ownership (double-free if destroyed here).
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_vector_query_set_fts_params(IntPtr query, IntPtr paramsPtr);
 
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_query_params_hnsw_create(
+        int ef,
+        float radius,
+        [MarshalAs(UnmanagedType.U1)] bool isLinear,
+        [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_hnsw_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_hnsw_set_ef(IntPtr paramsPtr, int ef);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_hnsw_params(IntPtr query, IntPtr hnswParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_query_params_ivf_create(
+        int nprobe,
+        [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner,
+        float scaleFactor);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_ivf_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_ivf_set_nprobe(IntPtr paramsPtr, int nprobe);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_ivf_params(IntPtr query, IntPtr ivfParams);
 
     [LibraryImport(LibraryName)]
     internal static partial IntPtr zvec_doc_get_pk_copy(IntPtr doc);

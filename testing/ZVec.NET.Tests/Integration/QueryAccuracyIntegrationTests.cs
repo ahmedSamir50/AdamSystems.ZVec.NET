@@ -24,7 +24,7 @@ public class QueryAccuracyIntegrationTests : IClassFixture<ZVecRealNativeFixture
                     Name = "embedding",
                     DataType = ZVecDataType.VectorFp32,
                     Dimension = 4,
-                    IndexParam = new ZVecHnswIndexParam { MetricType = ZVecMetricType.L2 }
+                    IndexParam = new ZVecFlatIndexParam { MetricType = ZVecDefaults.Flat.MetricType }
                 }
             ]
         };
@@ -44,13 +44,12 @@ public class QueryAccuracyIntegrationTests : IClassFixture<ZVecRealNativeFixture
         Setup();
         _collection.Should().NotBeNull();
 
-        // ≥100 docs with known distances from the query vector (ascending scale).
-        const int docCount = 100;
+        const int docCount = 1000;
         var docs = new ZVecDoc[docCount];
         for (int i = 0; i < docCount; i++)
         {
-            float v = i / (float)(docCount - 1); // 0 .. 1
-            docs[i] = ZVecDoc.Create($"doc{i:D3}",
+            float v = i / (float)(docCount - 1);
+            docs[i] = ZVecDoc.Create($"doc{i:D4}",
                 denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
                 {
                     ["embedding"] = new float[] { v, v, v, v }
@@ -60,22 +59,20 @@ public class QueryAccuracyIntegrationTests : IClassFixture<ZVecRealNativeFixture
         var insertResult = _collection!.Insert(docs);
         insertResult.IsSuccess.Should().BeTrue();
 
-        // Query near the high end — closest should be doc099, then doc098, ...
         var queryVector = new float[] { 1.0f, 1.0f, 1.0f, 1.0f };
         var query = new ZVecQuery { FieldName = "embedding", Vector = queryVector };
 
-        var results = _collection.Query(query, topk: 10);
+        var results = _collection.Query(query, topk: ZVecDefaults.Query.Topk);
 
-        results.Should().HaveCount(10);
-        results[0].Id.Should().Be("doc099");
-        results[1].Id.Should().Be("doc098");
-        results[2].Id.Should().Be("doc097");
+        results.Should().HaveCount(ZVecDefaults.Query.Topk);
+        results[0].Id.Should().Be("doc0999");
+        results[1].Id.Should().Be("doc0998");
+        results[2].Id.Should().Be("doc0997");
         for (int i = 1; i < results.Count; i++)
         {
-            // Scores for L2: lower is closer — ensure non-decreasing distance order via Id rank.
             int prev = int.Parse(results[i - 1].Id!["doc".Length..]);
             int curr = int.Parse(results[i].Id!["doc".Length..]);
-            curr.Should().BeLessThan(prev);
+            curr.Should().BeLessThan(prev, "L2 ranking should return decreasing doc indices (closer vectors first)");
         }
     }
 

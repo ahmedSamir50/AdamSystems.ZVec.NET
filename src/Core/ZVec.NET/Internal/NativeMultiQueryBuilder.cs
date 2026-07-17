@@ -121,6 +121,8 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
             }
             else if (reranker is ZVecWeightedReranker weighted)
             {
+                ZVecWeightedReranker.ValidateWeights(weighted.Weights, queries.Count);
+
                 double[] weightsArray = new double[queries.Count];
                 for (int i = 0; i < queries.Count; i++)
                 {

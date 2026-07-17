@@ -24,6 +24,9 @@ internal static class NativeLibraryResolver
     private static bool _isRegistered = false;
     private static IntPtr _cachedHandle = IntPtr.Zero;
     internal static bool IsLoaded => _cachedHandle != IntPtr.Zero;
+
+    /// <summary>Returns the cached native module handle, or <see cref="IntPtr.Zero"/> if not loaded.</summary>
+    internal static IntPtr LoadedHandle => _cachedHandle;
     private static readonly object _lock = new();
 
 #pragma warning disable CA2255
@@ -76,9 +79,26 @@ internal static class NativeLibraryResolver
     /// </summary>
     internal static void EnsureLoaded()
     {
-        // Try custom probe paths first (runtimes/{rid}/native/ layout).
         if (_cachedHandle != IntPtr.Zero)
             return;
+
+        var state = _resolverState;
+        if (state.UseMock && state.MockLibraryPath is not null)
+        {
+            // Resolve throws DllNotFoundException when the mock path cannot be loaded.
+            IntPtr handle = Resolve(NativeMethods.LibraryName, typeof(NativeMethods).Assembly, null);
+            if (handle == IntPtr.Zero)
+            {
+                throw new DllNotFoundException(
+                    string.Format(
+                        ZVecDefaults.Errors.NativeLibraryLoadFailed,
+                        RuntimeInformation.RuntimeIdentifier,
+                        ZVecDefaults.Errors.NativeLibraryLoadHint));
+            }
+
+            _cachedHandle = handle;
+            return;
+        }
 
         string baseDir = AppContext.BaseDirectory;
         string rid = RuntimeInformation.RuntimeIdentifier;
@@ -123,7 +143,10 @@ internal static class NativeLibraryResolver
                 return handle;
 
             throw new DllNotFoundException(
-                $"ZVec native library not found: mock library path '{state.MockLibraryPath}' does not exist.");
+                string.Format(
+                    ZVecDefaults.Errors.NativeLibraryLoadFailed,
+                    RuntimeInformation.RuntimeIdentifier,
+                    ZVecDefaults.Errors.NativeLibraryLoadHint));
         }
 
         // Return cached handle if already loaded.
@@ -135,7 +158,9 @@ internal static class NativeLibraryResolver
             return _cachedHandle = realHandle;
 
         throw new DllNotFoundException(
-            $"ZVec native library not found for RID '{RuntimeInformation.RuntimeIdentifier}'. " +
-            "Ensure the ZVec.NET NuGet package supports your platform.");
+            string.Format(
+                ZVecDefaults.Errors.NativeLibraryLoadFailed,
+                RuntimeInformation.RuntimeIdentifier,
+                ZVecDefaults.Errors.NativeLibraryLoadHint));
     }
 }

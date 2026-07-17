@@ -188,6 +188,15 @@ public static class ZVecDefaults
         /// <summary>Default top-K retrieval limit: 10.</summary>
         public const int Topk = 10;
 
+        /// <summary>Default HNSW ef_search when not specified on <see cref="ZVecHnswQueryParams"/>.</summary>
+        public const int HnswEfSearch = 300;
+
+        /// <summary>Default IVF nprobe when not specified on <see cref="ZVecIvfQueryParams"/>.</summary>
+        public const int IvfNprobe = Ivf.Nprobe;
+
+        /// <summary>Default IVF scale factor passed to native query params.</summary>
+        public const float IvfScaleFactor = 10.0f;
+
         /// <summary>Default FTS operator: Or.</summary>
         public const ZVecFtsDefaultOperator DefaultOperator = ZVecFtsDefaultOperator.Or;
     }
@@ -272,6 +281,20 @@ public static class ZVecDefaults
 
         /// <summary>Backslash escape character.</summary>
         public const char Backslash = '\\';
+
+        /// <summary>IS NULL predicate keyword.</summary>
+        public const string IsNull = "IS NULL";
+
+        /// <summary>IS NOT NULL predicate keyword.</summary>
+        public const string IsNotNull = "IS NOT NULL";
+
+        /// <summary>
+        /// Allowed filter field-name pattern: letter/underscore start, then alphanumerics/underscores.
+        /// </summary>
+        public const string FieldNamePattern = "^[A-Za-z_][A-Za-z0-9_]*$";
+
+        /// <summary>Debugger/ToString prefix for filter builders.</summary>
+        public const string BuilderToStringPrefix = "ZVecFilterBuilder: ";
     }
 
     /// <summary>Default parameters for Reranking.</summary>
@@ -295,6 +318,9 @@ public static class ZVecDefaults
 
         /// <summary>Default max concurrent native calls: 0 (unlimited).</summary>
         public const int MaxConcurrentNativeCalls = 0;
+
+        /// <summary>Configuration section name for ZVec options binding.</summary>
+        public const string ConfigurationSection = "ZVec";
     }
 
     /// <summary>Centralized error message strings.</summary>
@@ -342,6 +368,25 @@ public static class ZVecDefaults
         /// <summary>Message shown when the native library fails to allocate an FTS query handle.</summary>
         public const string NativeFtsQueryCreateFailed = "Failed to create native FTS query handle.";
 
+        /// <summary>Message shown when group-by query execution is unavailable in the native C API.</summary>
+        public const string NativeGroupByQueryNotSupported =
+            "Group-by vector queries are not supported: c_api.h exposes zvec_group_by_vector_query_* builders but no zvec_collection_group_by_query execution entry point.";
+
+        /// <summary>Message shown when <see cref="ZVecQuery.DocumentId"/> conflicts with other query inputs. Arg: parameter name.</summary>
+        public const string QueryDocumentIdConflict =
+            "DocumentId cannot be combined with Vector, SparseVector, or Fts on the same query.";
+
+        /// <summary>Message shown when a document id referenced by a query was not found. Arg: document id.</summary>
+        public const string QueryDocumentNotFound = "Document '{0}' was not found.";
+
+        /// <summary>Message shown when a query field is missing on a fetched document. Args: field name, document id.</summary>
+        public const string QueryFieldNotOnDocument =
+            "Field '{0}' was not found on document '{1}'.";
+
+        /// <summary>Message shown when an unsupported <see cref="ZVecQueryParams"/> subclass is supplied.</summary>
+        public const string UnsupportedQueryParamsType =
+            "Query parameter type '{0}' is not supported by the native query builder.";
+
         /// <summary>Message shown when a collection/field/vector name is null, empty, or whitespace.</summary>
         public const string NameRequired = "Name cannot be empty or whitespace.";
 
@@ -366,6 +411,29 @@ public static class ZVecDefaults
         /// <summary>Message shown when Not() cannot rewrite an expression into a native-supported form.</summary>
         public const string FilterNotUnsupported =
             "Unary NOT is not supported by the native ZVec filter engine. Use !=, NOT IN, or NOT CONTAIN_* forms, or pass a simple comparison/In/Contain expression to Not().";
+
+        /// <summary>Message shown when a filter field name fails the identifier allowlist.</summary>
+        public const string FilterFieldNameInvalid =
+            "Filter field name '{0}' is invalid. Field names must match pattern: letter or underscore, then letters, digits, or underscores.";
+
+        /// <summary>Message shown when And/Or receives an empty right-hand filter.</summary>
+        public const string FilterEmptyRightOperand = "The right-hand filter expression cannot be empty.";
+
+        /// <summary>Message shown when Where() receives a non-relational compare operator.</summary>
+        public const string UnsupportedWhereCompareOp =
+            "Compare operator {0} cannot be used with Where(). Use dedicated Like/In/ContainAny/ContainAll/IsNull/IsNotNull methods.";
+
+        /// <summary>Message shown when WeightedReranker weights are invalid.</summary>
+        public const string RerankerWeightsInvalid =
+            "Weighted reranker weights must be non-null, non-empty, and match the number of sub-queries.";
+
+        /// <summary>Message shown when native library load fails (format: RID, hint).</summary>
+        public const string NativeLibraryLoadFailed =
+            "Failed to load zvec_c_api native library for RID '{0}'. Ensure runtimes/{0}/native contains the binary, or set the library path. {1}";
+
+        /// <summary>Hint appended to native load failures.</summary>
+        public const string NativeLibraryLoadHint =
+            "See CONTRIBUTING.md for local native build steps; multi-RID NuGet packaging is Epic E21.";
 
         /// <summary>
         /// Platform gate: HNSW-RaBitQ requires x86_64 with AVX2 or higher (not available on ARM).

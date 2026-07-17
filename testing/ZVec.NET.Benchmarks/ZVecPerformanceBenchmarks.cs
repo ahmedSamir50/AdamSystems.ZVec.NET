@@ -32,21 +32,20 @@ public class ZVecPerformanceBenchmarks
         var schema = new ZVecCollectionSchema
         {
             Name = "benchmarks",
-            Fields = new List<ZVecFieldSchema>
-            {
-                new ZVecFieldSchema { Name = "id", DataType = ZVecDataType.String },
+            Fields =
+            [
                 new ZVecFieldSchema { Name = "content", DataType = ZVecDataType.String }
-            },
-            Vectors = new List<ZVecVectorSchema>
-            {
-                new ZVecVectorSchema 
-                { 
-                    Name = "vec", 
-                    DataType = ZVecDataType.VectorFp32, 
-                    Dimension = 128, 
-                    IndexParam = new ZVecFlatIndexParam() 
+            ],
+            Vectors =
+            [
+                new ZVecVectorSchema
+                {
+                    Name = "vec",
+                    DataType = ZVecDataType.VectorFp32,
+                    Dimension = 128,
+                    IndexParam = new ZVecFlatIndexParam()
                 }
-            }
+            ]
         };
 
         // Create a memory collection to avoid IO overhead during benchmark

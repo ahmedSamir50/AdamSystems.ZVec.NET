@@ -50,12 +50,15 @@ public class CollectionLifecycleIntegrationTests : IClassFixture<ZVecRealNativeF
         {
             col.Insert(doc).IsSuccess.Should().BeTrue();
             col.Fetch("persist1").Should().NotBeNull();
+
+            var updated = ZVecDoc.Create("persist1",
+                denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector },
+                fields: new Dictionary<string, object> { ["title"] = "updated-title" });
+            col.Update(updated).IsSuccess.Should().BeTrue();
         }
 
         using (var reopened = _factory.Open(_testPath))
         {
-            // Open() does not carry a managed schema, so scalar field unmarshalling is skipped.
-            // Persist is verified by Id + ANN recall of the stored vector.
             var fetched = reopened.Fetch("persist1", includeVector: false);
             fetched.Should().NotBeNull();
             fetched!.Id.Should().Be("persist1");

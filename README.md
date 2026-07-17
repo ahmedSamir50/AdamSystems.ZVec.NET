@@ -15,8 +15,8 @@
 
 | Feature | What it means for you |
 |---------|----------------------|
-| **Zero-allocation vector pipelines** | `ReadOnlyMemory<float>` on all vector hot paths — no `float[]` copies, no GC pressure on queries |
-| **Sync + Async APIs** | Lowest-latency sync path for batch jobs; bounded async offload for ASP.NET Core |
+| **Pin-based vector pipelines** | `ReadOnlyMemory&lt;float&gt;` on hot paths — no intermediate `float[]` copies on the query pin path (measure with `MemoryDiagnosisBench`) |
+| **Sync + Async APIs** | Lowest-latency sync path for batch jobs; async `ValueTask` APIs for ASP.NET Core (cooperative cancel; no thread-pool offload today) |
 | **DI-first design** | `AddZVec()` / `AddZVecCollection()` — works with ASP.NET Core, MAUI, Blazor Server out of the box |
 | **Safe native lifecycle** | Collection handles use `nint` + `Interlocked` dispose/destroy; query/doc helpers use `SafeHandle` where ownership is short-lived |
 | **Cross-platform NuGet (planned)** | Target RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 — full multi-RID packaging is Epic E21 |
@@ -83,7 +83,7 @@ public class ProductService(IZvecCollection products)
     public async Task<IReadOnlyList<ZVecDoc>> SearchAsync(ReadOnlyMemory<float> queryVector, string? category = null)
     {
         var filter = category is not null
-            ? ZVecFilterBuilder.Create().Where("category", ZVecCompareOp.Eq, category).ToString()
+            ? ZVecFilterBuilder.Create().Where("category", ZVecCompareOp.Eq, category).Build()
             : null;
 
         return await products.QueryAsync(
@@ -182,7 +182,7 @@ foreach (var hit in results)
 - **Hybrid** (dense + sparse) — multi-query with dense + sparse sub-queries and optional `filter`
 - **Full-text** — `new ZVecQuery { FieldName = "content", Fts = new ZVecFtsQuery { QueryString = "search terms" } }`
 - **Group-by** — `col.QueryGroupBy(new ZVecGroupByQuery { Query = q, GroupByField = "category", GroupSize = 5 })`
-- **Filtered** — `col.Query(query, topk: 10, filter: ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020).ToString())`
+- **Filtered** — `col.Query(query, topk: 10, filter: ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020))`
 
 ### CRUD
 
@@ -216,14 +216,18 @@ col.Optimize();
 
 ### Filter Builder
 
+Immutable AST builder — one `Create()`, nest with lambdas, call `Build()` (or pass the builder to `Query` overloads):
+
 ```csharp
 var filter = ZVecFilterBuilder.Create()
     .Where("publish_year", ZVecCompareOp.Gt, 2020)
-    .And(ZVecFilterBuilder.Create()
+    .And(f => f
         .Where("category", ZVecCompareOp.Eq, "fiction")
-        .Or(ZVecFilterBuilder.Create().ContainAny("tags", "AI", "ML")));
+        .Or(g => g.ContainAny("tags", "AI", "ML")))
+    .Build();
 
-// -> "publish_year > 2020 AND (category = \"fiction\" OR tags CONTAIN_ANY [\"AI\", \"ML\"])"
+// -> publish_year > 2020 AND (category = "fiction" OR tags CONTAIN_ANY ("AI", "ML"))
+// Native list syntax uses parentheses, not square brackets.
 ```
 
 ### Sync + Async
@@ -234,7 +238,8 @@ Every mutating/querying operation exposes both sync and async variants:
 // Sync (lowest latency — P/Invoke on caller thread)
 var results = col.Query(query, topk: 10);
 
-// Async (bounded offload for ASP.NET — never unbounded Task.Run)
+// Async (ValueTask; currently completes synchronously after the native call —
+// not a thread-pool offload). Pass CancellationToken for cooperative cancel before/around the call.
 var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
 ```
 
@@ -242,14 +247,67 @@ var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
 
 ## Performance
 
-| Metric | Target | Notes |
-|--------|--------|-------|
-| Sync P/Invoke overhead (768-dim) | &lt; 50 µs | Target; measure with BenchmarkDotNet |
-| Single-vector query (10k docs, topk=10) | &lt; 1 ms | Target vs Python ZVec baseline |
-| Batch insert (1000 docs) | &gt; 50k docs/sec | Target |
-| GC allocation per query (vector path) | &lt; 256 B | Intermediate + result objects only |
+Workload for primary numbers: **768-dim Flat**, `win-x64`, native ZVec `v0.5.1-35-g1afdea8`, .NET 8.0.29, Intel Core i7-8850H, BenchmarkDotNet **ShortRun** (2026-07-17). Query/memory benches seed **10_000** docs; insert batch size **1000**.
 
-The zero-allocation vector pipeline uses `ReadOnlyMemory<float>` + `Memory.Pin()` for the native call duration only — no intermediate `float[]` copies.
+**Why these differ from older smoke numbers:** an earlier table used legacy `ZVecPerformanceBenchmarks` (**128-dim**, empty/tiny corpus). That path reported ~ns latency and ~208 B allocated. The primary suite below uses **768-dim / 10k Flat** and materializes **topk=10** results (including vectors), so mean latency is in milliseconds and Allocated is dominated by result unmarshalling (~10 × 768 × 4 B ≈ 30 KB of vector bytes alone, ~45 KB total) — not a silent P/Invoke regression. Filtered query (`Query_WithFilter`, one match) allocating ~5.7 KB shows the same pin path with a smaller result set.
+
+### Upstream engine scale (VectorDBBench — published)
+
+Official ZVec [Benchmarks](https://zvec.org/en/docs/db/benchmarks/) use VectorDBBench on Cohere **1M / 10M** (768-dim). Documented in code as `UpstreamEngineScaleBaseline` / `EngineScaleReferenceBench` (not re-run locally):
+
+| Case | Scale | Published figure | Notes |
+|------|-------|------------------|-------|
+| `Performance768D1M` | Cohere **1M** × 768-d | See VectorDBBench run on docs page | Engine scale |
+| `Performance768D10M` | Cohere **10M** × 768-d | Homepage **8500+ QPS**; index build **~1 hour** | Engine scale |
+
+These are **not** apples-to-apples with the 10k Flat SDK binding suite. A single-threaded inverse of local query mean (~2.46 ms → ~400 QPS) is a different metric shape than concurrent VectorDBBench QPS at 10M.
+
+### Binding suite: .NET vs Python vs Node.js (same machine, 10k Flat)
+
+Ephemeral parity scripts (Python `zvec` **0.5.1**, Node `@zvec/zvec` **0.5.0** via `npm install --registry https://registry.npmjs.org/`) were run once on the same host and discarded — not kept in this repo. Official docs do not publish this 10k Flat recipe.
+
+| Metric | .NET (ours) | Python | Node.js |
+|--------|-------------|--------|---------|
+| Warm query (128 docs, topk=10) | **0.318 ms** | 0.396 ms | 1.594 ms |
+| Query (10k docs, topk=10) | **2.46 ms** | 3.180 ms | 4.103 ms |
+| Batch insert (1000 docs) | **~17.7k docs/sec** | ~15.2k docs/sec | ~5.8k docs/sec |
+| GC alloc / query (topk=10 + vectors) | 45.4 KB | n/a | n/a |
+
+### Targets vs measured (.NET)
+
+| Metric | Target | Measured | Status |
+|--------|--------|----------|--------|
+| Warm query, tiny corpus (128 docs, topk=10) | &lt; 50 µs | 318 µs (`Query_WarmTinyCorpus`) | Miss — full warm query, not a no-op P/Invoke stub |
+| Single-vector query (10k docs, topk=10) | &lt; 1 ms | 2.46 ms (`Query_Sync`) | Miss |
+| Batch insert (1000 docs) | &gt; 50k docs/sec | ~17.7k docs/sec (`Insert_Batch`, 56.6 ms/batch) | Miss |
+| GC allocation per query (pin path, 10k / topk=10) | &lt; 256 B | 45.4 KB (`Query_768Dim` / `Query_Sync`) | Miss — dominated by **result materialization** (not query-vector marshalling) |
+
+**Allocation split:** the query vector still uses `ReadOnlyMemory<float>` + `Memory.Pin()` (no intermediate `float[]` copy). Pin vs explicit copy is **45.4 KB** vs **48.5 KB** (`Query_ReadOnlyMemory` vs `Query_ExplicitCopy`) — the ~3 KB delta is the marshalling comparison; the ~45 KB floor is returning topk docs with vectors.
+
+### Measured suite (primary, .NET BDN)
+
+| Method | Mean | Allocated |
+|--------|------|----------:|
+| `Query_Sync` (10k docs) | 2.46 ms | 45.4 KB |
+| `Query_WithFilter` (10k docs) | 1.45 ms | 5.7 KB |
+| `Query_WarmTinyCorpus` (128 docs) | 318 µs | 45.3 KB |
+| `Query_768Dim` | 2.55 ms | 45.4 KB |
+| `Query_ReadOnlyMemory` (pin) | 2.71 ms | 45.4 KB |
+| `Query_ExplicitCopy` | 2.56 ms | 48.5 KB |
+| `Fetch_ScalarOnly` | 184 µs | 1.2 KB |
+| `Insert_Single` | 54.9 µs | 1.4 KB |
+| `Insert_Batch` (1000 docs) | 56.6 ms | 464 KB |
+| `Build_SimpleFilter` | 57 ns | 128 B |
+| `Build_CompoundFilter` | 197 ns | 544 B |
+| `Local_10k_Query_ForEngineScaleContext` | same as `Query_Sync` (~2.46 ms) | 45.4 KB |
+
+### How to reproduce (.NET)
+
+```bash
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j short -f *.QueryThroughputBench.* *.MemoryDiagnosisBench.* *.InsertThroughputBench.* *.VectorMarshallingBench.* *.FilterParsingBench.* *.EngineScaleReferenceBench.* --join
+```
+
+Named classes: `VectorMarshallingBench`, `QueryThroughputBench`, `InsertThroughputBench`, `MemoryDiagnosisBench`, `FilterParsingBench`, `EngineScaleReferenceBench` (+ `UpstreamEngineScaleBaseline` constants for Cohere 1M/10M). Legacy `ZVecPerformanceBenchmarks` (128-dim smoke) remains for quick local checks; it is not the primary baseline.
 
 ---
 

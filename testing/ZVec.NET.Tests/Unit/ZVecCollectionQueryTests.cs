@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ZVec.NET.Query;
 
 namespace ZVec.NET.Tests.Unit;
 
@@ -69,6 +70,61 @@ public class ZVecCollectionQueryTests : IDisposable
         cts.Cancel();
         var q = new ZVecQuery { FieldName = "vec" };
         var act = async () => await col.QueryAsync(q, ct: cts.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public void Query_WithFilterBuilder_NullFilter_ThrowsArgumentNullException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        var act = () => col.Query(new ZVecQuery { FieldName = "vec", Vector = new float[] { 1f, 0f } }, 1, (ZVecFilterBuilder)null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Query_WithDocumentId_NotFound_ThrowsKeyNotFoundException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        var q = new ZVecQuery { FieldName = "vec", DocumentId = "missing" };
+        var act = () => col.Query(q);
+        act.Should().Throw<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public void QueryGroupBy_ThrowsNotSupportedException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        var gq = new ZVecGroupByQuery
+        {
+            Query = new ZVecQuery { FieldName = "vec", Vector = new float[] { 1f, 0f } },
+            GroupByField = "category"
+        };
+        var act = () => col.QueryGroupBy(gq);
+        act.Should().Throw<NotSupportedException>()
+            .WithMessage("*zvec_collection_group_by*");
+    }
+
+    [Fact]
+    public void QueryGroupBy_WithNull_ThrowsArgumentNullException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        var act = () => col.QueryGroupBy(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task QueryAsync_MultiQuery_CancelledToken_ThrowsOperationCanceledException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var queries = new List<ZVecQuery> { new() { FieldName = "vec", Vector = new float[] { 1f, 0f } } };
+        var act = async () => await col.QueryAsync(queries, ct: cts.Token);
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
 }

@@ -7,6 +7,7 @@ namespace ZVec.NET.Tests.Integration;
 /// US-E18.9 — version gate: too-old / wrong-major (not exact patch).
 /// Logic is covered by unit tests; this verifies the live ABI path when native is available.
 /// </summary>
+[Collection(nameof(NativeSessionCollection))]
 public class VersionGateIntegrationTests : IClassFixture<ZVecRealNativeFixture>
 {
     private readonly ZVecRealNativeFixture _fixture;
@@ -33,8 +34,6 @@ public class VersionGateIntegrationTests : IClassFixture<ZVecRealNativeFixture>
             ZVecDefaults.Version.ExpectedMinor = ZVecNativeAbi.MinimumMinor;
             ZVecDefaults.Version.ExpectedPatch = ZVecNativeAbi.MinimumPatch;
 
-            // Factory may already be initialized process-wide; smoke-check version APIs instead
-            // when re-init would be a no-op.
             using var factory = new ZVecFactory();
             factory.Initialize();
             factory.IsInitialized.Should().BeTrue();
@@ -52,9 +51,40 @@ public class VersionGateIntegrationTests : IClassFixture<ZVecRealNativeFixture>
     }
 
     [Fact]
+    public void Initialize_WithForcedAbiMismatch_Throws()
+    {
+        _fixture.SkipIfNotAvailable();
+
+        var previousMajor = ZVecDefaults.Version.ExpectedMajor;
+        var previousMinor = ZVecDefaults.Version.ExpectedMinor;
+        var previousPatch = ZVecDefaults.Version.ExpectedPatch;
+        var previousBypass = ZVecDefaults.Version.BypassAbiCheck;
+
+        try
+        {
+            ZVecDefaults.Version.BypassAbiCheck = false;
+            ZVecDefaults.Version.ExpectedMajor = ZVecNativeAbi.MinimumMajor + 99;
+            ZVecDefaults.Version.ExpectedMinor = 0;
+            ZVecDefaults.Version.ExpectedPatch = 0;
+
+            using var factory = new ZVecFactory();
+            var act = () => factory.Initialize();
+
+            act.Should().Throw<ZVecAbiMismatchException>()
+                .Which.Message.Should().Contain("ABI version mismatch");
+        }
+        finally
+        {
+            ZVecDefaults.Version.ExpectedMajor = previousMajor;
+            ZVecDefaults.Version.ExpectedMinor = previousMinor;
+            ZVecDefaults.Version.ExpectedPatch = previousPatch;
+            ZVecDefaults.Version.BypassAbiCheck = previousBypass;
+        }
+    }
+
+    [Fact]
     public void IsCompatible_RejectsTooOldAndWrongMajor()
     {
-        // Pure gate semantics used by CheckAbiVersion (too-old / wrong-major).
         ZVecNativeAbi.IsCompatible(meetsMinimumVersion: false, foundMajor: 0, requiredMajor: 0)
             .Should().BeFalse("too-old minimum must fail");
 
