@@ -80,5 +80,8 @@
         <ProjectReference Include="..\ZVec.NET.Samples.Shared\ZVec.NET.Samples.Shared.csproj" />
     </ItemGroup>
 
+    <Import Project="ZVec.Native.targets" />
+
 </Project>
+
 

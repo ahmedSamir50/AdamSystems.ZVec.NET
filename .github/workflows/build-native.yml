@@ -1,0 +1,164 @@
+name: Build Native (desktop)
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "src/Native/**"
+      - "build/ci/**"
+      - ".github/workflows/build-native.yml"
+  pull_request:
+    paths:
+      - "src/Native/**"
+      - "build/ci/**"
+      - ".github/workflows/build-native.yml"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    # Optional RIDs must not block pack if the toolchain is unavailable on the runner.
+    continue-on-error: ${{ matrix.optional }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            test: true
+            optional: false
+            cmake_extra: ""
+          - os: windows-latest
+            rid: win-arm64
+            test: false
+            optional: true
+            cmake_extra: "-A ARM64"
+          - os: ubuntu-latest
+            rid: linux-x64
+            test: true
+            optional: false
+            cmake_extra: ""
+          - os: ubuntu-latest
+            rid: linux-arm64
+            test: false
+            optional: true
+            cross: true
+            cmake_extra: >-
+              -DCMAKE_SYSTEM_NAME=Linux
+              -DCMAKE_SYSTEM_PROCESSOR=aarch64
+              -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc
+              -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+          - os: macos-latest
+            rid: osx-arm64
+            test: true
+            optional: false
+            cmake_extra: "-DCMAKE_OSX_ARCHITECTURES=arm64"
+          - os: macos-13
+            rid: osx-x64
+            test: true
+            optional: true
+            cmake_extra: "-DCMAKE_OSX_ARCHITECTURES=x86_64"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake build-essential
+          if [ "${{ matrix.rid }}" = "linux-arm64" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user
+          fi
+
+      - name: Install macOS build tools
+        if: runner.os == 'macOS'
+        run: brew install ninja cmake || true
+
+      - name: Install Windows Ninja
+        if: runner.os == 'Windows'
+        run: choco install ninja -y
+
+      # Ninja on Windows needs cl/link on PATH (Developer Command Prompt).
+      - name: Setup MSVC (x64)
+        if: matrix.rid == 'win-x64'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup MSVC (arm64 cross)
+        if: matrix.rid == 'win-arm64'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_arm64
+
+      - name: Configure CMake (Unix)
+        if: runner.os != 'Windows'
+        working-directory: src/Native/ZVec.Native
+        run: |
+          cmake -B "build-${{ matrix.rid }}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            ${{ matrix.cmake_extra }} \
+            -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF \
+            -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON \
+            -S .
+
+      - name: Configure CMake (Windows x64)
+        if: matrix.rid == 'win-x64'
+        working-directory: src/Native/ZVec.Native
+        shell: pwsh
+        run: |
+          cmake -B "build-${{ matrix.rid }}" -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
+            -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
+
+      - name: Configure CMake (Windows ARM64)
+        if: matrix.rid == 'win-arm64'
+        working-directory: src/Native/ZVec.Native
+        shell: pwsh
+        run: |
+          cmake -B "build-${{ matrix.rid }}" -G "Visual Studio 17 2022" -A ARM64 `
+            -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
+            -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
+
+      - name: Build zvec_c_api
+        working-directory: src/Native/ZVec.Native
+        run: cmake --build "build-${{ matrix.rid }}" --config Release --target zvec_c_api
+
+      - name: Locate and deploy native (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          set -e
+          BUILD="src/Native/ZVec.Native/build-${{ matrix.rid }}"
+          LIB=$(find "$BUILD" \( -name 'libzvec_c_api.so' -o -name 'libzvec_c_api.dylib' -o -name 'zvec_c_api.so' -o -name 'zvec_c_api.dylib' \) | head -n1)
+          test -n "$LIB"
+          chmod +x build/ci/deploy-native.sh
+          ./build/ci/deploy-native.sh "${{ matrix.rid }}" "$LIB"
+          if [ "${{ matrix.rid }}" = "linux-arm64" ]; then
+            file "$LIB" || true
+            # Smoke: ensure aarch64 ELF; full QEMU app test is optional
+            file "$LIB" | grep -Ei 'ARM aarch64|ARM64|aarch64' || echo "WARN: file(1) did not confirm aarch64"
+          fi
+
+      - name: Locate and deploy native (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $build = "src/Native/ZVec.Native/build-${{ matrix.rid }}"
+          $lib = Get-ChildItem -Recurse $build -Filter "zvec_c_api.dll" | Select-Object -First 1
+          if (-not $lib) { throw "zvec_c_api.dll not found under $build" }
+          ./build/ci/deploy-native.ps1 -Rid "${{ matrix.rid }}" -SourcePath $lib.FullName
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zvec-native-${{ matrix.rid }}
+          path: src/Core/ZVec.NET/runtimes/${{ matrix.rid }}/native/*
+          if-no-files-found: error
+          retention-days: 14

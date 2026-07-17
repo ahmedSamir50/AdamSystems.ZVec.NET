@@ -32,6 +32,15 @@ Because this project relies on a native C++ engine, you cannot simply press "Run
 
    The DLL is written under `src/Native/ZVec.Native/build\` (e.g. `build\external\zvec\bin\zvec_c_api.dll`).
 
+3. **Deploy win-x64 into runtimes (local):** use `src/Native/ZVec.Native/_build_and_deploy.bat` (or copy the DLL to `src/Core/ZVec.NET/runtimes/win-x64/native/`).
+4. **Other RIDs / mobile:** see `build/ci/` (`build-android.sh`, `build-ios.sh`, `deploy-native.sh`) and GitHub Actions workflows. MAUI embeds matching natives via `samples/ZVec.NET.Samples.Maui/ZVec.Native.targets`.
+
+## NuGet publish & upstream announce (maintainers)
+
+- PackageId **`ZVec.NET`** (not the GitHub repo name). nuget.org owner: **AdamSystems**.
+- Trusted Publishing policy must match workflow file `publish-nuget.yml` and repo `ahmedSamir50/AdamSystems.ZVec.NET`.
+- After the first package is live: open a Community SDK issue on [alibaba/zvec](https://github.com/alibaba/zvec) with NuGet + GitHub links (see Implementation Plan E21 / Project Plan §9.4).
+
 ## How to Contribute
 
 1. **Branching:** Never work directly on `main`. Create a feature branch off the `dev` branch (e.g., `feature/add-hybrid-search`).

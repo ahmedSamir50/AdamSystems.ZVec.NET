@@ -437,7 +437,7 @@ public static class ZVecDefaults
 
         /// <summary>Hint appended to native load failures.</summary>
         public const string NativeLibraryLoadHint =
-            "See CONTRIBUTING.md for local native build steps; multi-RID NuGet packaging is Epic E21.";
+            "See CONTRIBUTING.md and README (Native RIDs). Ensure runtimes/{rid}/native has zvec_c_api for your platform, or restore the ZVec.NET NuGet with matching native assets.";
 
         /// <summary>
         /// Platform gate: HNSW-RaBitQ requires x86_64 with AVX2 or higher (not available on ARM).

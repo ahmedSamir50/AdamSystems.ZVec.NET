@@ -1,0 +1,67 @@
+name: Publish NuGet
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # NuGet Trusted Publishing (OIDC)
+
+jobs:
+  pack:
+    uses: ./.github/workflows/pack.yml
+
+  publish:
+    name: push to nuget.org
+    needs: pack
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/nuget
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: NuGet login (OIDC Trusted Publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: AdamSystems
+        continue-on-error: true
+
+      - name: Push (Trusted Publishing)
+        if: steps.login.outcome == 'success'
+        run: |
+          shopt -s nullglob
+          for pkg in artifacts/nuget/*.nupkg; do
+            dotnet nuget push "$pkg" \
+              --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+      - name: Push (API key fallback)
+        if: steps.login.outcome != 'success'
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "${NUGET_API_KEY:-}" ]; then
+            echo "Trusted Publishing login failed and NUGET_API_KEY secret is not set." >&2
+            exit 1
+          fi
+          shopt -s nullglob
+          for pkg in artifacts/nuget/*.nupkg; do
+            dotnet nuget push "$pkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done

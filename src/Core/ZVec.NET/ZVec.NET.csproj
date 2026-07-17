@@ -10,12 +10,17 @@
     <Version>1.0.0-alpha.1+zvec.0.5.1</Version>
     <Authors>Ahmed Samir https://github.com/ahmedSamir50</Authors>
     <Company>Adam Systems EGY</Company>
-    <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (win/linux/mac, x64/arm64).</Description>
-    <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann</PackageTags>
+    <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (Windows, Linux, macOS, Android, iOS / Mac Catalyst).</Description>
+    <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann;maui</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Wraps ZVec C++ 0.5.1; targets .NET 8.0+ (LTS baseline)</PackageReleaseNotes>
+    <PackageReleaseNotes>Wraps ZVec C++ 0.5.1; targets .NET 8.0+ (LTS baseline). Natives: win/linux/osx × x64/arm64 plus Android/iOS/MacCatalyst when CI artifacts are present.</PackageReleaseNotes>
+    <PackageProjectUrl>https://github.com/ahmedSamir50/AdamSystems.ZVec.NET</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ahmedSamir50/AdamSystems.ZVec.NET</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\..\README.md" Pack="true" PackagePath="\" />
     <None Include="runtimes\**\*" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes" />
   </ItemGroup>
 
@@ -39,4 +45,3 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
   </ItemGroup>
 </Project>
-

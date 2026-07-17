@@ -2,11 +2,11 @@
 
 User demos for offline/edge RAG, semantic search, and recommendations.
 
-**Not part of the NuGet package.** Epic **E21** (packaging/CI) is deferred — these projects are `IsPackable=false`, live under `samples/`, and must never gate pack or default CI.
+**Not part of the NuGet package.** These projects are `IsPackable=false`, live under `samples/`, and must never gate NuGet pack. MAUI is the cross-platform native proof (Windows / Android / iOS / Mac Catalyst) when RID binaries exist under `src/Core/ZVec.NET/runtimes/`.
 
 ## Target framework
 
-All samples target **.NET 10** only (`net10.0` / `net10.0-windows…` for MAUI).
+All samples target **.NET 10** only (`net10.0` / `net10.0-*` for MAUI).
 
 ## Solution entrypoint
 
@@ -28,7 +28,7 @@ Prefer this over the root solution when working on samples. Root `ZVec.NET.slnx`
 ## Prerequisites
 
 1. **.NET 10 SDK**
-2. **Native library** for your RID (win-x64 today): copy `zvec_c_api.dll` into `src/Core/ZVec.NET/runtimes/win-x64/native/` (Appendix C in the Implementation Plan). Multi-RID bundling is E21.
+2. **Native library** for your RID under `src/Core/ZVec.NET/runtimes/{rid}/native/` (see root README Native RIDs). Local win-x64: build via `src/Native/ZVec.Native` deploy scripts. Android: `build/ci/build-android.sh`. iOS/MacCatalyst: `build/ci/build-ios.sh` on macOS / GHA. MAUI embeds them via `ZVec.NET.Samples.Maui/ZVec.Native.targets`.
 3. **LM Studio** at `http://127.0.0.1:1234/v1` with **both** models loaded at once (no switching):
    - Embeddings: `text-embedding-google_embeddinggemma-300m-qat` (768-d EmbeddingGemma) → `POST /v1/embeddings`
    - Chat: `google/gemma-4-e2b` → `POST /v1/chat/completions`
@@ -44,18 +44,20 @@ See [datasets/README.md](datasets/README.md).
 - Network failure leaves the T0 path working
 - Hard cap ≈ 100 MB per pack — no GB corpora
 
-## Quick smoke (win-x64, manual — no CI job)
+## Quick smoke (manual — samples are not default CI)
 
-- [ ] `dotnet run --project samples/ZVec.NET.Samples.Console -- basics`
+- [ ] `dotnet run --project samples/ZVec.NET.Samples.Console -- basics` (win-x64 native present)
 - [ ] LM Studio up with **both** models → `ingest --fixtures` → `ask "What is ZVec.NET?"`
 - [ ] First run downloads T1 into `datasets/cache/`; second run logs `skip …: already present`
 - [ ] `dotnet run --project samples/ZVec.NET.Samples.AspNet` → `GET /health` healthy
 - [ ] `POST /rag/ask` returns answer + hits
 - [ ] MAUI Windows: ingest fixtures → ask → citations; restart app → doc count preserved
+- [ ] MAUI Android (after NDK build): Debug + Release on device/emulator load ZVec (no `DllNotFoundException`)
+- [ ] MAUI iOS simulator / Mac Catalyst (after Xcode/CI native): app loads ZVec
 
-## E21 isolation
+## Packaging isolation
 
-- No sample assets under NuGet `runtimes/`
-- No GitHub Actions workflow for samples in E25
-- After a package is published, samples may *document* `dotnet add package ZVec.NET` as an alternate to `ProjectReference`
+- Sample projects are never packed into `ZVec.NET.nupkg`
+- No required GitHub Actions job for sample apps (native/pack CI is separate)
+- After nuget.org publish, samples may document `dotnet add package ZVec.NET` as an alternate to `ProjectReference`
 - **No .NET Aspire** for LM Studio — use HTTP clients + health probes only

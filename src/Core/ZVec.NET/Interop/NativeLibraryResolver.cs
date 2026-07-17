@@ -5,7 +5,8 @@ using System.Runtime.InteropServices;
 namespace ZVec.NET.Interop;
 
 /// <summary>
-/// Handles platform-specific loading of the ZVec native library.
+/// Handles platform-specific loading of the ZVec native library
+/// (<c>zvec_c_api.dll</c> / <c>libzvec_c_api.so</c> / <c>libzvec_c_api.dylib</c>).
 /// </summary>
 internal static class NativeLibraryResolver
 {
@@ -74,6 +75,100 @@ internal static class NativeLibraryResolver
     }
 
     /// <summary>
+    /// File name of the shared library for the current OS
+    /// (e.g. <c>zvec_c_api.dll</c>, <c>libzvec_c_api.so</c>, <c>libzvec_c_api.dylib</c>).
+    /// </summary>
+    internal static string GetNativeLibraryFileName()
+    {
+        if (OperatingSystem.IsWindows())
+            return NativeMethods.LibraryName + ".dll";
+        if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
+            return "lib" + NativeMethods.LibraryName + ".dylib";
+        // Linux, Android, FreeBSD, etc.
+        return "lib" + NativeMethods.LibraryName + ".so";
+    }
+
+    /// <summary>
+    /// Maps a runtime RID (e.g. <c>win10-x64</c>, <c>ubuntu.22.04-x64</c>) to the portable
+    /// RID folder we ship under <c>runtimes/{rid}/native/</c>.
+    /// </summary>
+    internal static string GetPortableRid(string? runtimeIdentifier = null)
+    {
+        string rid = runtimeIdentifier ?? RuntimeInformation.RuntimeIdentifier;
+        if (string.IsNullOrEmpty(rid))
+            return rid;
+
+        // Prefer exact known portable folders when present later via probe; normalize common cases.
+        if (rid.StartsWith("win", StringComparison.OrdinalIgnoreCase))
+        {
+            if (rid.Contains("arm64", StringComparison.OrdinalIgnoreCase))
+                return "win-arm64";
+            if (rid.Contains("x86", StringComparison.OrdinalIgnoreCase) && !rid.Contains("x64", StringComparison.OrdinalIgnoreCase))
+                return "win-x86";
+            return "win-x64";
+        }
+
+        if (rid.StartsWith("osx", StringComparison.OrdinalIgnoreCase) ||
+            rid.StartsWith("macos", StringComparison.OrdinalIgnoreCase))
+        {
+            return rid.Contains("arm64", StringComparison.OrdinalIgnoreCase) ||
+                   rid.Contains("aarch64", StringComparison.OrdinalIgnoreCase)
+                ? "osx-arm64"
+                : "osx-x64";
+        }
+
+        if (rid.StartsWith("maccatalyst", StringComparison.OrdinalIgnoreCase))
+        {
+            return rid.Contains("arm64", StringComparison.OrdinalIgnoreCase) ||
+                   rid.Contains("aarch64", StringComparison.OrdinalIgnoreCase)
+                ? "maccatalyst-arm64"
+                : "maccatalyst-x64";
+        }
+
+        if (rid.StartsWith("ios", StringComparison.OrdinalIgnoreCase))
+        {
+            if (rid.Contains("simulator", StringComparison.OrdinalIgnoreCase))
+            {
+                return rid.Contains("x64", StringComparison.OrdinalIgnoreCase) ||
+                       rid.Contains("x86_64", StringComparison.OrdinalIgnoreCase)
+                    ? "iossimulator-x64"
+                    : "iossimulator-arm64";
+            }
+
+            return "ios-arm64";
+        }
+
+        if (rid.StartsWith("android", StringComparison.OrdinalIgnoreCase))
+        {
+            if (rid.Contains("x64", StringComparison.OrdinalIgnoreCase) ||
+                rid.Contains("x86_64", StringComparison.OrdinalIgnoreCase))
+                return "android-x64";
+            if (rid.Contains("x86", StringComparison.OrdinalIgnoreCase))
+                return "android-x86";
+            if (rid.Contains("arm", StringComparison.OrdinalIgnoreCase) &&
+                !rid.Contains("arm64", StringComparison.OrdinalIgnoreCase))
+                return "android-arm";
+            return "android-arm64";
+        }
+
+        if (rid.Contains("linux", StringComparison.OrdinalIgnoreCase) ||
+            rid.Contains("ubuntu", StringComparison.OrdinalIgnoreCase) ||
+            rid.Contains("debian", StringComparison.OrdinalIgnoreCase) ||
+            rid.Contains("alpine", StringComparison.OrdinalIgnoreCase))
+        {
+            bool musl = rid.Contains("musl", StringComparison.OrdinalIgnoreCase) ||
+                        rid.Contains("alpine", StringComparison.OrdinalIgnoreCase);
+            bool arm64 = rid.Contains("arm64", StringComparison.OrdinalIgnoreCase) ||
+                         rid.Contains("aarch64", StringComparison.OrdinalIgnoreCase);
+            if (musl)
+                return arm64 ? "linux-musl-arm64" : "linux-musl-x64";
+            return arm64 ? "linux-arm64" : "linux-x64";
+        }
+
+        return rid;
+    }
+
+    /// <summary>
     /// Attempts to load the native library by probing well-known paths,
     /// then falls back to standard .NET resolution.
     /// </summary>
@@ -100,14 +195,7 @@ internal static class NativeLibraryResolver
             return;
         }
 
-        string baseDir = AppContext.BaseDirectory;
-        string rid = RuntimeInformation.RuntimeIdentifier;
-        string[] probePaths = [
-            Path.Combine(baseDir, "runtimes", rid, "native", NativeMethods.LibraryName + ".dll"),
-            Path.Combine(baseDir, NativeMethods.LibraryName + ".dll"),
-        ];
-
-        foreach (var path in probePaths)
+        foreach (var path in EnumerateProbePaths())
         {
             if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
             {
@@ -116,7 +204,7 @@ internal static class NativeLibraryResolver
             }
         }
 
-        // Fall back to standard .NET native library resolution.
+        // Fall back to standard .NET native library resolution (deps.json / libzvec_c_api.so on Android).
         try
         {
             _ = NativeLibrary.Load(NativeMethods.LibraryName, typeof(NativeMethods).Assembly, null);
@@ -126,6 +214,44 @@ internal static class NativeLibraryResolver
             // Call our resolver directly to throw the custom RID exception.
             Resolve(NativeMethods.LibraryName, typeof(NativeMethods).Assembly, null);
             throw;
+        }
+    }
+
+    private static IEnumerable<string> EnumerateProbePaths()
+    {
+        string baseDir = AppContext.BaseDirectory;
+        string fileName = GetNativeLibraryFileName();
+        string runtimeRid = RuntimeInformation.RuntimeIdentifier;
+        string portableRid = GetPortableRid(runtimeRid);
+
+        var ridCandidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            runtimeRid,
+            portableRid
+        };
+
+        foreach (var rid in ridCandidates)
+        {
+            if (string.IsNullOrEmpty(rid))
+                continue;
+            yield return Path.Combine(baseDir, "runtimes", rid, "native", fileName);
+        }
+
+        // Flat next to the managed assembly (local deploy / some MAUI layouts).
+        yield return Path.Combine(baseDir, fileName);
+
+        // Android often extracts JNI libs under lib/{abi}/ relative to the app.
+        if (OperatingSystem.IsAndroid())
+        {
+            string abi = portableRid switch
+            {
+                "android-arm64" => "arm64-v8a",
+                "android-x64" => "x86_64",
+                "android-arm" => "armeabi-v7a",
+                "android-x86" => "x86",
+                _ => "arm64-v8a"
+            };
+            yield return Path.Combine(baseDir, "lib", abi, fileName);
         }
     }
 
@@ -152,6 +278,12 @@ internal static class NativeLibraryResolver
         // Return cached handle if already loaded.
         if (_cachedHandle != IntPtr.Zero)
             return _cachedHandle;
+
+        foreach (var path in EnumerateProbePaths())
+        {
+            if (File.Exists(path) && NativeLibrary.TryLoad(path, out var probed))
+                return _cachedHandle = probed;
+        }
 
         // Fall back to standard native resolution rules.
         if (NativeLibrary.TryLoad(name, assembly, searchPath, out var realHandle))

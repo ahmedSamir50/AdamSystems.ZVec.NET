@@ -20,7 +20,7 @@
 | **DI-first design** | `AddZVec()` / `AddZVecCollection<T>()` — works with ASP.NET Core, MAUI, Blazor Server out of the box |
 | **Typed ODM** | Map POCOs with `ZVec.NET.Mapping` attributes — schema `From<T>()`, expression filters, typed CRUD/DDL without magic field strings |
 | **Safe native lifecycle** | Collection handles owned by `SafeZvecHandle` (close-only); `Dispose` closes, `Destroy` deletes then closes; `Shutdown` disposes all tracked open collections before `zvec_shutdown` |
-| **Cross-platform NuGet (planned)** | Target RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 — full multi-RID packaging is Epic E21 |
+| **Cross-platform natives** | Single NuGet `ZVec.NET` with `runtimes/{rid}/native/` for Windows, Linux, macOS, **Android**, **iOS / Mac Catalyst** (CI-built; MAUI sample is the proof) |
 | **Full ZVec DB coverage** | HNSW, Flat, IVF, HNSW-RaBitQ, DiskANN, Vamana, Invert, FTS indexes; hybrid search; schema evolution; in-DB RRF/Weighted rerankers |
 | **Idiomatic C#** | .NET naming guidelines, `ValueTask`, `CancellationToken`, fluent builders |
 
@@ -45,7 +45,21 @@ ZVec.NET is built for thread-safe use against the native engine:
 dotnet add package ZVec.NET
 ```
 
-> **Requires .NET 8.0+ (LTS).** Pre-alpha: native binaries for your current RID must be present locally (or tests Skip). Multi-RID NuGet bundling is planned in Epic E21.
+> **Requires .NET 8.0+ (LTS).** Version scheme: `1.0.0-alpha.1+zvec.0.5.1` (SDK SemVer + pinned native). Supported TFMs are `lib/net8.0`, `lib/net9.0`, `lib/net10.0` — **not** encoded in the version string. Pre-alpha: CI packs whatever RID natives are built; local tests Skip if the native for your RID is missing.
+
+### Native RIDs (NuGet `runtimes/`)
+
+| RID | Native file | Built by |
+|-----|-------------|----------|
+| `win-x64`, `win-arm64` | `zvec_c_api.dll` | GitHub Actions (Windows) |
+| `linux-x64`, `linux-arm64` | `libzvec_c_api.so` | GitHub Actions (Ubuntu; arm64 cross + QEMU) |
+| `osx-x64`, `osx-arm64` | `libzvec_c_api.dylib` | GitHub Actions (macOS) |
+| `android-arm64`, `android-x64` | `libzvec_c_api.so` | Android NDK + CMake (CI / local) |
+| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | macOS + Xcode (CI) |
+
+Package size grows with each RID (desktop natives are already large). There is **no** fixed 50 MB gate — see pack workflow / release notes for measured size. Blazor WebAssembly is out of scope (no native RID).
+
+**Owner on nuget.org:** [AdamSystems](https://www.nuget.org/profiles/AdamSystems). **Source:** [ahmedSamir50/AdamSystems.ZVec.NET](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET). PackageId remains **`ZVec.NET`**.
 
 ### Samples (Epic E25 — .NET 10 only)
 

@@ -1,0 +1,33 @@
+name: iOS Device Testing Report
+description: Report success or failure running ZVec.NET / MAUI sample on a physical iPhone or iPad
+title: "[ios] Testing report: "
+labels: ["platform", "ios", "community-testing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        iOS device binaries are built on GitHub macOS runners. Physical device runs need community verification (Apple signing).
+  - type: input
+    id: version
+    attributes:
+      label: ZVec.NET version / commit
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Works on device
+        - Works on simulator only
+        - Fails to load native
+        - Signing / deploy issue
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Device / iOS version / details
+    validations:
+      required: true

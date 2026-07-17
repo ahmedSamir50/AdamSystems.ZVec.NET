@@ -1,0 +1,142 @@
+name: Pack NuGet
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+  workflow_call:
+    outputs:
+      nupkg-name:
+        description: Artifact name for packed nupkg
+        value: nuget-packages
+
+permissions:
+  contents: read
+
+jobs:
+  natives:
+    uses: ./.github/workflows/build-native.yml
+
+  natives-mobile:
+    uses: ./.github/workflows/build-native-mobile.yml
+
+  managed:
+    uses: ./.github/workflows/build-managed.yml
+
+  pack:
+    name: pack ZVec.NET
+    needs: [natives, natives-mobile, managed]
+    # Pack when managed + desktop native workflow finished; mobile may be partial/fail.
+    if: |
+      always() &&
+      needs.managed.result == 'success' &&
+      (needs.natives.result == 'success' || needs.natives.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Download all native artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: zvec-native-*
+          path: _native_artifacts
+          merge-multiple: false
+
+      - name: Assemble runtimes/
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for dir in _native_artifacts/zvec-native-*; do
+            rid="${dir##*/zvec-native-}"
+            dest="src/Core/ZVec.NET/runtimes/${rid}/native"
+            mkdir -p "$dest"
+            cp -f "$dir"/* "$dest/" || true
+            echo "Assembled $rid:"
+            ls -la "$dest" || true
+          done
+          echo "=== RID tree ==="
+          find src/Core/ZVec.NET/runtimes -type f | sort
+
+      - name: Pack
+        run: |
+          dotnet pack src/Core/ZVec.NET/ZVec.NET.csproj -c Release -o artifacts/nuget
+          ls -la artifacts/nuget
+
+      - name: Assert snupkg + size note
+        shell: bash
+        run: |
+          set -euo pipefail
+          NUPKG=$(ls artifacts/nuget/ZVec.NET.*.nupkg | head -n1)
+          SNUPKG=$(ls artifacts/nuget/ZVec.NET.*.snupkg | head -n1)
+          test -f "$NUPKG"
+          test -f "$SNUPKG"
+          SIZE=$(stat -c%s "$NUPKG")
+          echo "nupkg bytes=$SIZE path=$NUPKG"
+          # Soft ceiling (500 MiB). Fat multi-RID packages are expected; fail only on runaway growth.
+          MAX=$((500 * 1024 * 1024))
+          if [ "$SIZE" -gt "$MAX" ]; then
+            echo "ERROR: nupkg exceeds 500 MiB soft gate ($SIZE bytes)" >&2
+            exit 1
+          fi
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/nuget/*
+          if-no-files-found: error
+          retention-days: 30
+
+  validate-consumer:
+    name: validate clean consumer
+    needs: pack
+    if: needs.pack.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Download nupkg
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/nuget
+
+      - name: Download native for smoke RID
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: zvec-native-${{ matrix.rid }}
+          path: _rid_native
+
+      - name: Consumer smoke (restore from local feed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x build/ci/validate-consumer.sh || true
+          bash build/ci/validate-consumer.sh "${{ matrix.rid }}" artifacts/nuget

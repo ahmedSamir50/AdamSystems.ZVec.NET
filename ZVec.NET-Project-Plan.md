@@ -41,8 +41,8 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 | G1 | **Idiomatic C# API** | Sync + async entry points; .NET naming guidelines; `ValueTask` for async; `IAsyncEnumerable` for streaming where useful |
 | G2 | **Zero-allocation vector pipeline** | `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` on vector hot paths; no `float[]` copies. Scalar `Fields` may box (documented) |
 | G3 | **Sub-millisecond overhead** | Sync P/Invoke marshalling overhead < 50 µs on a 768-dim vector query (verified by BenchmarkDotNet); async path uses bounded offload |
-| G4 | **Cross-platform single NuGet** | One `.nupkg` (`ZVec.NET`) with native binaries for win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 |
-| G5 | **Edge-ready / MAUI-compatible** | Memory-mapped I/O exposed; resource governance knobs exposed; no server dependency |
+| G4 | **Cross-platform single NuGet** | One `.nupkg` (`ZVec.NET`) with native binaries for win/linux/osx × x64/arm64 **plus** Android / iOS / Mac Catalyst when CI builds succeed |
+| G5 | **Edge-ready / MAUI-compatible** | Memory-mapped I/O exposed; resource governance knobs exposed; no server dependency; MAUI sample wires natives for Windows/Android/iOS/MacCatalyst |
 | G6 | **Full in-process DB / C++ wrap** | 100% of the **Vector Database** API that `zvec_c_api` / C++ exposes, with managed shapes aligned to Python/Node **DB** docs in [llms-full](https://zvec.org/llms-full.txt) (collections, schema, CRUD, query modes, indexes, schema evolution, config). **Not** 100% of AI Integration packages (embeddings, MCP, skills, model rerankers) |
 | G7 | **SafeHandle guarantees** | Every native pointer wrapped in `SafeHandle`; consumers **must** `Dispose` / `await using`; finalizer is a safety net only |
 | G8 | **Comprehensive test & benchmark suite** | ≥90% line coverage; BenchmarkDotNet comparison vs. raw P/Invoke baseline |
@@ -66,7 +66,7 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 |----------|--------|-----------|
 | Public identity | Namespace, assembly, PackageId = **`ZVec.NET`** |  ZVec (wrapped product) + .NET (framework). Consumers import only this name |
 | Inner project path | `src/Core/...` for layout only | Folder/project may use `Core` internally; **never** ship a public `*.Core` namespace or PackageId |
-| .NET Target | `net8.0` – `net10.0` (pack `lib/net8.0` when identical) | `net8.0` is LTS; net9/10 fall back to net8.0 asset if no TFM-specific code |
+| .NET Target | `net8.0` – `net10.0` (pack all three `lib/` TFMs) | LTS baseline net8.0; ship net9/net10 assemblies in the same package; **never** encode TFM in the SemVer string |
 | C++ Standard | C++17 | Matches ZVec upstream |
 | License | MIT via `<PackageLicenseExpression>` | Correct NuGet metadata property (not `<License>`) |
 | Strong-naming | Yes, open signing key (`.snk` committed to repo) | Enterprise / strong-named consumer compatibility. The `.snk` is an **identity key** (not a security secret) — like SQLitePCLRaw's approach. Generated once via `sn -k ZVec.NET.snk` and placed in `build/`. It lets strong-named consumers reference our assembly |
@@ -1237,24 +1237,25 @@ public sealed class ZVecCollectionOptions
 
 ### 9.1 NuGet Structure
 
-Prefer a **single** `lib/net8.0` asset when there is no TFM-specific `#if` code — net9/net10 consumers fall back to it. Multi-target locally if needed for testing.
+Ship **`lib/net8.0` + `lib/net9.0` + `lib/net10.0`** in one package (same SemVer). Natives are assembled from CI artifacts into `runtimes/{rid}/native/`.
 
 ```
 ZVec.NET.nupkg/
 ├── lib/
-│   └── net8.0/ZVec.NET.dll
+│   ├── net8.0/ZVec.NET.dll
+│   ├── net9.0/ZVec.NET.dll
+│   └── net10.0/ZVec.NET.dll
 ├── runtimes/
-│   ├── win-x64/native/zvec_c_api.dll
-│   ├── win-arm64/native/zvec_c_api.dll
-│   ├── linux-x64/native/libzvec_c_api.so
-│   ├── linux-arm64/native/libzvec_c_api.so
-│   ├── osx-x64/native/libzvec_c_api.dylib
-│   └── osx-arm64/native/libzvec_c_api.dylib
+│   ├── win-x64|win-arm64/native/zvec_c_api.dll
+│   ├── linux-x64|linux-arm64/native/libzvec_c_api.so
+│   ├── osx-x64|osx-arm64/native/libzvec_c_api.dylib
+│   ├── android-arm64|android-x64/native/libzvec_c_api.so
+│   └── ios-arm64|iossimulator-arm64|maccatalyst-arm64/native/libzvec_c_api.dylib
 ├── README.md
 └── (optional) ZVec.NET.snupkg alongside
 ```
 
-No `build/*.props` for RID native packing — the .NET runtime resolves `runtimes/{rid}/native/` automatically.
+No `build/*.props` for RID native packing — the .NET runtime resolves `runtimes/{rid}/native/` automatically. Soft size gate in CI: **500 MiB** (desktop+mobile natives are large). Package owner on nuget.org: **AdamSystems**; PackageId remains **`ZVec.NET`**.
 
 ### 9.2 .csproj NuGet Packaging Configuration
 
@@ -1313,7 +1314,7 @@ If managed adds P/Invoke for new APIs before native ships those symbols, bump th
 
 Once the alpha NuGet package is published:
 
-1. **GitHub Issue** — Open a "Community SDK" issue on `alibaba/zvec` announcing the .NET wrapper with a link to the NuGet package and repo
+1. **GitHub Issue** — Open a "Community SDK" issue on `alibaba/zvec` with NuGet `https://www.nuget.org/packages/ZVec.NET` and source `https://github.com/ahmedSamir50/AdamSystems.ZVec.NET` (maintainer Adam Systems EGY; PackageId `ZVec.NET`)
 2. **Docs PR** — Submit a PR to ZVec's docs adding `ZVec.NET` to their SDK list (alongside Python/Node)
 3. **Community channels** — Announce in ZVec's Discord/Slack channels
 4. **NuGet discoverability** — `<PackageTags>` with `zvec`, `vector-database`, `alibaba` ensures developers searching NuGet for vector DBs find it
@@ -1856,40 +1857,22 @@ Optimistic calendar floor remains ~8 weeks if native/CI goes smoothly; plan to *
 
 ### 13.1 Build Matrix
 
-```yaml
-# .github/workflows/build-native.yml
-strategy:
-  matrix:
-    include:
-      - os: windows-latest
-        rid: win-x64
-        cmake_generator: "Ninja"
-      - os: windows-latest
-        rid: win-arm64
-        cmake_generator: "Ninja"
-        cmake_extra: "-A ARM64"
-      - os: ubuntu-latest
-        rid: linux-x64
-        cmake_generator: "Unix Makefiles"
-      - os: ubuntu-latest
-        rid: linux-arm64
-        cmake_generator: "Unix Makefiles"
-        cmake_extra: "-DCMAKE_TOOLCHAIN_FILE=toolchain-arm64.cmake"
-      - os: macos-latest
-        rid: osx-x64
-        cmake_generator: "Unix Makefiles"
-      - os: macos-latest
-        rid: osx-arm64
-        cmake_generator: "Unix Makefiles"
-        cmake_extra: "-DCMAKE_OSX_ARCHITECTURES=arm64"
-```
+Workflows live under `.github/workflows/` (not only `build/ci/`):
+
+- `build-native.yml` — desktop: win-x64, win-arm64 (compile-only), linux-x64, linux-arm64 (cross), osx-arm64 (`macos-latest`), osx-x64 (`macos-13`)
+- `build-native-mobile.yml` — android-arm64 / android-x64 (NDK); ios-arm64 / iossimulator-arm64 / maccatalyst-arm64 (Xcode)
+- `build-managed.yml` — restore/build/test (unit always; integration Skip without native)
+- `pack.yml` — assemble RID artifacts → `dotnet pack` → consumer smoke
+- `publish-nuget.yml` — tag `v*` → nuget.org (Trusted Publishing OIDC preferred)
+
+Scripts: `build/ci/deploy-native.sh|.ps1`, `build-android.sh`, `build-ios.sh`, `validate-consumer.sh`.
 
 ### 13.2 Pipeline Stages
 
-1. **Build Native** — Compile `zvec_c_api` for all 6 RIDs
-2. **Build Managed** — `dotnet build` ZVec.NET
-3. **Test (Mock)** — Unit tests against mock native library
-4. **Test (Integration)** — Integration tests against real ZVec binaries (Linux x64)
+1. **Build Native (desktop)** — Compile `zvec_c_api` for 6 desktop RIDs
+2. **Build Native (mobile)** — Android NDK + Apple mobile RIDs
+3. **Build Managed** — `dotnet build` / `dotnet test` ZVec.NET
+4. **Test (Integration)** — Real ZVec binaries when present (Skip otherwise); no mock-native stage (E17 canceled)
 5. **Benchmark** — BenchmarkDotNet on Linux x64
 6. **Pack** — `dotnet pack` with `runtimes/` + symbols
 7. **Publish** — Push to nuget.org (release tag only)
@@ -2004,7 +1987,7 @@ For developers without ARM64 hardware:
 
 1. **Docker + QEMU:** Run `docker run --platform linux/arm64 ...` with QEMU emulation.
 2. **CI is the gate:** Don't build ARM64 locally. Push to CI and let the matrix handle it.
-3. **The mock library** (`zvec_c_api_mock`) is x64-only — all unit tests run on x64. ARM64 testing is integration-only.
+3. Unit tests are managed-only (no mock C++ library). ARM64/mobile device runs are integration/community QA.
 
 ---
 

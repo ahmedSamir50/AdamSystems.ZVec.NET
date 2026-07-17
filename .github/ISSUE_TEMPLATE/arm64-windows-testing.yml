@@ -1,0 +1,34 @@
+name: ARM64 Windows Testing Report
+description: Report success or failure running ZVec.NET on Windows ARM64
+title: "[win-arm64] Testing report: "
+labels: ["platform", "win-arm64", "community-testing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Windows ARM64 natives are **compile-only** in CI. Please help verify on real hardware.
+  - type: input
+    id: version
+    attributes:
+      label: ZVec.NET version / commit
+      placeholder: 1.0.0-alpha.1 or commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Works
+        - Fails to load native
+        - Fails at runtime
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Device / OS / details
+      placeholder: Surface Pro X, Windows 11 ARM64, steps, exception text…
+    validations:
+      required: true

@@ -1,0 +1,67 @@
+<!--
+  Embeds zvec_c_api from the core package runtimes/ tree into MAUI platform builds.
+  Natives are produced by build/ci + GitHub Actions. Missing files are skipped (Exists);
+  deploy will fail at runtime until the matching RID is built.
+-->
+<Project>
+  <PropertyGroup>
+    <ZVecRuntimesDir>$(MSBuildThisFileDirectory)..\..\src\Core\ZVec.NET\runtimes\</ZVecRuntimesDir>
+  </PropertyGroup>
+
+  <!-- Android -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <AndroidNativeLibrary
+      Include="$(ZVecRuntimesDir)android-arm64\native\libzvec_c_api.so"
+      Condition="Exists('$(ZVecRuntimesDir)android-arm64\native\libzvec_c_api.so')">
+      <Abi>arm64-v8a</Abi>
+    </AndroidNativeLibrary>
+    <AndroidNativeLibrary
+      Include="$(ZVecRuntimesDir)android-x64\native\libzvec_c_api.so"
+      Condition="Exists('$(ZVecRuntimesDir)android-x64\native\libzvec_c_api.so')">
+      <Abi>x86_64</Abi>
+    </AndroidNativeLibrary>
+  </ItemGroup>
+
+  <!-- iOS device -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <NativeReference
+      Include="$(ZVecRuntimesDir)ios-arm64\native\libzvec_c_api.dylib"
+      Condition="Exists('$(ZVecRuntimesDir)ios-arm64\native\libzvec_c_api.dylib')">
+      <Kind>Dynamic</Kind>
+      <SmartLink>false</SmartLink>
+      <ForceLoad>true</ForceLoad>
+    </NativeReference>
+    <NativeReference
+      Include="$(ZVecRuntimesDir)iossimulator-arm64\native\libzvec_c_api.dylib"
+      Condition="Exists('$(ZVecRuntimesDir)iossimulator-arm64\native\libzvec_c_api.dylib')">
+      <Kind>Dynamic</Kind>
+      <SmartLink>false</SmartLink>
+      <ForceLoad>true</ForceLoad>
+    </NativeReference>
+  </ItemGroup>
+
+  <!-- Mac Catalyst -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+    <NativeReference
+      Include="$(ZVecRuntimesDir)maccatalyst-arm64\native\libzvec_c_api.dylib"
+      Condition="Exists('$(ZVecRuntimesDir)maccatalyst-arm64\native\libzvec_c_api.dylib')">
+      <Kind>Dynamic</Kind>
+      <SmartLink>false</SmartLink>
+      <ForceLoad>true</ForceLoad>
+    </NativeReference>
+  </ItemGroup>
+
+  <!-- Windows: ensure win-x64 dll is copied next to the app -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+    <None
+      Include="$(ZVecRuntimesDir)win-x64\native\zvec_c_api.dll"
+      Condition="Exists('$(ZVecRuntimesDir)win-x64\native\zvec_c_api.dll')"
+      CopyToOutputDirectory="PreserveNewest"
+      Link="runtimes\win-x64\native\zvec_c_api.dll" />
+    <None
+      Include="$(ZVecRuntimesDir)win-arm64\native\zvec_c_api.dll"
+      Condition="Exists('$(ZVecRuntimesDir)win-arm64\native\zvec_c_api.dll')"
+      CopyToOutputDirectory="PreserveNewest"
+      Link="runtimes\win-arm64\native\zvec_c_api.dll" />
+  </ItemGroup>
+</Project>
