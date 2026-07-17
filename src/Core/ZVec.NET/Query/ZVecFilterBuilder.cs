@@ -1,113 +1,51 @@
 using System.Globalization;
-using System.Text;
+using System.Text.RegularExpressions;
+using ZVec.NET.Query.Internal;
 
 namespace ZVec.NET.Query;
 
 /// <summary>
-/// A fluent builder for constructing ZVec query filter expressions.
-/// String values are escaped (quotes / backslashes) so literals like O'Brien cannot break the expression.
+/// Immutable fluent builder for ZVec filter expressions.
+/// Builds an AST and renders a native filter string via <see cref="Build"/>.
+/// Nest with lambda <c>And</c>/<c>Or</c>/<c>Not</c> to avoid repeated <see cref="Create"/> calls.
 /// </summary>
-public sealed class ZVecFilterBuilder
+public sealed partial class ZVecFilterBuilder
 {
-    private string _expression;
+    private readonly FilterNode _root;
 
-    private ZVecFilterBuilder(string expression)
-    {
-        _expression = expression;
-    }
+    private ZVecFilterBuilder(FilterNode root) => _root = root;
 
-    /// <summary>
-    /// Creates a new, empty <see cref="ZVecFilterBuilder"/>.
-    /// </summary>
-    public static ZVecFilterBuilder Create() => new(string.Empty);
+    /// <summary>Creates an empty filter builder.</summary>
+    public static ZVecFilterBuilder Create() => new(EmptyFilterNode.Instance);
 
-    /// <summary>
-    /// Adds a comparison against an <see cref="int"/> value.
-    /// </summary>
+    /// <inheritdoc cref="Where(string, ZVecCompareOp, int)"/>
     public ZVecFilterBuilder Where(string fieldName, ZVecCompareOp op, int value)
-        => WhereCore(fieldName, op, FormatNumber(value));
+        => AppendComparison(fieldName, op, FilterValueFormatter.FormatNumber(value));
 
-    /// <summary>
-    /// Adds a comparison against a <see cref="long"/> value.
-    /// </summary>
+    /// <inheritdoc cref="Where(string, ZVecCompareOp, long)"/>
     public ZVecFilterBuilder Where(string fieldName, ZVecCompareOp op, long value)
-        => WhereCore(fieldName, op, FormatNumber(value));
+        => AppendComparison(fieldName, op, FilterValueFormatter.FormatNumber(value));
 
-    /// <summary>
-    /// Adds a comparison against a <see cref="float"/> value.
-    /// </summary>
+    /// <inheritdoc cref="Where(string, ZVecCompareOp, float)"/>
     public ZVecFilterBuilder Where(string fieldName, ZVecCompareOp op, float value)
-        => WhereCore(fieldName, op, FormatNumber(value));
+        => AppendComparison(fieldName, op, FilterValueFormatter.FormatNumber(value));
 
-    /// <summary>
-    /// Adds a comparison against a <see cref="double"/> value.
-    /// </summary>
+    /// <inheritdoc cref="Where(string, ZVecCompareOp, double)"/>
     public ZVecFilterBuilder Where(string fieldName, ZVecCompareOp op, double value)
-        => WhereCore(fieldName, op, FormatNumber(value));
+        => AppendComparison(fieldName, op, FilterValueFormatter.FormatNumber(value));
 
-    /// <summary>
-    /// Adds a comparison against a string value (escaped and quoted).
-    /// </summary>
+    /// <summary>Adds a relational comparison against a string value (ANDed if non-empty).</summary>
     public ZVecFilterBuilder Where(string fieldName, ZVecCompareOp op, string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return WhereCore(fieldName, op, FormatString(value));
+        return AppendComparison(fieldName, op, FilterValueFormatter.FormatString(value));
     }
 
-    /// <summary>
-    /// Adds a comparison against a boolean value.
-    /// </summary>
+    /// <summary>Adds a relational comparison against a boolean value.</summary>
     public ZVecFilterBuilder Where(string fieldName, ZVecCompareOp op, bool value)
-        => WhereCore(fieldName, op, value ? ZVecDefaults.Filter.True : ZVecDefaults.Filter.False);
+        => AppendComparison(fieldName, op, value ? ZVecDefaults.Filter.True : ZVecDefaults.Filter.False);
 
-    /// <summary>
-    /// Chains another filter expression with a logical AND.
-    /// </summary>
-    public ZVecFilterBuilder And(ZVecFilterBuilder inner)
-    {
-        ArgumentNullException.ThrowIfNull(inner);
-        _expression = string.Concat(
-            _expression,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.And,
-            ZVecDefaults.Filter.Space,
-            inner._expression);
-        return this;
-    }
-
-    /// <summary>
-    /// Chains another filter expression with a logical OR (both sides parenthesized).
-    /// </summary>
-    public ZVecFilterBuilder Or(ZVecFilterBuilder inner)
-    {
-        ArgumentNullException.ThrowIfNull(inner);
-        _expression = string.Concat(
-            ZVecDefaults.Filter.OpenParen,
-            _expression,
-            ZVecDefaults.Filter.CloseParen,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.Or,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.OpenParen,
-            inner._expression,
-            ZVecDefaults.Filter.CloseParen);
-        return this;
-    }
-
-    /// <summary>
-    /// Negates the given filter expression using a native-supported form
-    /// (<c>!=</c>, <c>NOT IN</c>, <c>NOT CONTAIN_*</c>). Unary <c>NOT (expr)</c> is not part of the ZVec SQL grammar.
-    /// </summary>
-    public ZVecFilterBuilder Not(ZVecFilterBuilder inner)
-    {
-        ArgumentNullException.ThrowIfNull(inner);
-        _expression = NegateExpression(inner._expression);
-        return this;
-    }
-
-    /// <summary>
-    /// Adds an IN clause for the specified field.
-    /// </summary>
+    /// <summary>Adds an IN clause (ANDed if the builder is non-empty).</summary>
     public ZVecFilterBuilder In(string fieldName, params object[] values)
     {
         ValidateFieldName(fieldName);
@@ -115,37 +53,18 @@ public sealed class ZVecFilterBuilder
         if (values.Length == 0)
             throw new ArgumentException(ZVecDefaults.Errors.FilterValuesRequired, nameof(values));
 
-        _expression = string.Concat(
-            fieldName,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.In,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.OpenParen,
-            FormatValueList(values),
-            ZVecDefaults.Filter.CloseParen);
-        return this;
+        return AppendNode(new InFilterNode(fieldName, FilterValueFormatter.FormatValueList(values)));
     }
 
-    /// <summary>
-    /// Adds a LIKE clause for the specified field.
-    /// </summary>
+    /// <summary>Adds a LIKE clause.</summary>
     public ZVecFilterBuilder Like(string fieldName, string pattern)
     {
         ValidateFieldName(fieldName);
         ArgumentNullException.ThrowIfNull(pattern);
-
-        _expression = string.Concat(
-            fieldName,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.Like,
-            ZVecDefaults.Filter.Space,
-            FormatString(pattern));
-        return this;
+        return AppendNode(new LikeFilterNode(fieldName, FilterValueFormatter.FormatString(pattern)));
     }
 
-    /// <summary>
-    /// Adds a CONTAIN_ANY clause for array/list intersection logic.
-    /// </summary>
+    /// <summary>Adds a CONTAIN_ANY clause.</summary>
     public ZVecFilterBuilder ContainAny(string fieldName, params object[] values)
     {
         ValidateFieldName(fieldName);
@@ -153,20 +72,13 @@ public sealed class ZVecFilterBuilder
         if (values.Length == 0)
             throw new ArgumentException(ZVecDefaults.Errors.FilterValuesRequired, nameof(values));
 
-        _expression = string.Concat(
+        return AppendNode(new ContainFilterNode(
             fieldName,
-            ZVecDefaults.Filter.Space,
             ZVecDefaults.Filter.ContainAny,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.OpenParen,
-            FormatValueList(values),
-            ZVecDefaults.Filter.CloseParen);
-        return this;
+            FilterValueFormatter.FormatValueList(values)));
     }
 
-    /// <summary>
-    /// Adds a CONTAIN_ALL clause for array/list subset logic.
-    /// </summary>
+    /// <summary>Adds a CONTAIN_ALL clause.</summary>
     public ZVecFilterBuilder ContainAll(string fieldName, params object[] values)
     {
         ValidateFieldName(fieldName);
@@ -174,183 +86,137 @@ public sealed class ZVecFilterBuilder
         if (values.Length == 0)
             throw new ArgumentException(ZVecDefaults.Errors.FilterValuesRequired, nameof(values));
 
-        _expression = string.Concat(
+        return AppendNode(new ContainFilterNode(
             fieldName,
-            ZVecDefaults.Filter.Space,
             ZVecDefaults.Filter.ContainAll,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.OpenParen,
-            FormatValueList(values),
-            ZVecDefaults.Filter.CloseParen);
-        return this;
+            FilterValueFormatter.FormatValueList(values)));
+    }
+
+    /// <summary>Adds an IS NULL predicate.</summary>
+    public ZVecFilterBuilder IsNull(string fieldName)
+    {
+        ValidateFieldName(fieldName);
+        return AppendNode(new IsNullFilterNode(fieldName));
+    }
+
+    /// <summary>Adds an IS NOT NULL predicate.</summary>
+    public ZVecFilterBuilder IsNotNull(string fieldName)
+    {
+        ValidateFieldName(fieldName);
+        return AppendNode(new IsNullFilterNode(fieldName, isNotNull: true));
+    }
+
+    /// <summary>Logical AND with another filter. Empty left absorbs right.</summary>
+    public ZVecFilterBuilder And(ZVecFilterBuilder other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        if (other._root.IsEmpty)
+            throw new ArgumentException(ZVecDefaults.Errors.FilterEmptyRightOperand, nameof(other));
+        if (_root.IsEmpty)
+            return other;
+        return new ZVecFilterBuilder(new AndFilterNode(_root, other._root));
+    }
+
+    /// <summary>Logical AND with a nested builder (no nested Create required).</summary>
+    public ZVecFilterBuilder And(Func<ZVecFilterBuilder, ZVecFilterBuilder> build)
+    {
+        ArgumentNullException.ThrowIfNull(build);
+        return And(build(Create()));
+    }
+
+    /// <summary>Logical OR with another filter. Empty left absorbs right.</summary>
+    public ZVecFilterBuilder Or(ZVecFilterBuilder other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        if (other._root.IsEmpty)
+            throw new ArgumentException(ZVecDefaults.Errors.FilterEmptyRightOperand, nameof(other));
+        if (_root.IsEmpty)
+            return other;
+        return new ZVecFilterBuilder(new OrFilterNode(_root, other._root));
+    }
+
+    /// <summary>Logical OR with a nested builder.</summary>
+    public ZVecFilterBuilder Or(Func<ZVecFilterBuilder, ZVecFilterBuilder> build)
+    {
+        ArgumentNullException.ThrowIfNull(build);
+        return Or(build(Create()));
     }
 
     /// <summary>
-    /// Returns the fully constructed filter expression.
+    /// Negates <paramref name="other"/> and ANDs it with the current filter when non-empty.
+    /// Negation is performed on the AST (not by scanning rendered strings).
     /// </summary>
-    public override string ToString() => _expression;
+    public ZVecFilterBuilder Not(ZVecFilterBuilder other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        if (other._root.IsEmpty)
+            throw new ArgumentException(ZVecDefaults.Errors.FilterEmptyRightOperand, nameof(other));
 
-    private ZVecFilterBuilder WhereCore(string fieldName, ZVecCompareOp op, string formattedValue)
+        var negated = new ZVecFilterBuilder(new NotFilterNode(other._root));
+        if (_root.IsEmpty)
+            return negated;
+        return And(negated);
+    }
+
+    /// <summary>Negates a nested builder and ANDs when the left side is non-empty.</summary>
+    public ZVecFilterBuilder Not(Func<ZVecFilterBuilder, ZVecFilterBuilder> build)
+    {
+        ArgumentNullException.ThrowIfNull(build);
+        return Not(build(Create()));
+    }
+
+    /// <summary>Renders the native filter expression string.</summary>
+    public string Build() => _root.Render();
+
+    /// <summary>Debugger-friendly representation including the built expression.</summary>
+    public override string ToString() =>
+        string.Concat(ZVecDefaults.Filter.BuilderToStringPrefix, Build());
+
+    private ZVecFilterBuilder AppendComparison(string fieldName, ZVecCompareOp op, string formattedValue)
     {
         ValidateFieldName(fieldName);
-        _expression = string.Concat(
-            fieldName,
-            ZVecDefaults.Filter.Space,
-            OpToString(op),
-            ZVecDefaults.Filter.Space,
-            formattedValue);
-        return this;
+        EnsureRelationalOp(op);
+        return AppendNode(new ComparisonFilterNode(fieldName, op, formattedValue));
+    }
+
+    private ZVecFilterBuilder AppendNode(FilterNode node)
+    {
+        if (_root.IsEmpty)
+            return new ZVecFilterBuilder(node);
+        return new ZVecFilterBuilder(new AndFilterNode(_root, node));
+    }
+
+    private static void EnsureRelationalOp(ZVecCompareOp op)
+    {
+        switch (op)
+        {
+            case ZVecCompareOp.Eq:
+            case ZVecCompareOp.Ne:
+            case ZVecCompareOp.Lt:
+            case ZVecCompareOp.Le:
+            case ZVecCompareOp.Gt:
+            case ZVecCompareOp.Ge:
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(op),
+                    string.Format(CultureInfo.InvariantCulture, ZVecDefaults.Errors.UnsupportedWhereCompareOp, op));
+        }
     }
 
     private static void ValidateFieldName(string fieldName)
     {
         if (string.IsNullOrWhiteSpace(fieldName))
             throw new ArgumentException(ZVecDefaults.Errors.FilterFieldNameRequired, nameof(fieldName));
+
+        if (!FieldNameRegex().IsMatch(fieldName))
+        {
+            throw new ArgumentException(
+                string.Format(CultureInfo.InvariantCulture, ZVecDefaults.Errors.FilterFieldNameInvalid, fieldName),
+                nameof(fieldName));
+        }
     }
 
-    private static string OpToString(ZVecCompareOp op) => op switch
-    {
-        ZVecCompareOp.Eq => ZVecDefaults.Filter.Eq,
-        ZVecCompareOp.Ne => ZVecDefaults.Filter.Ne,
-        ZVecCompareOp.Gt => ZVecDefaults.Filter.Gt,
-        ZVecCompareOp.Lt => ZVecDefaults.Filter.Lt,
-        ZVecCompareOp.Ge => ZVecDefaults.Filter.Ge,
-        ZVecCompareOp.Le => ZVecDefaults.Filter.Le,
-        ZVecCompareOp.Like => ZVecDefaults.Filter.Like,
-        ZVecCompareOp.ContainAny => ZVecDefaults.Filter.ContainAny,
-        ZVecCompareOp.ContainAll => ZVecDefaults.Filter.ContainAll,
-        _ => throw new ArgumentOutOfRangeException(
-            nameof(op),
-            string.Format(CultureInfo.InvariantCulture, ZVecDefaults.Errors.UnsupportedCompareOp, op))
-    };
-
-    /// <summary>
-    /// Rewrites a simple builder-produced expression into a native-supported negation.
-    /// Compound AND/OR expressions cannot be negated this way.
-    /// </summary>
-    private static string NegateExpression(string expression)
-    {
-        if (string.IsNullOrWhiteSpace(expression))
-            throw new ArgumentException(ZVecDefaults.Errors.FilterNotUnsupported, nameof(expression));
-
-        string andToken = string.Concat(ZVecDefaults.Filter.Space, ZVecDefaults.Filter.And, ZVecDefaults.Filter.Space);
-        string orToken = string.Concat(ZVecDefaults.Filter.Space, ZVecDefaults.Filter.Or, ZVecDefaults.Filter.Space);
-        if (expression.Contains(andToken, StringComparison.Ordinal)
-            || expression.Contains(orToken, StringComparison.Ordinal))
-        {
-            throw new ArgumentException(ZVecDefaults.Errors.FilterNotUnsupported, nameof(expression));
-        }
-
-        string inToken = string.Concat(ZVecDefaults.Filter.Space, ZVecDefaults.Filter.In, ZVecDefaults.Filter.Space);
-        string notInToken = string.Concat(
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.Not,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.In,
-            ZVecDefaults.Filter.Space);
-        if (expression.Contains(inToken, StringComparison.Ordinal)
-            && !expression.Contains(notInToken, StringComparison.Ordinal))
-        {
-            return expression.Replace(inToken, notInToken, StringComparison.Ordinal);
-        }
-
-        string containAnyToken = string.Concat(ZVecDefaults.Filter.Space, ZVecDefaults.Filter.ContainAny, ZVecDefaults.Filter.Space);
-        string notContainAnyToken = string.Concat(
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.Not,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.ContainAny,
-            ZVecDefaults.Filter.Space);
-        if (expression.Contains(containAnyToken, StringComparison.Ordinal)
-            && !expression.Contains(notContainAnyToken, StringComparison.Ordinal))
-        {
-            return expression.Replace(containAnyToken, notContainAnyToken, StringComparison.Ordinal);
-        }
-
-        string containAllToken = string.Concat(ZVecDefaults.Filter.Space, ZVecDefaults.Filter.ContainAll, ZVecDefaults.Filter.Space);
-        string notContainAllToken = string.Concat(
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.Not,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.ContainAll,
-            ZVecDefaults.Filter.Space);
-        if (expression.Contains(containAllToken, StringComparison.Ordinal)
-            && !expression.Contains(notContainAllToken, StringComparison.Ordinal))
-        {
-            return expression.Replace(containAllToken, notContainAllToken, StringComparison.Ordinal);
-        }
-
-        // Flip simple comparison operators (space-padded tokens from Where()).
-        if (TryReplaceOp(expression, ZVecDefaults.Filter.Eq, ZVecDefaults.Filter.Ne, out string? flipped)
-            || TryReplaceOp(expression, ZVecDefaults.Filter.Ne, ZVecDefaults.Filter.Eq, out flipped)
-            || TryReplaceOp(expression, ZVecDefaults.Filter.Gt, ZVecDefaults.Filter.Le, out flipped)
-            || TryReplaceOp(expression, ZVecDefaults.Filter.Lt, ZVecDefaults.Filter.Ge, out flipped)
-            || TryReplaceOp(expression, ZVecDefaults.Filter.Ge, ZVecDefaults.Filter.Lt, out flipped)
-            || TryReplaceOp(expression, ZVecDefaults.Filter.Le, ZVecDefaults.Filter.Gt, out flipped))
-        {
-            return flipped!;
-        }
-
-        throw new ArgumentException(ZVecDefaults.Errors.FilterNotUnsupported, nameof(expression));
-    }
-
-    private static bool TryReplaceOp(string expression, string fromOp, string toOp, out string? result)
-    {
-        string from = string.Concat(ZVecDefaults.Filter.Space, fromOp, ZVecDefaults.Filter.Space);
-        string to = string.Concat(ZVecDefaults.Filter.Space, toOp, ZVecDefaults.Filter.Space);
-        int index = expression.IndexOf(from, StringComparison.Ordinal);
-        if (index < 0)
-        {
-            result = null;
-            return false;
-        }
-
-        result = string.Concat(
-            expression.AsSpan(0, index),
-            to,
-            expression.AsSpan(index + from.Length));
-        return true;
-    }
-
-    private static string FormatValueList(object[] values)
-    {
-        var sb = new StringBuilder();
-        for (int i = 0; i < values.Length; i++)
-        {
-            if (i > 0)
-                sb.Append(ZVecDefaults.Filter.CommaSpace);
-            sb.Append(FormatValue(values[i]));
-        }
-        return sb.ToString();
-    }
-
-    private static string FormatValue(object? value) => value switch
-    {
-        null => ZVecDefaults.Filter.Null,
-        string s => FormatString(s),
-        bool b => b ? ZVecDefaults.Filter.True : ZVecDefaults.Filter.False,
-        IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? ZVecDefaults.Filter.Null,
-        _ => value.ToString() ?? ZVecDefaults.Filter.Null
-    };
-
-    private static string FormatString(string value)
-        => string.Concat(
-            ZVecDefaults.Filter.DoubleQuote,
-            EscapeString(value),
-            ZVecDefaults.Filter.DoubleQuote);
-
-    private static string EscapeString(string value)
-        => value
-            .Replace(
-                ZVecDefaults.Filter.Backslash.ToString(),
-                string.Concat(ZVecDefaults.Filter.Backslash, ZVecDefaults.Filter.Backslash))
-            .Replace(
-                ZVecDefaults.Filter.SingleQuote.ToString(),
-                string.Concat(ZVecDefaults.Filter.Backslash, ZVecDefaults.Filter.SingleQuote))
-            .Replace(
-                ZVecDefaults.Filter.DoubleQuote.ToString(),
-                string.Concat(ZVecDefaults.Filter.Backslash, ZVecDefaults.Filter.DoubleQuote));
-
-    private static string FormatNumber<T>(T value) where T : IFormattable
-        => value.ToString(null, CultureInfo.InvariantCulture)!;
+    [GeneratedRegex(ZVecDefaults.Filter.FieldNamePattern)]
+    private static partial Regex FieldNameRegex();
 }

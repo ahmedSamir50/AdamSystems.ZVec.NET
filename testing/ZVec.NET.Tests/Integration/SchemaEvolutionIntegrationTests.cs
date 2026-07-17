@@ -64,6 +64,17 @@ public class SchemaEvolutionIntegrationTests : IClassFixture<ZVecRealNativeFixtu
         fetched!.Fields.Should().ContainKey("rating");
         Convert.ToSingle(fetched.Fields["rating"]).Should().Be(4.5f);
 
+        // 3b. Query with filter on the new column (not only Fetch)
+        _collection.CreateIndex("rating", new ZVecInvertIndexParam());
+        var ratingFilter = ZVecFilterBuilder.Create()
+            .Where("rating", ZVecCompareOp.Ge, 4.0f)
+            .Build();
+        var ratingHits = _collection.Query(
+            new ZVecQuery { FieldName = "embedding", Vector = vector },
+            topk: ZVecDefaults.Query.Topk,
+            filter: ratingFilter);
+        ratingHits.Should().ContainSingle(r => r.Id == "doc1");
+
         // 4. Alter column (rename rating to stars)
         _collection.AlterColumn("rating", newName: "stars");
 
@@ -105,7 +116,7 @@ public class SchemaEvolutionIntegrationTests : IClassFixture<ZVecRealNativeFixtu
 
         var filter = ZVecFilterBuilder.Create()
             .Where("priority", ZVecCompareOp.Eq, 1.0f)
-            .ToString();
+            .Build();
         var results = _collection.Query(
             new ZVecQuery { FieldName = "embedding", Vector = vector },
             topk: 5,

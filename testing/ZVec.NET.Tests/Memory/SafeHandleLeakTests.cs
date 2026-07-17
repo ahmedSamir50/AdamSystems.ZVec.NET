@@ -1,28 +1,32 @@
-using ZVec.NET.Interop;
 using FluentAssertions;
+using ZVec.NET.Interop;
+using ZVec.NET.Tests.Integration;
 
 namespace ZVec.NET.Tests.Memory;
 
-public class SafeHandleLeakTests
+public class SafeHandleLeakTests : IClassFixture<ZVecRealNativeFixture>
 {
+    private readonly ZVecRealNativeFixture _fixture;
+
+    public SafeHandleLeakTests(ZVecRealNativeFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
     [Fact]
     public void SafeZvecHandle_Leak_Finalizer_Diagnostic_Warning()
     {
-        // Redirect Console.Error to capture the warning output
         using var sw = new StringWriter();
         var originalError = Console.Error;
         Console.SetError(sw);
 
         try
         {
-            // Run in a separate scope so the handle can be collected
-            ExecuteLeakAction();
+            ExecuteSafeHandleLeakAction();
 
-            // Force GC collection and wait for finalizers to run
             GC.Collect();
             GC.WaitForPendingFinalizers();
 
-            // Verify warning output was printed to Console.Error
             var output = sw.ToString();
             output.Should().Contain("[Warning] SafeHandle of type 'SafeZvecHandle'");
             output.Should().Contain("was finalized without being explicitly disposed");
@@ -33,13 +37,65 @@ public class SafeHandleLeakTests
         }
     }
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private void ExecuteLeakAction()
+    [Fact]
+    public void Collection_WithoutDispose_IsCollectedByGc()
     {
-        // Instantiate a fake SafeZvecHandle that owns a handle.
-        // We pass a dummy pointer (0x12345).
+        _fixture.SkipIfNotAvailable();
+
+        var testPath = Path.Combine(Path.GetTempPath(), $"zvec_leak_{Guid.NewGuid():N}");
+        WeakReference? weakRef = null;
+
+        try
+        {
+            new Action(() =>
+            {
+                var factory = new ZVecFactory();
+                factory.Initialize();
+                var schema = new ZVecCollectionSchema
+                {
+                    Name = "leak_test",
+                    Vectors =
+                    [
+                        new ZVecVectorSchema
+                        {
+                            Name = "embedding",
+                            DataType = ZVecDataType.VectorFp32,
+                            Dimension = 4,
+                            IndexParam = new ZVecFlatIndexParam()
+                        }
+                    ]
+                };
+                var col = factory.CreateAndOpen(testPath, schema);
+                weakRef = new WeakReference(col, trackResurrection: true);
+                factory.Shutdown();
+            })();
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            weakRef.Should().NotBeNull();
+            weakRef!.IsAlive.Should().BeFalse(
+                "managed ZVecCollection is collectable without Dispose once the factory releases tracking");
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(testPath))
+                    Directory.Delete(testPath, true);
+            }
+            catch
+            {
+                // Ignore cleanup failures
+            }
+        }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void ExecuteSafeHandleLeakAction()
+    {
         var handle = new SafeZvecHandle(new IntPtr(0x12345), ownsHandle: true);
         handle.IsInvalid.Should().BeFalse();
-        // Allow it to go out of scope without calling Dispose()
     }
 }

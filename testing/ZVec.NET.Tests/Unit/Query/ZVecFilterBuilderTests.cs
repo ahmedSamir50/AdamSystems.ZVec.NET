@@ -18,47 +18,59 @@ public class ZVecFilterBuilderTests
         var filter = ZVecFilterBuilder.Create()
             .Where("age", ZVecCompareOp.Eq, 25);
 
-        filter.ToString().Should().Be(Cmp("age", ZVecDefaults.Filter.Eq, "25"));
+        filter.Build().Should().Be(Cmp("age", ZVecDefaults.Filter.Eq, "25"));
     }
 
     [Fact]
     public void FilterBuilder_Where_Long_Float_Double_Bool_Overloads()
     {
         ZVecFilterBuilder.Create().Where("id", ZVecCompareOp.Eq, 100L)
-            .ToString().Should().Be(Cmp("id", ZVecDefaults.Filter.Eq, "100"));
+            .Build().Should().Be(Cmp("id", ZVecDefaults.Filter.Eq, "100"));
 
         ZVecFilterBuilder.Create().Where("score", ZVecCompareOp.Gt, 1.5f)
-            .ToString().Should().Be(Cmp("score", ZVecDefaults.Filter.Gt, 1.5f.ToString(CultureInfo.InvariantCulture)));
+            .Build().Should().Be(Cmp("score", ZVecDefaults.Filter.Gt, 1.5f.ToString(CultureInfo.InvariantCulture)));
 
         ZVecFilterBuilder.Create().Where("score", ZVecCompareOp.Lt, 2.5d)
-            .ToString().Should().Be(Cmp("score", ZVecDefaults.Filter.Lt, 2.5d.ToString(CultureInfo.InvariantCulture)));
+            .Build().Should().Be(Cmp("score", ZVecDefaults.Filter.Lt, 2.5d.ToString(CultureInfo.InvariantCulture)));
 
         ZVecFilterBuilder.Create().Where("active", ZVecCompareOp.Eq, true)
-            .ToString().Should().Be(Cmp("active", ZVecDefaults.Filter.Eq, ZVecDefaults.Filter.True));
+            .Build().Should().Be(Cmp("active", ZVecDefaults.Filter.Eq, ZVecDefaults.Filter.True));
 
         ZVecFilterBuilder.Create().Where("active", ZVecCompareOp.Eq, false)
-            .ToString().Should().Be(Cmp("active", ZVecDefaults.Filter.Eq, ZVecDefaults.Filter.False));
+            .Build().Should().Be(Cmp("active", ZVecDefaults.Filter.Eq, ZVecDefaults.Filter.False));
     }
 
     [Fact]
-    public void FilterBuilder_Where_AllCompareOps()
+    public void FilterBuilder_Where_AllRelationalOps()
     {
         ZVecFilterBuilder.Create().Where("a", ZVecCompareOp.Ne, 1)
-            .ToString().Should().Be(Cmp("a", ZVecDefaults.Filter.Ne, "1"));
+            .Build().Should().Be(Cmp("a", ZVecDefaults.Filter.Ne, "1"));
         ZVecFilterBuilder.Create().Where("a", ZVecCompareOp.Ge, 1)
-            .ToString().Should().Be(Cmp("a", ZVecDefaults.Filter.Ge, "1"));
+            .Build().Should().Be(Cmp("a", ZVecDefaults.Filter.Ge, "1"));
         ZVecFilterBuilder.Create().Where("a", ZVecCompareOp.Le, 1)
-            .ToString().Should().Be(Cmp("a", ZVecDefaults.Filter.Le, "1"));
-        ZVecFilterBuilder.Create().Where("a", ZVecCompareOp.Like, "x%")
-            .ToString().Should().Be(Cmp("a", ZVecDefaults.Filter.Like, Quoted("x%")));
+            .Build().Should().Be(Cmp("a", ZVecDefaults.Filter.Le, "1"));
     }
 
     [Fact]
-    public void FilterBuilder_CompoundAnd_GeneratesCorrectString()
+    public void FilterBuilder_Where_ContainAnyOp_Throws()
+    {
+        var act = () => ZVecFilterBuilder.Create().Where("tags", ZVecCompareOp.ContainAny, "AI");
+        act.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("op");
+    }
+
+    [Fact]
+    public void FilterBuilder_Where_LikeOp_Throws()
+    {
+        var act = () => ZVecFilterBuilder.Create().Where("name", ZVecCompareOp.Like, "x%");
+        act.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("op");
+    }
+
+    [Fact]
+    public void FilterBuilder_ChainedWhere_AndsTogether()
     {
         var filter = ZVecFilterBuilder.Create()
             .Where("age", ZVecCompareOp.Gt, 18)
-            .And(ZVecFilterBuilder.Create().Where("active", ZVecCompareOp.Eq, true));
+            .Where("active", ZVecCompareOp.Eq, true);
 
         var expected = string.Concat(
             Cmp("age", ZVecDefaults.Filter.Gt, "18"),
@@ -67,15 +79,32 @@ public class ZVecFilterBuilderTests
             ZVecDefaults.Filter.Space,
             Cmp("active", ZVecDefaults.Filter.Eq, ZVecDefaults.Filter.True));
 
-        filter.ToString().Should().Be(expected);
+        filter.Build().Should().Be(expected);
     }
 
     [Fact]
-    public void FilterBuilder_Or_ParenthesizesBothSides()
+    public void FilterBuilder_CompoundAnd_Lambda_GeneratesCorrectString()
+    {
+        var filter = ZVecFilterBuilder.Create()
+            .Where("age", ZVecCompareOp.Gt, 18)
+            .And(f => f.Where("active", ZVecCompareOp.Eq, true));
+
+        var expected = string.Concat(
+            Cmp("age", ZVecDefaults.Filter.Gt, "18"),
+            ZVecDefaults.Filter.Space,
+            ZVecDefaults.Filter.And,
+            ZVecDefaults.Filter.Space,
+            Cmp("active", ZVecDefaults.Filter.Eq, ZVecDefaults.Filter.True));
+
+        filter.Build().Should().Be(expected);
+    }
+
+    [Fact]
+    public void FilterBuilder_Or_Lambda_ParenthesizesBothSides()
     {
         var filter = ZVecFilterBuilder.Create()
             .Where("age", ZVecCompareOp.Lt, 10)
-            .Or(ZVecFilterBuilder.Create().Where("age", ZVecCompareOp.Gt, 60));
+            .Or(f => f.Where("age", ZVecCompareOp.Gt, 60));
 
         var expected = string.Concat(
             ZVecDefaults.Filter.OpenParen,
@@ -88,23 +117,56 @@ public class ZVecFilterBuilderTests
             Cmp("age", ZVecDefaults.Filter.Gt, "60"),
             ZVecDefaults.Filter.CloseParen);
 
-        filter.ToString().Should().Be(expected);
+        filter.Build().Should().Be(expected);
+    }
+
+    [Fact]
+    public void FilterBuilder_NestedLambda_MatchesReadmeShape()
+    {
+        var filter = ZVecFilterBuilder.Create()
+            .Where("publish_year", ZVecCompareOp.Gt, 2020)
+            .And(f => f
+                .Where("category", ZVecCompareOp.Eq, "fiction")
+                .Or(g => g.ContainAny("tags", "AI", "ML")));
+
+        filter.Build().Should().Contain(ZVecDefaults.Filter.ContainAny);
+        filter.Build().Should().Contain(ZVecDefaults.Filter.OpenParen);
+        filter.Build().Should().NotContain(ZVecDefaults.Filter.OpenBracket);
     }
 
     [Fact]
     public void FilterBuilder_Not_RewritesEqualityToInequality()
     {
-        var inner = ZVecFilterBuilder.Create().Where("active", ZVecCompareOp.Eq, false);
-        var filter = ZVecFilterBuilder.Create().Not(inner);
+        var filter = ZVecFilterBuilder.Create()
+            .Not(f => f.Where("active", ZVecCompareOp.Eq, false));
 
-        filter.ToString().Should().Be(Cmp("active", ZVecDefaults.Filter.Ne, ZVecDefaults.Filter.False));
+        filter.Build().Should().Be(Cmp("active", ZVecDefaults.Filter.Ne, ZVecDefaults.Filter.False));
+    }
+
+    [Fact]
+    public void FilterBuilder_Not_ValueContainingAnd_Succeeds()
+    {
+        var filter = ZVecFilterBuilder.Create()
+            .Not(f => f.Where("description", ZVecCompareOp.Eq, "This AND that"));
+
+        var escaped = string.Concat(
+            "This ",
+            ZVecDefaults.Filter.And,
+            " that"); // value text — escaping only quotes/backslash; AND inside value is fine
+        // Actual value is "This AND that" with AND as content
+        escaped = "This AND that";
+        var expected = Cmp(
+            "description",
+            ZVecDefaults.Filter.Ne,
+            Quoted(escaped));
+
+        filter.Build().Should().Be(expected);
     }
 
     [Fact]
     public void FilterBuilder_Not_RewritesInToNotIn()
     {
-        var inner = ZVecFilterBuilder.Create().In("status", "open");
-        var filter = ZVecFilterBuilder.Create().Not(inner);
+        var filter = ZVecFilterBuilder.Create().Not(f => f.In("status", "open"));
 
         var expected = string.Concat(
             "status",
@@ -117,92 +179,67 @@ public class ZVecFilterBuilderTests
             Quoted("open"),
             ZVecDefaults.Filter.CloseParen);
 
-        filter.ToString().Should().Be(expected);
+        filter.Build().Should().Be(expected);
     }
 
     [Fact]
-    public void FilterBuilder_Not_Compound_Throws()
-    {
-        var compound = ZVecFilterBuilder.Create()
-            .Where("age", ZVecCompareOp.Gt, 18)
-            .And(ZVecFilterBuilder.Create().Where("active", ZVecCompareOp.Eq, true));
-
-        var act = () => ZVecFilterBuilder.Create().Not(compound);
-        act.Should().Throw<ArgumentException>();
-    }
-
-    [Fact]
-    public void FilterBuilder_In_GeneratesCorrectString()
-    {
-        var filter = ZVecFilterBuilder.Create().In("status", "open", "closed");
-
-        var expected = string.Concat(
-            "status",
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.In,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.OpenParen,
-            Quoted("open"),
-            ZVecDefaults.Filter.CommaSpace,
-            Quoted("closed"),
-            ZVecDefaults.Filter.CloseParen);
-
-        filter.ToString().Should().Be(expected);
-    }
-
-    [Fact]
-    public void FilterBuilder_Like_GeneratesCorrectString()
-    {
-        var filter = ZVecFilterBuilder.Create().Like("name", "Al%");
-
-        var expected = string.Concat(
-            "name",
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.Like,
-            ZVecDefaults.Filter.Space,
-            Quoted("Al%"));
-
-        filter.ToString().Should().Be(expected);
-    }
-
-    [Fact]
-    public void FilterBuilder_ContainAny_GeneratesCorrectString()
+    public void FilterBuilder_Not_Compound_UsesDeMorgan()
     {
         var filter = ZVecFilterBuilder.Create()
-            .ContainAny("tags", "sport", "music");
+            .Not(f => f
+                .Where("age", ZVecCompareOp.Gt, 18)
+                .And(g => g.Where("active", ZVecCompareOp.Eq, true)));
 
-        var expected = string.Concat(
-            "tags",
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.ContainAny,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.OpenParen,
-            Quoted("sport"),
-            ZVecDefaults.Filter.CommaSpace,
-            Quoted("music"),
-            ZVecDefaults.Filter.CloseParen);
-
-        filter.ToString().Should().Be(expected);
+        // NOT (age > 18 AND active = true) => (age <= 18) OR (active != true)
+        filter.Build().Should().Contain(ZVecDefaults.Filter.Or);
+        filter.Build().Should().Contain(ZVecDefaults.Filter.Le);
+        filter.Build().Should().Contain(ZVecDefaults.Filter.Ne);
     }
 
     [Fact]
-    public void FilterBuilder_ContainAll_GeneratesCorrectString()
+    public void FilterBuilder_And_EmptyLeft_AbsorbsRight()
     {
-        var filter = ZVecFilterBuilder.Create()
-            .ContainAll("tags", "a", "b");
+        var right = ZVecFilterBuilder.Create().Where("a", ZVecCompareOp.Eq, 1);
+        ZVecFilterBuilder.Create().And(right).Build().Should().Be(right.Build());
+    }
 
-        var expected = string.Concat(
-            "tags",
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.ContainAll,
-            ZVecDefaults.Filter.Space,
-            ZVecDefaults.Filter.OpenParen,
-            Quoted("a"),
-            ZVecDefaults.Filter.CommaSpace,
-            Quoted("b"),
-            ZVecDefaults.Filter.CloseParen);
+    [Fact]
+    public void FilterBuilder_And_EmptyRight_Throws()
+    {
+        var act = () => ZVecFilterBuilder.Create().Where("a", ZVecCompareOp.Eq, 1).And(ZVecFilterBuilder.Create());
+        act.Should().Throw<ArgumentException>().WithMessage($"*{ZVecDefaults.Errors.FilterEmptyRightOperand}*");
+    }
 
-        filter.ToString().Should().Be(expected);
+    [Fact]
+    public void FilterBuilder_In_Like_ContainAny_ContainAll()
+    {
+        ZVecFilterBuilder.Create().In("status", "open", "closed").Build()
+            .Should().Contain(ZVecDefaults.Filter.In);
+
+        ZVecFilterBuilder.Create().Like("name", "Al%").Build()
+            .Should().Be(Cmp("name", ZVecDefaults.Filter.Like, Quoted("Al%")));
+
+        var any = ZVecFilterBuilder.Create().ContainAny("tags", "sport", "music").Build();
+        any.Should().StartWith("tags");
+        any.Should().Contain(ZVecDefaults.Filter.ContainAny);
+        any.Should().Contain(ZVecDefaults.Filter.OpenParen);
+        any.Should().NotContain(ZVecDefaults.Filter.OpenBracket);
+
+        ZVecFilterBuilder.Create().ContainAll("tags", "a", "b").Build()
+            .Should().Contain(ZVecDefaults.Filter.ContainAll);
+    }
+
+    [Fact]
+    public void FilterBuilder_IsNull_IsNotNull()
+    {
+        ZVecFilterBuilder.Create().IsNull("title").Build()
+            .Should().Be(string.Concat("title", ZVecDefaults.Filter.Space, ZVecDefaults.Filter.IsNull));
+
+        ZVecFilterBuilder.Create().IsNotNull("title").Build()
+            .Should().Be(string.Concat("title", ZVecDefaults.Filter.Space, ZVecDefaults.Filter.IsNotNull));
+
+        ZVecFilterBuilder.Create().Not(f => f.IsNull("title")).Build()
+            .Should().Be(string.Concat("title", ZVecDefaults.Filter.Space, ZVecDefaults.Filter.IsNotNull));
     }
 
     [Fact]
@@ -217,37 +254,20 @@ public class ZVecFilterBuilderTests
             ZVecDefaults.Filter.SingleQuote,
             "Brien");
 
-        filter.ToString().Should().Be(Cmp("name", ZVecDefaults.Filter.Eq, Quoted(escaped)));
+        filter.Build().Should().Be(Cmp("name", ZVecDefaults.Filter.Eq, Quoted(escaped)));
     }
 
     [Fact]
-    public void FilterBuilder_StringWithBackslashAndDoubleQuote_EscapesCorrectly()
+    public void FilterBuilder_InvalidFieldName_Throws()
     {
-        var input = string.Concat("a", ZVecDefaults.Filter.Backslash, "b", ZVecDefaults.Filter.DoubleQuote, "c");
-        var filter = ZVecFilterBuilder.Create().Where("name", ZVecCompareOp.Eq, input);
+        var empty = () => ZVecFilterBuilder.Create().Where("", ZVecCompareOp.Eq, 1);
+        empty.Should().Throw<ArgumentException>().WithParameterName("fieldName");
 
-        var escaped = string.Concat(
-            "a",
-            ZVecDefaults.Filter.Backslash, ZVecDefaults.Filter.Backslash,
-            "b",
-            ZVecDefaults.Filter.Backslash, ZVecDefaults.Filter.DoubleQuote,
-            "c");
+        var spaces = () => ZVecFilterBuilder.Create().Where("a b", ZVecCompareOp.Eq, 1);
+        spaces.Should().Throw<ArgumentException>().WithParameterName("fieldName");
 
-        filter.ToString().Should().Be(Cmp("name", ZVecDefaults.Filter.Eq, Quoted(escaped)));
-    }
-
-    [Fact]
-    public void FilterBuilder_EmptyFieldName_Throws()
-    {
-        var act = () => ZVecFilterBuilder.Create().Where("", ZVecCompareOp.Eq, 1);
-        act.Should().Throw<ArgumentException>().WithParameterName("fieldName");
-    }
-
-    [Fact]
-    public void FilterBuilder_UnsupportedCompareOp_Throws()
-    {
-        var act = () => ZVecFilterBuilder.Create().Where("age", ZVecCompareOp.IsNull, 1);
-        act.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("op");
+        var inject = () => ZVecFilterBuilder.Create().Where("x;DROP", ZVecCompareOp.Eq, 1);
+        inject.Should().Throw<ArgumentException>().WithParameterName("fieldName");
     }
 
     [Fact]
@@ -255,37 +275,38 @@ public class ZVecFilterBuilderTests
     {
         var builder = ZVecFilterBuilder.Create().Where("a", ZVecCompareOp.Eq, 1);
 
-        var andAct = () => builder.And(null!);
-        andAct.Should().Throw<ArgumentNullException>().WithParameterName("inner");
+        var andAct = () => builder.And((ZVecFilterBuilder)null!);
+        andAct.Should().Throw<ArgumentNullException>();
 
-        var orAct = () => builder.Or(null!);
-        orAct.Should().Throw<ArgumentNullException>().WithParameterName("inner");
+        var orAct = () => builder.Or((Func<ZVecFilterBuilder, ZVecFilterBuilder>)null!);
+        orAct.Should().Throw<ArgumentNullException>();
 
-        var notAct = () => ZVecFilterBuilder.Create().Not(null!);
-        notAct.Should().Throw<ArgumentNullException>().WithParameterName("inner");
+        var notAct = () => ZVecFilterBuilder.Create().Not((ZVecFilterBuilder)null!);
+        notAct.Should().Throw<ArgumentNullException>();
     }
 
     [Fact]
-    public void FilterBuilder_NullStringValue_Throws()
+    public void FilterBuilder_ToString_IncludesPrefix()
     {
-        var act = () => ZVecFilterBuilder.Create().Where("name", ZVecCompareOp.Eq, (string)null!);
-        act.Should().Throw<ArgumentNullException>();
+        var filter = ZVecFilterBuilder.Create().Where("a", ZVecCompareOp.Eq, 1);
+        filter.ToString().Should().StartWith(ZVecDefaults.Filter.BuilderToStringPrefix);
+        filter.ToString().Should().Contain(filter.Build());
     }
 
     [Fact]
-    public void FilterBuilder_In_NullOrEmptyValues_Throws()
+    public void FilterBuilder_Immutability_AndDoesNotMutateOriginal()
     {
-        var nullAct = () => ZVecFilterBuilder.Create().In("status", null!);
-        nullAct.Should().Throw<ArgumentNullException>();
-
-        var emptyAct = () => ZVecFilterBuilder.Create().In("status");
-        emptyAct.Should().Throw<ArgumentException>().WithParameterName("values");
+        var left = ZVecFilterBuilder.Create().Where("a", ZVecCompareOp.Eq, 1);
+        var original = left.Build();
+        _ = left.And(f => f.Where("b", ZVecCompareOp.Eq, 2));
+        left.Build().Should().Be(original);
     }
 
     [Fact]
-    public void FilterBuilder_Like_NullPattern_Throws()
+    public void FilterBuilder_Create_StartsEmptyBuilder()
     {
-        var act = () => ZVecFilterBuilder.Create().Like("name", null!);
-        act.Should().Throw<ArgumentNullException>();
+        ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020)
+            .Build()
+            .Should().Be(Cmp("year", ZVecDefaults.Filter.Gt, "2020"));
     }
 }

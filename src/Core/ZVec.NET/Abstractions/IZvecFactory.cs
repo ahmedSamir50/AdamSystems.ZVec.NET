@@ -50,4 +50,15 @@ public interface IZvecFactory : IAsyncDisposable, IDisposable
     /// Asynchronously opens an existing collection.
     /// </summary>
     ValueTask<IZvecCollection> OpenAsync(string path, ZVecCollectionOptions? options = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the native library version string (for example <c>0.5.1</c>).
+    /// Requires the factory to be initialized and the native library to be loaded.
+    /// </summary>
+    string GetNativeVersion();
+
+    /// <summary>
+    /// Returns required ABI metadata and, when the native library is loaded, the discovered version.
+    /// </summary>
+    ZVecNativeAbiInfo GetAbiInfo();
 }

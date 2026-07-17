@@ -74,6 +74,39 @@ public class ZVecCollectionDdlTests
         act.Should().Throw<ObjectDisposedException>();
     }
 
+    [Fact]
+    public async Task AlterColumnAsync_CancelledToken_ThrowsOperationCanceledException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateTestCollection();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var act = async () => await col.AlterColumnAsync("content", ct: cts.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task CreateIndexAsync_CancelledToken_ThrowsOperationCanceledException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateTestCollection();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var act = async () => await col.CreateIndexAsync("content", new ZVecFtsIndexParam(), cts.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task DropIndexAsync_CancelledToken_ThrowsOperationCanceledException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateTestCollection();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var act = async () => await col.DropIndexAsync("content", cts.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
 
 
 

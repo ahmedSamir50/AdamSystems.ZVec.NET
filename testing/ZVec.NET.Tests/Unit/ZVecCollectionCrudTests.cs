@@ -81,4 +81,69 @@ public class ZVecCollectionCrudTests : IDisposable
         act.Should().Throw<ArgumentException>();
     }
 
+    [Fact]
+    public void Update_WithNullDoc_ThrowsArgumentNullException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        var act = () => col.Update((ZVecDoc)null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Update_AfterInsert_Succeeds()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        var doc = ZVecDoc.Create("u1",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["vec"] = new float[] { 1f, 0f } },
+            fields: new Dictionary<string, object> { ["id1"] = "u1" });
+        col.Insert(doc).IsSuccess.Should().BeTrue();
+        col.Update(doc).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Upsert_WithNullDoc_ThrowsArgumentNullException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        var act = () => col.Upsert((ZVecDoc)null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Upsert_InsertsWhenMissing()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        var doc = ZVecDoc.Create("up1",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["vec"] = new float[] { 0.5f, 0.5f } },
+            fields: new Dictionary<string, object> { ["id1"] = "up1" });
+        col.Upsert(doc).IsSuccess.Should().BeTrue();
+        col.Fetch("up1").Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_Batch_CancelledToken_ThrowsOperationCanceledException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var act = async () => await col.DeleteAsync(new[] { "x" }, cts.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task FetchAsync_Batch_ReturnsDocs()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        col.Insert(ZVecDoc.Create("f1",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["vec"] = new float[] { 1f, 1f } },
+            fields: new Dictionary<string, object> { ["id1"] = "f1" }));
+        var docs = await col.FetchAsync(new[] { "f1" });
+        docs.Should().ContainSingle(d => d.Id == "f1");
+    }
+
 }

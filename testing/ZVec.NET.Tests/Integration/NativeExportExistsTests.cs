@@ -55,8 +55,6 @@ public class NativeExportExistsTests : IClassFixture<ZVecRealNativeFixture>
         _fixture.SkipIfNotAvailable();
 
         NativeMethods.zvec_get_version_major().Should().BeGreaterThanOrEqualTo(0);
-        NativeMethods.zvec_get_version_minor().Should().BeGreaterThanOrEqualTo(0);
-        NativeMethods.zvec_get_version_patch().Should().BeGreaterThanOrEqualTo(0);
         NativeMethods.GetVersionString().Should().NotBeNullOrWhiteSpace();
     }
 }

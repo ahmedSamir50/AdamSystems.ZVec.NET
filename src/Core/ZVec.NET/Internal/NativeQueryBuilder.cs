@@ -47,6 +47,8 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
                     nameof(NativeMethods.zvec_vector_query_set_query_vector));
             }
 
+            ApplyQueryParams(query.QueryParams);
+
             ZVecError.ThrowIfFailed(
                 (ZVecErrorCode)NativeMethods.zvec_vector_query_set_include_vector(_handle, true), 
                 nameof(NativeMethods.zvec_vector_query_set_include_vector));
@@ -91,6 +93,58 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
         {
             Dispose();
             throw;
+        }
+    }
+
+    private void ApplyQueryParams(ZVecQueryParams? queryParams)
+    {
+        if (queryParams is null)
+            return;
+
+        switch (queryParams)
+        {
+            case ZVecHnswQueryParams hnsw:
+            {
+                int ef = hnsw.EfSearch ?? ZVecDefaults.Query.HnswEfSearch;
+                nint handle = NativeMethods.zvec_query_params_hnsw_create(ef, 0f, false, false);
+                if (handle == IntPtr.Zero)
+                    throw new InvalidOperationException(ZVecDefaults.Errors.NativeQueryCreateFailed);
+
+                if (hnsw.EfSearch.HasValue)
+                {
+                    ZVecError.ThrowIfFailed(
+                        (ZVecErrorCode)NativeMethods.zvec_query_params_hnsw_set_ef(handle, hnsw.EfSearch.Value),
+                        nameof(NativeMethods.zvec_query_params_hnsw_set_ef));
+                }
+
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_vector_query_set_hnsw_params(_handle, handle),
+                    nameof(NativeMethods.zvec_vector_query_set_hnsw_params));
+                break;
+            }
+            case ZVecIvfQueryParams ivf:
+            {
+                int nprobe = ivf.Nprobe ?? ZVecDefaults.Query.IvfNprobe;
+                nint handle = NativeMethods.zvec_query_params_ivf_create(
+                    nprobe, false, ZVecDefaults.Query.IvfScaleFactor);
+                if (handle == IntPtr.Zero)
+                    throw new InvalidOperationException(ZVecDefaults.Errors.NativeQueryCreateFailed);
+
+                if (ivf.Nprobe.HasValue)
+                {
+                    ZVecError.ThrowIfFailed(
+                        (ZVecErrorCode)NativeMethods.zvec_query_params_ivf_set_nprobe(handle, ivf.Nprobe.Value),
+                        nameof(NativeMethods.zvec_query_params_ivf_set_nprobe));
+                }
+
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_vector_query_set_ivf_params(_handle, handle),
+                    nameof(NativeMethods.zvec_vector_query_set_ivf_params));
+                break;
+            }
+            default:
+                throw new NotSupportedException(
+                    string.Format(ZVecDefaults.Errors.UnsupportedQueryParamsType, queryParams.GetType().Name));
         }
     }
 

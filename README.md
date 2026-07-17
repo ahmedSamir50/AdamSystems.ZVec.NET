@@ -15,8 +15,8 @@
 
 | Feature | What it means for you |
 |---------|----------------------|
-| **Zero-allocation vector pipelines** | `ReadOnlyMemory<float>` on all vector hot paths — no `float[]` copies, no GC pressure on queries |
-| **Sync + Async APIs** | Lowest-latency sync path for batch jobs; bounded async offload for ASP.NET Core |
+| **Pin-based vector pipelines** | `ReadOnlyMemory&lt;float&gt;` on hot paths — no intermediate `float[]` copies on the query pin path (measure with `MemoryDiagnosisBench`) |
+| **Sync + Async APIs** | Lowest-latency sync path for batch jobs; async `ValueTask` APIs for ASP.NET Core (cooperative cancel; no thread-pool offload today) |
 | **DI-first design** | `AddZVec()` / `AddZVecCollection()` — works with ASP.NET Core, MAUI, Blazor Server out of the box |
 | **Safe native lifecycle** | Collection handles use `nint` + `Interlocked` dispose/destroy; query/doc helpers use `SafeHandle` where ownership is short-lived |
 | **Cross-platform NuGet (planned)** | Target RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 — full multi-RID packaging is Epic E21 |
@@ -83,7 +83,7 @@ public class ProductService(IZvecCollection products)
     public async Task<IReadOnlyList<ZVecDoc>> SearchAsync(ReadOnlyMemory<float> queryVector, string? category = null)
     {
         var filter = category is not null
-            ? ZVecFilterBuilder.Create().Where("category", ZVecCompareOp.Eq, category).ToString()
+            ? ZVecFilterBuilder.Create().Where("category", ZVecCompareOp.Eq, category).Build()
             : null;
 
         return await products.QueryAsync(
@@ -182,7 +182,7 @@ foreach (var hit in results)
 - **Hybrid** (dense + sparse) — multi-query with dense + sparse sub-queries and optional `filter`
 - **Full-text** — `new ZVecQuery { FieldName = "content", Fts = new ZVecFtsQuery { QueryString = "search terms" } }`
 - **Group-by** — `col.QueryGroupBy(new ZVecGroupByQuery { Query = q, GroupByField = "category", GroupSize = 5 })`
-- **Filtered** — `col.Query(query, topk: 10, filter: ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020).ToString())`
+- **Filtered** — `col.Query(query, topk: 10, filter: ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020))`
 
 ### CRUD
 
@@ -216,14 +216,18 @@ col.Optimize();
 
 ### Filter Builder
 
+Immutable AST builder — one `Create()`, nest with lambdas, call `Build()` (or pass the builder to `Query` overloads):
+
 ```csharp
 var filter = ZVecFilterBuilder.Create()
     .Where("publish_year", ZVecCompareOp.Gt, 2020)
-    .And(ZVecFilterBuilder.Create()
+    .And(f => f
         .Where("category", ZVecCompareOp.Eq, "fiction")
-        .Or(ZVecFilterBuilder.Create().ContainAny("tags", "AI", "ML")));
+        .Or(g => g.ContainAny("tags", "AI", "ML")))
+    .Build();
 
-// -> "publish_year > 2020 AND (category = \"fiction\" OR tags CONTAIN_ANY [\"AI\", \"ML\"])"
+// -> publish_year > 2020 AND (category = "fiction" OR tags CONTAIN_ANY ("AI", "ML"))
+// Native list syntax uses parentheses, not square brackets.
 ```
 
 ### Sync + Async
@@ -234,7 +238,8 @@ Every mutating/querying operation exposes both sync and async variants:
 // Sync (lowest latency — P/Invoke on caller thread)
 var results = col.Query(query, topk: 10);
 
-// Async (bounded offload for ASP.NET — never unbounded Task.Run)
+// Async (ValueTask; currently completes synchronously after the native call —
+// not a thread-pool offload). Pass CancellationToken for cooperative cancel before/around the call.
 var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
 ```
 
@@ -250,6 +255,12 @@ var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
 | GC allocation per query (vector path) | &lt; 256 B | Intermediate + result objects only |
 
 The zero-allocation vector pipeline uses `ReadOnlyMemory<float>` + `Memory.Pin()` for the native call duration only — no intermediate `float[]` copies.
+
+**Named BenchmarkDotNet suite** (`testing/ZVec.NET.Benchmarks/`): `VectorMarshallingBench`, `QueryThroughputBench`, `InsertThroughputBench`, `MemoryDiagnosisBench`, `FilterParsingBench`.
+
+```bash
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks --filter "*"
+```
 
 **Measured** (2026-07-17, `win-x64`, .NET 8.0.29, Intel Core i7-8850H, Release BenchmarkDotNet, **128-dim Flat**, tiny/empty corpus — not the 768-dim / 10k-doc targets above):
 

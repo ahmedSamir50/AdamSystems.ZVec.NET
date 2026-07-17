@@ -84,13 +84,17 @@ public sealed class ZVecFactory : IZvecFactory
 
             try
             {
-                // Only initialize the native library on the very first factory globally.
                 if (_globalNativeInitCount == 0)
                 {
                     NativeLibraryResolver.EnsureLoaded();
-                    CheckAbiVersion();
                     ApplyNativeConfig(options);
                 }
+                else
+                {
+                    NativeLibraryResolver.EnsureLoaded();
+                }
+
+                CheckAbiVersion();
 
                 int maxNative = options?.MaxConcurrentNativeCalls
                     ?? ZVecDefaults.GlobalOptions.MaxConcurrentNativeCalls;
@@ -224,6 +228,46 @@ public sealed class ZVecFactory : IZvecFactory
     {
         ct.ThrowIfCancellationRequested();
         return ValueTask.FromResult(Open(path, options));
+    }
+
+    /// <inheritdoc/>
+    public string GetNativeVersion()
+    {
+        ThrowIfNotInitialized();
+        return NativeMethods.GetVersionString();
+    }
+
+    /// <inheritdoc/>
+    public ZVecNativeAbiInfo GetAbiInfo()
+    {
+        int requiredMajor = ZVecDefaults.Version.ExpectedMajor;
+        string requiredMinimum =
+            $"{requiredMajor}.{ZVecDefaults.Version.ExpectedMinor}.{ZVecDefaults.Version.ExpectedPatch}";
+
+        if (!Interop.NativeLibraryResolver.IsLoaded)
+        {
+            return new ZVecNativeAbiInfo(
+                requiredMinimum,
+                requiredMajor,
+                FoundVersion: null,
+                FoundMajor: null,
+                IsCompatible: false);
+        }
+
+        string found = NativeMethods.GetVersionString();
+        int foundMajor = NativeMethods.zvec_get_version_major();
+        bool meetsMinimum = NativeMethods.zvec_check_version(
+            ZVecDefaults.Version.ExpectedMajor,
+            ZVecDefaults.Version.ExpectedMinor,
+            ZVecDefaults.Version.ExpectedPatch);
+        bool compatible = ZVecNativeAbi.IsCompatible(meetsMinimum, foundMajor, requiredMajor);
+
+        return new ZVecNativeAbiInfo(
+            requiredMinimum,
+            requiredMajor,
+            found,
+            foundMajor,
+            compatible);
     }
 
     // =========================================================================

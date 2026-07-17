@@ -32,12 +32,6 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial int zvec_get_version_major();
 
-    [LibraryImport(LibraryName)]
-    internal static partial int zvec_get_version_minor();
-
-    [LibraryImport(LibraryName)]
-    internal static partial int zvec_get_version_patch();
-
     // =========================================================================
     // Init & Error Retrieval
     // =========================================================================
@@ -132,6 +126,26 @@ internal static partial class NativeMethods
         IntPtr options,
         [MarshalAs(UnmanagedType.U1)] bool enableMmap);
 
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_get_stats(
+        IntPtr collection,
+        out IntPtr stats);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_collection_stats_destroy(IntPtr stats);
+
+    [LibraryImport(LibraryName)]
+    internal static partial ulong zvec_collection_stats_get_doc_count(IntPtr stats);
+
+    [LibraryImport(LibraryName)]
+    internal static partial nuint zvec_collection_stats_get_index_count(IntPtr stats);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_collection_stats_get_index_name(IntPtr stats, nuint index);
+
+    [LibraryImport(LibraryName)]
+    internal static partial float zvec_collection_stats_get_index_completeness(IntPtr stats, nuint index);
+
     // =========================================================================
     // CRUD Operations (DML)
     // =========================================================================
@@ -161,12 +175,28 @@ internal static partial class NativeMethods
         out nuint errorCount);
 
     [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_update_with_results(
+        IntPtr collection,
+        IntPtr docs,
+        nuint docCount,
+        out IntPtr results,
+        out nuint resultCount);
+
+    [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_upsert(
         IntPtr collection,
         IntPtr docs,
         nuint docCount,
         out nuint successCount,
         out nuint errorCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_upsert_with_results(
+        IntPtr collection,
+        IntPtr docs,
+        nuint docCount,
+        out IntPtr results,
+        out nuint resultCount);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_collection_delete(
@@ -415,12 +445,41 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial IntPtr zvec_query_params_fts_create([MarshalAs(UnmanagedType.LPUTF8Str)] string defaultOperator);
 
-    [LibraryImport(LibraryName)]
-    internal static partial void zvec_query_params_fts_destroy(IntPtr paramsPtr);
+    // Intentionally no zvec_query_params_fts_destroy: set_fts_params takes ownership (double-free if destroyed here).
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_vector_query_set_fts_params(IntPtr query, IntPtr paramsPtr);
 
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_query_params_hnsw_create(
+        int ef,
+        float radius,
+        [MarshalAs(UnmanagedType.U1)] bool isLinear,
+        [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_hnsw_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_hnsw_set_ef(IntPtr paramsPtr, int ef);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_hnsw_params(IntPtr query, IntPtr hnswParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_query_params_ivf_create(
+        int nprobe,
+        [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner,
+        float scaleFactor);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_ivf_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_ivf_set_nprobe(IntPtr paramsPtr, int nprobe);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_ivf_params(IntPtr query, IntPtr ivfParams);
 
     [LibraryImport(LibraryName)]
     internal static partial IntPtr zvec_doc_get_pk_copy(IntPtr doc);

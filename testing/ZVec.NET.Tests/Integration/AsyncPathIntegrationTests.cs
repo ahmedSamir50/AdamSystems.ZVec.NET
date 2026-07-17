@@ -68,6 +68,42 @@ public class AsyncPathIntegrationTests : IClassFixture<ZVecRealNativeFixture>, I
         (await _collection.FetchAsync("async1", ct: ct)).Should().BeNull();
     }
 
+    [Fact]
+    public async Task Async_Update_Upsert_BatchFetch_Succeeds()
+    {
+        _fixture.SkipIfNotAvailable();
+        var ct = TestContext.Current.CancellationToken;
+        _factory = new ZVecFactory();
+        await _factory.InitializeAsync(ct: ct);
+        _collection = await _factory.CreateAndOpenAsync(_testPath + "_crud", _schema, ct: ct);
+
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        var doc = ZVecDoc.Create("batch1",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector },
+            fields: new Dictionary<string, object> { ["name"] = "batch" });
+
+        (await _collection.InsertAsync(doc, ct)).IsSuccess.Should().BeTrue();
+
+        var updated = ZVecDoc.Create("batch1",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector },
+            fields: new Dictionary<string, object> { ["name"] = "updated-batch" });
+        (await _collection.UpdateAsync(updated, ct)).IsSuccess.Should().BeTrue();
+
+        var upserted = ZVecDoc.Create("batch2",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector },
+            fields: new Dictionary<string, object> { ["name"] = "upserted" });
+        (await _collection.UpsertAsync(upserted, ct)).IsSuccess.Should().BeTrue();
+
+        var fetched = await _collection.FetchAsync(new[] { "batch1", "batch2" }, includeVector: true, ct: ct);
+        fetched.Should().HaveCount(2);
+        fetched.Should().Contain(d => d.Id == "batch1" && (string)d.Fields["name"]! == "updated-batch");
+        fetched.Should().Contain(d => d.Id == "batch2" && (string)d.Fields["name"]! == "upserted");
+
+        _collection.Stats.DocCount.Should().BeGreaterThanOrEqualTo(1);
+
+        (await _collection.DeleteAsync(new[] { "batch1" }, ct)).IsSuccess.Should().BeTrue();
+    }
+
     public void Dispose()
     {
         _collection?.Dispose();

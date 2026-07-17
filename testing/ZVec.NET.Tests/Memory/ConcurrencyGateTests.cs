@@ -6,7 +6,6 @@ namespace ZVec.NET.Tests.Memory;
 
 /// <summary>
 /// US-E19.7 / US-E19.8 — collection concurrency with SemaphoreSlim gates (0 = unlimited).
-/// Replaces obsolete WriteBlocksReads scenarios from the canceled E9 RW lock.
 /// </summary>
 public class ConcurrencyGateTests : IClassFixture<ZVecRealNativeFixture>, IDisposable
 {
@@ -46,9 +45,9 @@ public class ConcurrencyGateTests : IClassFixture<ZVecRealNativeFixture>, IDispo
     }
 
     [Fact]
-    public async Task ConcurrentReads_WithMaxConcurrentReads_CompleteWithoutDeadlock()
+    public async Task ConcurrentReads_DontBlock()
     {
-        Setup(collectionOptions: new ZVecCollectionOptions { MaxConcurrentReads = 2 });
+        Setup();
         _collection.Should().NotBeNull();
 
         var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
@@ -58,14 +57,15 @@ public class ConcurrencyGateTests : IClassFixture<ZVecRealNativeFixture>, IDispo
         var testCt = TestContext.Current.CancellationToken;
         await ConcurrencyTestHelper.VerifyNoDeadlock(async ct =>
         {
-            await ConcurrencyTestHelper.RunConcurrently(8, async (_, token) =>
+            await ConcurrencyTestHelper.RunConcurrently(10, async (_, token) =>
             {
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < 5; i++)
                 {
                     token.ThrowIfCancellationRequested();
-                    var results = _collection.Query(
+                    var results = await _collection.QueryAsync(
                         new ZVecQuery { FieldName = "embedding", Vector = vector },
-                        topk: 1);
+                        topk: ZVecDefaults.Query.Topk,
+                        ct: token);
                     results.Should().NotBeNull();
                     await Task.Yield();
                 }
@@ -74,28 +74,39 @@ public class ConcurrencyGateTests : IClassFixture<ZVecRealNativeFixture>, IDispo
     }
 
     [Fact]
-    public async Task GlobalThrottle_MaxConcurrentNativeCalls_Completes()
+    public async Task WriteBlocksReads_SerializedThroughNativeGate()
     {
-        Setup(options: new ZVecOptions { MaxConcurrentNativeCalls = 2 });
+        Setup(options: new ZVecOptions { MaxConcurrentNativeCalls = 1 });
         _collection.Should().NotBeNull();
 
         var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
-        var testCt = TestContext.Current.CancellationToken;
+        _collection!.Insert(ZVecDoc.Create("seed",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector }));
 
+        var testCt = TestContext.Current.CancellationToken;
         await ConcurrencyTestHelper.VerifyNoDeadlock(async ct =>
         {
             await ConcurrencyTestHelper.RunConcurrently(6, async (workerId, token) =>
             {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 10; i++)
                 {
                     token.ThrowIfCancellationRequested();
-                    var doc = ZVecDoc.Create($"w{workerId}_{i}",
-                        denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector });
-                    _collection!.Insert(doc).IsSuccess.Should().BeTrue();
+                    if (workerId == 0)
+                    {
+                        var doc = ZVecDoc.Create($"writer_{i}",
+                            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector });
+                        _collection.Insert(doc).IsSuccess.Should().BeTrue();
+                    }
+                    else
+                    {
+                        _ = _collection.Query(
+                            new ZVecQuery { FieldName = "embedding", Vector = vector },
+                            topk: ZVecDefaults.Query.Topk);
+                    }
                     await Task.Yield();
                 }
             }, ct);
-        }, TimeSpan.FromSeconds(20), testCt);
+        }, TimeSpan.FromSeconds(30), testCt);
     }
 
     [Fact]
@@ -130,6 +141,154 @@ public class ConcurrencyGateTests : IClassFixture<ZVecRealNativeFixture>, IDispo
                 }
             }, ct);
         }, TimeSpan.FromSeconds(25), testCt);
+    }
+
+    [Fact]
+    public async Task Cancellation_DuringQuery_ThrowsWhenAlreadyCancelled()
+    {
+        Setup(collectionOptions: new ZVecCollectionOptions { MaxConcurrentReads = 1 });
+        _collection.Should().NotBeNull();
+
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        _collection!.Insert(ZVecDoc.Create("seed",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector }));
+
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var act = async () => await _collection.QueryAsync(
+            new ZVecQuery { FieldName = "embedding", Vector = vector },
+            topk: ZVecDefaults.Query.Topk,
+            ct: cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task DisposeDuringActiveRead_CompletesWithoutDeadlock()
+    {
+        Setup();
+        _collection.Should().NotBeNull();
+
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        _collection!.Insert(ZVecDoc.Create("seed",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector }));
+
+        var testCt = TestContext.Current.CancellationToken;
+        await ConcurrencyTestHelper.VerifyNoDeadlock(async ct =>
+        {
+            var readTask = Task.Run(() =>
+            {
+                for (int i = 0; i < 50; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        _ = _collection.Query(
+                            new ZVecQuery { FieldName = "embedding", Vector = vector },
+                            topk: ZVecDefaults.Query.Topk);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
+                    }
+                }
+            }, ct);
+
+            await Task.Yield();
+            _collection.Dispose();
+            await readTask;
+        }, TimeSpan.FromSeconds(15), testCt);
+    }
+
+    [Fact]
+    public async Task DestroyDuringActiveRead_CompletesWithoutDeadlock()
+    {
+        Setup();
+        _collection.Should().NotBeNull();
+
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        _collection!.Insert(ZVecDoc.Create("seed",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector }));
+
+        var testCt = TestContext.Current.CancellationToken;
+        await ConcurrencyTestHelper.VerifyNoDeadlock(async ct =>
+        {
+            var readTask = Task.Run(() =>
+            {
+                for (int i = 0; i < 50; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        _ = _collection.Query(
+                            new ZVecQuery { FieldName = "embedding", Vector = vector },
+                            topk: ZVecDefaults.Query.Topk);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
+                    }
+                }
+            }, ct);
+
+            await Task.Yield();
+            _collection.Destroy();
+            await readTask;
+        }, TimeSpan.FromSeconds(15), testCt);
+    }
+
+    [Fact]
+    public async Task MaxConcurrentReads_Throttles()
+    {
+        Setup(collectionOptions: new ZVecCollectionOptions { MaxConcurrentReads = 4 });
+        _collection.Should().NotBeNull();
+
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        _collection!.Insert(ZVecDoc.Create("seed",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector }));
+
+        var testCt = TestContext.Current.CancellationToken;
+        await ConcurrencyTestHelper.VerifyNoDeadlock(async ct =>
+        {
+            await ConcurrencyTestHelper.RunConcurrently(12, async (_, token) =>
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var results = _collection.Query(
+                        new ZVecQuery { FieldName = "embedding", Vector = vector },
+                        topk: 1);
+                    results.Should().NotBeNull();
+                    await Task.Yield();
+                }
+            }, ct);
+        }, TimeSpan.FromSeconds(25), testCt);
+    }
+
+    [Fact]
+    public async Task GlobalThrottle_LimitsNativeCalls()
+    {
+        Setup(options: new ZVecOptions { MaxConcurrentNativeCalls = 8 });
+        _collection.Should().NotBeNull();
+
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        var testCt = TestContext.Current.CancellationToken;
+
+        await ConcurrencyTestHelper.VerifyNoDeadlock(async ct =>
+        {
+            await ConcurrencyTestHelper.RunConcurrently(16, async (workerId, token) =>
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var doc = ZVecDoc.Create($"w{workerId}_{i}",
+                        denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector });
+                    _collection!.Insert(doc).IsSuccess.Should().BeTrue();
+                    await Task.Yield();
+                }
+            }, ct);
+        }, TimeSpan.FromSeconds(30), testCt);
     }
 
     public void Dispose()

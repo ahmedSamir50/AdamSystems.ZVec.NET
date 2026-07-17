@@ -85,7 +85,7 @@ public class FilterBuilderIntegrationTests : IClassFixture<ZVecRealNativeFixture
 
         var filter = ZVecFilterBuilder.Create()
             .Where("age", ZVecCompareOp.Gt, 18)
-            .ToString();
+            .Build();
 
         var results = QueryWithFilter(filter);
         results.Select(d => d.Id).Should().BeEquivalentTo(["doc1", "doc2"]);
@@ -99,7 +99,7 @@ public class FilterBuilderIntegrationTests : IClassFixture<ZVecRealNativeFixture
         var filter = ZVecFilterBuilder.Create()
             .Where("age", ZVecCompareOp.Gt, 18)
             .And(ZVecFilterBuilder.Create().Where("active", ZVecCompareOp.Eq, true))
-            .ToString();
+            .Build();
 
         var results = QueryWithFilter(filter);
         results.Select(d => d.Id).Should().BeEquivalentTo(["doc1"]);
@@ -113,7 +113,7 @@ public class FilterBuilderIntegrationTests : IClassFixture<ZVecRealNativeFixture
         var filter = ZVecFilterBuilder.Create()
             .Where("age", ZVecCompareOp.Lt, 18)
             .Or(ZVecFilterBuilder.Create().Where("age", ZVecCompareOp.Ge, 40))
-            .ToString();
+            .Build();
 
         var results = QueryWithFilter(filter);
         results.Select(d => d.Id).Should().BeEquivalentTo(["doc2", "doc3"]);
@@ -126,7 +126,7 @@ public class FilterBuilderIntegrationTests : IClassFixture<ZVecRealNativeFixture
 
         var filter = ZVecFilterBuilder.Create()
             .Not(ZVecFilterBuilder.Create().Where("active", ZVecCompareOp.Eq, true))
-            .ToString();
+            .Build();
 
         var results = QueryWithFilter(filter);
         results.Select(d => d.Id).Should().BeEquivalentTo(["doc2"]);
@@ -139,7 +139,7 @@ public class FilterBuilderIntegrationTests : IClassFixture<ZVecRealNativeFixture
 
         var filter = ZVecFilterBuilder.Create()
             .In("status", "open", "pending")
-            .ToString();
+            .Build();
 
         var results = QueryWithFilter(filter);
         results.Select(d => d.Id).Should().BeEquivalentTo(["doc1", "doc3"]);
@@ -152,7 +152,7 @@ public class FilterBuilderIntegrationTests : IClassFixture<ZVecRealNativeFixture
 
         var filter = ZVecFilterBuilder.Create()
             .Like("name", "Al%")
-            .ToString();
+            .Build();
 
         var results = QueryWithFilter(filter);
         results.Select(d => d.Id).Should().BeEquivalentTo(["doc1"]);
@@ -165,7 +165,7 @@ public class FilterBuilderIntegrationTests : IClassFixture<ZVecRealNativeFixture
 
         var filter = ZVecFilterBuilder.Create()
             .Where("name", ZVecCompareOp.Eq, "O'Brien")
-            .ToString();
+            .Build();
 
         var results = QueryWithFilter(filter);
         results.Select(d => d.Id).Should().BeEquivalentTo(["doc2"]);
