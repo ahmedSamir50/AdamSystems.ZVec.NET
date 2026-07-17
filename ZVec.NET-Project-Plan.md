@@ -390,7 +390,7 @@ ZVec.NET/                    # repo / product root
 │       ├── build-managed.yml
 │       └── publish-nuget.yml
 │
-├── ZVec.NET.slnx      # Solution at repo root (VS .slnx) — core + tests; samples optional
+├── ZVec.NET.slnx      # Solution at repo root (VS .slnx) — core + tests + benchmarks; samples in samples/*.slnx only
 ├── Directory.Build.props         # Auto-imported by MSBuild (must be at root / ancestor of projects)
 ├── Directory.Packages.props      # Central Package Management (must be at root)
 └── README.md
@@ -1861,21 +1861,20 @@ Workflows live under `.github/workflows/` (not only `build/ci/`):
 
 - `build-native.yml` — desktop: win-x64, win-arm64 (compile-only), linux-x64, linux-arm64 (cross), osx-arm64 (`macos-latest`), osx-x64 (`macos-13`)
 - `build-native-mobile.yml` — android-arm64 / android-x64 (NDK); ios-arm64 / iossimulator-arm64 / maccatalyst-arm64 (Xcode)
-- `build-managed.yml` — restore/build/test (unit always; integration Skip without native)
-- `pack.yml` — assemble RID artifacts → `dotnet pack` → consumer smoke
+- `build-managed.yml` — restore/build/test **core + tests only** (not samples). Push/PR: integration Skip without native. Pack calls with `require_native` after desktop natives.
+- `pack.yml` — desktop natives → managed-with-RID → assemble artifacts → `dotnet pack` → consumer smoke (mobile soft-fail in parallel)
 - `publish-nuget.yml` — tag `v*` → nuget.org (Trusted Publishing OIDC preferred)
 
 Scripts: `build/ci/deploy-native.sh|.ps1`, `build-android.sh`, `build-ios.sh`, `validate-consumer.sh`.
 
 ### 13.2 Pipeline Stages
 
-1. **Build Native (desktop)** — Compile `zvec_c_api` for 6 desktop RIDs
-2. **Build Native (mobile)** — Android NDK + Apple mobile RIDs
-3. **Build Managed** — `dotnet build` / `dotnet test` ZVec.NET
-4. **Test (Integration)** — Real ZVec binaries when present (Skip otherwise); no mock-native stage (E17 canceled)
-5. **Benchmark** — BenchmarkDotNet on Linux x64
-6. **Pack** — `dotnet pack` with `runtimes/` + symbols
-7. **Publish** — Push to nuget.org (release tag only)
+1. **Build Native (desktop)** — Compile `zvec_c_api` for 6 desktop RIDs; upload `zvec-native-{rid}`
+2. **Build Native (mobile)** — Android NDK + Apple mobile RIDs (parallel; soft-fail OK for pack)
+3. **Build Managed (Pack)** — Download RID for the runner → `dotnet build` / `dotnet test` core + tests (integration must run)
+4. **Build Managed (push/PR)** — Same projects without native download; integration Skip if binary missing
+5. **Pack** — Assemble `runtimes/` + `dotnet pack` + symbols
+6. **Publish** — Push to nuget.org (release tag only; commit on `release/*`)
 
 ### 13.3 Cross-Compilation Strategy for 6 RIDs (No ARM64 Hardware)
 

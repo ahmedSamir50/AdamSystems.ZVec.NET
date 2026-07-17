@@ -23,8 +23,12 @@ jobs:
   natives-mobile:
     uses: ./.github/workflows/build-native-mobile.yml
 
+  # Desktop natives first so managed can download zvec-native-{rid} and run integration tests.
   managed:
+    needs: [natives]
     uses: ./.github/workflows/build-managed.yml
+    with:
+      require_native: true
 
   pack:
     name: pack ZVec.NET

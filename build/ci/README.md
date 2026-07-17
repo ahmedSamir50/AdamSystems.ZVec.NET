@@ -11,10 +11,16 @@
 
 | Workflow | Typical triggers | Publishes to nuget.org? |
 |----------|------------------|-------------------------|
-| `build-managed.yml` | `main`, `development`, `release/**`, PRs | No |
+| `build-managed.yml` | `main`, `development`, `release/**`, PRs | No — core + tests only (not samples) |
 | `build-native.yml` / `build-native-mobile.yml` | same (+ path filters) | No |
 | `pack.yml` | `release/**`, tags `v*`, manual | No (pack + smoke only) |
 | `publish-nuget.yml` | tags `v*` only | **Yes** — commit must be on `release/*` |
+
+**Pack order:** desktop natives → managed tests with `require_native` (download `zvec-native-{rid}` into `runtimes/`, then test) → pack nupkg. Mobile natives run in parallel and are soft-fail.
+
+**Standalone managed** (push/PR): no native download; integration tests Skip if the RID binary is missing. Unit tests still gate the job.
+
+Samples live under `samples/ZVec.NET.Samples.slnx` and are never built by these workflows.
 
 ## Branch / tag cheat sheet
 

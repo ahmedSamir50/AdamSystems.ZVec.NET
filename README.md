@@ -625,7 +625,7 @@ ZVec.NET/
 │   ├── ZVec.NET.Tests/               # xUnit + FluentAssertions (real native + Skip)
 │   └── ZVec.NET.Benchmarks/          # BenchmarkDotNet
 ├── build/                            # .snk + CI scripts
-├── ZVec.NET.slnx                     # Solution (VS .slnx)
+├── ZVec.NET.slnx                     # Core + tests + benchmarks (samples: samples/*.slnx)
 ├── Directory.Build.props
 └── Directory.Packages.props
 ```

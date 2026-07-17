@@ -161,12 +161,12 @@ There is **no** merge of “different development branches into different `relea
 
 | Workflow | Runs on | Publishes to nuget.org? |
 |----------|---------|-------------------------|
-| `build-managed.yml` | `main`, `development`, `release/**`, all PRs | No |
+| `build-managed.yml` | `main`, `development`, `release/**`, all PRs | No — core + tests only (not `samples/`) |
 | `build-native.yml` / `build-native-mobile.yml` | same (+ path filters) | No |
-| `pack.yml` | `release/**`, tags `v*`, manual | No (pack + smoke only) |
+| `pack.yml` | `release/**`, tags `v*`, manual | No — natives first, then managed with RID artifacts, then pack |
 | `publish-nuget.yml` | tags `v*` only | **Yes** — commit must be on `release/*` |
 
-Day-to-day CI on `development` / `main` stays green before cutting a release. Only **nuget.org publish** is release-branch-gated. See also [`build/ci/README.md`](build/ci/README.md).
+**Pack:** desktop natives finish → managed downloads `zvec-native-{rid}` and runs integration tests → pack. Day-to-day managed on `development` / `main` does not wait for natives (integration Skip if missing). Only **nuget.org publish** is release-branch-gated. See [`build/ci/README.md`](build/ci/README.md).
 
 ### NuGet publish & upstream announce (maintainers)
 
@@ -202,7 +202,7 @@ Tag name is **`v1.0.0-alpha.1`** only (no `+zvec…`). That push runs `publish-n
 6. **Zero allocation:** On hot paths (`Query` / `Insert`), use `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` and `MemoryHandle`. Do not introduce `new float[]` copies on vector passing paths. Typed ODM mapping is a managed edge cost — keep heavy work on the existing `ZVecDoc` native path.
 7. **Enums / ABI:** Match numeric values to upstream `zvec/db/type.h` and `c_api.h`. If the C header omits a define (e.g. `HNSW_RABITQ = 4`), use the `type.h` value — do not invent new numbers. Document every enum in the project plan Appendix A.
 8. **LINQ:** Apply LINQ to **results** only. Expression filters on `IZvecCollection<T>` translate to native filter strings — do **not** add a custom `IQueryable` provider over the engine.
-9. **Testing:** Run the `ZVec.NET.Tests` project. Unit tests cover pure managed logic (including Mapping / typed façade); native-backed integration/memory tests use the real `zvec_c_api` binary and **Skip** when it is not available. `NativeLibraryResolver.SetMockLibrary` is reserved for missing-path / failure-path tests only (no mock C++ project). Typed ODM overhead: `TypedOdmOverheadBench` in `ZVec.NET.Benchmarks`.
+9. **Testing:** Run the `ZVec.NET.Tests` project. Unit tests cover pure managed logic (including Mapping / typed façade). Native-backed integration/memory tests use the real `zvec_c_api` binary and **Skip** when it is not available locally or on PR/push managed CI. **Pack CI** passes `require_native` so win-x64 / linux-x64 / osx-arm64 integration tests run against CI-built artifacts (failures fail the pipeline). `NativeLibraryResolver.SetMockLibrary` is reserved for missing-path / failure-path tests only. Typed ODM overhead: `TypedOdmOverheadBench` in `ZVec.NET.Benchmarks`.
 
 If you are unsure where to start, check the Issues tab for "good first 
 issue" tags!

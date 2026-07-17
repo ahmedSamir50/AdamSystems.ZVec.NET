@@ -14,7 +14,7 @@ All samples target **.NET 10** only (`net10.0` / `net10.0-*` for MAUI).
 dotnet build samples/ZVec.NET.Samples.slnx
 ```
 
-Prefer this over the root solution when working on samples. Root `ZVec.NET.slnx` lists Shared/Console/AspNet optionally; MAUI stays in the samples solution so core CI does not need the MAUI workload.
+Use this solution for all sample work. Root `ZVec.NET.slnx` is core + tests + benchmarks only — samples are not listed there so managed CI never builds demos or needs the MAUI workload.
 
 ## Apps
 
