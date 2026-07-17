@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>ZVec.NET.Benchmarks.VectorMarshallingBench-20260717-214852</title>
+<title>ZVec.NET.Benchmarks.VectorMarshallingBench-20260717-222219</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -16,18 +16,18 @@
 BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8875)
 Intel Core i7-8850H CPU 2.60GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
 .NET SDK 10.0.110
-  [Host]   : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
-  ShortRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  [Host]    : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  MediumRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
 </code></pre>
-<pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
-WarmupCount=3  
+<pre><code>Job=MediumRun  IterationCount=15  LaunchCount=2  
+WarmupCount=10  
 </code></pre>
 
 <table>
-<thead><tr><th>Method        </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
+<thead><tr><th>Method        </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Allocated</th><th>Alloc Ratio</th>
 </tr>
-</thead><tbody><tr><td>Query_ReadOnlyMemory</td><td>3.433 ms</td><td>5.084 ms</td><td>0.2787 ms</td><td>1.00</td><td>0.10</td><td>7.8125</td><td>44.35 KB</td><td>1.00</td>
-</tr><tr><td>Query_ExplicitCopy</td><td>3.522 ms</td><td>7.172 ms</td><td>0.3931 ms</td><td>1.03</td><td>0.13</td><td>7.8125</td><td>47.37 KB</td><td>1.07</td>
+</thead><tbody><tr><td>Query_ReadOnlyMemory</td><td>4.289 ms</td><td>0.8236 ms</td><td>1.2328 ms</td><td>1.08</td><td>0.42</td><td>6.9 KB</td><td>1.00</td>
+</tr><tr><td>Query_ExplicitCopy</td><td>2.612 ms</td><td>0.1014 ms</td><td>0.1454 ms</td><td>0.66</td><td>0.18</td><td>9.92 KB</td><td>1.44</td>
 </tr></tbody></table>
 </body>
 </html>

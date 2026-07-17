@@ -244,14 +244,17 @@ var results = col.Query(query, topk: 10);
 var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
 ```
 
-Queries that set `ZVecQuery.DocumentId` perform an extra `Fetch` (with vectors) before search — expect an additional native round-trip.
+Pass `includeVector: false` when you do not need result embeddings (lower latency and GC alloc). Default remains `true` for backward compatibility. Queries that set `ZVecQuery.DocumentId` perform an extra `Fetch` (with vectors) before search.
+
 ---
 
 ## Performance
 
-Workload for primary numbers: **768-dim Flat**, `win-x64`, native ZVec `v0.5.1-35-g1afdea8`, .NET 8.0.29, Intel Core i7-8850H, BenchmarkDotNet **ShortRun** (2026-07-17, re-run after Core lifetime/ops split). Query/memory benches seed **10_000** docs; insert batch size **1000**. ShortRun Error margins are wide — treat means as directional.
+Workload for primary numbers: **768-dim Flat**, `win-x64`, native ZVec `v0.5.1-35-g1afdea8`, .NET 8.0.29, Intel Core i7-8850H, BenchmarkDotNet **medium** job (2026-07-17, after hot-path recovery). Query/memory benches seed **10_000** docs; insert batch size **1000**.
 
-**Why these differ from older smoke numbers:** an earlier table used legacy `ZVecPerformanceBenchmarks` (**128-dim**, empty/tiny corpus). That path reported ~ns latency and ~208 B allocated. The primary suite below uses **768-dim / 10k Flat** and materializes **topk=10** results (including vectors), so mean latency is in milliseconds and Allocated is dominated by result unmarshalling (~10 × 768 × 4 B ≈ 30 KB of vector bytes alone, ~44 KB total) — not a silent P/Invoke regression. Filtered query (`Query_WithFilter`, one match) allocating ~5.6 KB shows the same pin path with a smaller result set.
+**Primary latency / alloc benches use `includeVector: false`** (search + id/score/scalars). That matches Python’s `Collection.query(..., include_vector=False)` default. Full materialization (`includeVector: true`) is reported separately — it copies ~10 × 768 floats (~30 KB) and dominates GC alloc.
+
+**Why older smoke numbers looked different:** legacy `ZVecPerformanceBenchmarks` used **128-dim** / tiny corpus. Do not compare those ~ns figures to this suite.
 
 ### Upstream engine scale (VectorDBBench — published)
 
@@ -262,54 +265,116 @@ Official ZVec [Benchmarks](https://zvec.org/en/docs/db/benchmarks/) use VectorDB
 | `Performance768D1M` | Cohere **1M** × 768-d | See VectorDBBench run on docs page | Engine scale |
 | `Performance768D10M` | Cohere **10M** × 768-d | Homepage **8500+ QPS**; index build **~1 hour** | Engine scale |
 
-These are **not** apples-to-apples with the 10k Flat SDK binding suite. A single-threaded inverse of local query mean (~3.3 ms → ~300 QPS) is a different metric shape than concurrent VectorDBBench QPS at 10M.
+Not apples-to-apples with the 10k Flat SDK binding suite. Local single-threaded inverse of `Query_Sync` (~2.88 ms → ~350 QPS) is a different metric shape than concurrent VectorDBBench QPS at 10M.
 
 ### Binding suite: .NET vs Python vs Node.js (same machine, 10k Flat)
 
-Ephemeral parity scripts (Python `zvec` **0.5.1**, Node `@zvec/zvec` **0.5.0** via `npm install --registry https://registry.npmjs.org/`) were run once on the same host and discarded — not kept in this repo. Official docs do not publish this 10k Flat recipe. Python/Node columns are historical; .NET column refreshed with the latest ShortRun.
+Same-host parity. **Python `zvec` 0.5.1 re-confirmed this session** (`include_vector=False` for fair compare). Node `@zvec/zvec` column from the earlier same-day run (package not present in this verify session). Scripts are ephemeral (not checked in).
 
 | Metric | .NET (ours) | Python | Node.js |
 |--------|-------------|--------|---------|
-| Warm query (128 docs, topk=10) | **0.495 ms** | 0.396 ms | 1.594 ms |
-| Query (10k docs, topk=10) | **3.33 ms** | 3.180 ms | 4.103 ms |
-| Batch insert (1000 docs) | **~15.7k docs/sec** | ~15.2k docs/sec | ~5.8k docs/sec |
-| GC alloc / query (topk=10 + vectors) | 44.4 KB | n/a | n/a |
+| Warm query (128 docs, topk=10, no result vectors) | **0.512 ms** (median 0.390 ms) | 0.414 ms | 1.594 ms |
+| Query (10k docs, topk=10, no result vectors) | **2.88 ms** | 4.33 ms | 4.103 ms |
+| Batch insert (1000 docs) | **~16.8k docs/sec** | ~7.1k docs/sec | ~5.8k docs/sec |
+| GC alloc / query (no result vectors) | **6.8 KB** | n/a | n/a |
+| GC alloc / query (with topk vectors) | **40.5 KB** | n/a | n/a |
 
 ### Targets vs measured (.NET)
 
+Two tiers — Status is against the **medium** job after hot-path recovery.
+
+**Tier A — binding / search (`includeVector: false`)**
+
 | Metric | Target | Measured | Status |
 |--------|--------|----------|--------|
-| Warm query, tiny corpus (128 docs, topk=10) | &lt; 50 µs | 495 µs (`Query_WarmTinyCorpus`) | Miss — full warm query, not a no-op P/Invoke stub |
-| Single-vector query (10k docs, topk=10) | &lt; 1 ms | 3.33 ms (`Query_Sync`) | Miss |
-| Batch insert (1000 docs) | &gt; 50k docs/sec | ~15.7k docs/sec (`Insert_Batch`, 63.8 ms/batch) | Miss |
-| GC allocation per query (pin path, 10k / topk=10) | &lt; 256 B | 44.4 KB (`Query_768Dim` / `Query_Sync`) | Miss — dominated by **result materialization** (not query-vector marshalling) |
+| Warm query, 128 docs, topk=10 | &lt; 200 µs | 512 µs mean / 390 µs median (`Query_WarmTinyCorpus`) | Miss — stretch; still competitive with Python warm |
+| Single-vector query, 10k Flat, topk=10 | &lt; 2.0 ms (stretch &lt; 1.5 ms); beat Python | **2.88 ms** (`Query_Sync`) vs Python **4.33 ms** | Miss stretch target; **Pass vs Python** |
+| GC alloc / query (no vectors) | &lt; 4 KB | **6.8 KB** (`Query_768Dim` / `Query_Sync`) | Miss — much improved vs ~44 KB with vectors |
 
-**Allocation split:** the query vector still uses `ReadOnlyMemory<float>` + `Memory.Pin()` (no intermediate `float[]` copy). Pin vs explicit copy is **44.4 KB** vs **47.4 KB** (`Query_ReadOnlyMemory` vs `Query_ExplicitCopy`) — the ~3 KB delta is the marshalling comparison; the ~44 KB floor is returning topk docs with vectors.
+**Tier B — full materialization (`includeVector: true`)**
 
-### Measured suite (primary, .NET BDN)
+| Metric | Target | Measured | Status |
+|--------|--------|----------|--------|
+| 10k query with vectors | report / &lt; 4 ms | 2.57–3.16 ms (`Query_Sync_WithVectors` / `Query_768Dim_WithVectors`) | Pass report band |
+| GC alloc / query with vectors | ~40–45 KB expected | **40.5–41.5 KB** | Expected floor (not a &lt;256 B target) |
+
+**Tier C — insert**
+
+| Metric | Target | Measured | Status |
+|--------|--------|----------|--------|
+| Batch insert 1000 docs | &gt; 20k docs/sec (stretch &gt; 30k) | **~16.8k docs/sec** (`Insert_Batch`, 59.4 ms) | Miss; ahead of this-session Python (~7.1k) |
+
+**Allocation split:** query vector still uses `ReadOnlyMemory<float>` + `Memory.Pin()`. With `includeVector: false`, Allocated is mostly result doc/id/scalar unmarshall (~7 KB). With vectors on, ~40 KB is dominated by copying topk embeddings.
+
+### Measured suite (primary, .NET BDN medium)
 
 | Method | Mean | Allocated |
 |--------|------|----------:|
-| `Query_Sync` (10k docs) | 3.33 ms | 44.4 KB |
-| `Query_WithFilter` (10k docs) | 1.77 ms | 5.6 KB |
-| `Query_WarmTinyCorpus` (128 docs) | 495 µs | 44.3 KB |
-| `Query_768Dim` | 3.13 ms | 44.4 KB |
-| `Query_ReadOnlyMemory` (pin) | 3.43 ms | 44.4 KB |
-| `Query_ExplicitCopy` | 3.52 ms | 47.4 KB |
-| `Fetch_ScalarOnly` | 210 µs | 1.2 KB |
-| `Insert_Single` | 58.1 µs | 1.4 KB |
-| `Insert_Batch` (1000 docs) | 63.8 ms | 454 KB |
-| `Build_SimpleFilter` | 59 ns | 128 B |
-| `Build_CompoundFilter` | 217 ns | 544 B |
-| `Local_10k_Query_ForEngineScaleContext` | ~3.08 ms | 44.4 KB |
+| `Query_Sync` (10k, no vectors) | 2.88 ms | 6.8 KB |
+| `Query_Sync_WithVectors` (10k) | 2.57 ms | 40.5 KB |
+| `Query_WithFilter` (10k, no vectors) | 1.43 ms | 1.7 KB |
+| `Query_WarmTinyCorpus` (128, no vectors) | 512 µs | 6.7 KB |
+| `Query_768Dim` (no vectors) | 2.82 ms | 6.8 KB |
+| `Query_768Dim_WithVectors` | 3.16 ms | 40.5 KB |
+| `Query_ReadOnlyMemory` (pin, no result vectors) | 4.29 ms | 6.9 KB |
+| `Query_ExplicitCopy` (no result vectors) | 2.61 ms | 9.9 KB |
+| `Fetch_ScalarOnly` | 193 µs | 904 B |
+| `Insert_Single` | 53.1 µs | 1.4 KB |
+| `Insert_Batch` (1000 docs) | 59.4 ms | 446 KB |
+| `Build_SimpleFilter` | 67 ns | 128 B |
+| `Build_CompoundFilter` | 198 ns | 544 B |
+| `Local_10k_Query_ForEngineScaleContext` | 3.52 ms | 6.9 KB |
 
 ### How to reproduce (.NET)
 
+Primary numbers in this README come from a **full-assembly** BenchmarkDotNet run with the **`medium`** job (not `short`). Use `short` only for a quick smoke check.
+
+**Full suite (all classes in the assembly — preferred for README numbers):**
+
 ```bash
-dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j short -f *.QueryThroughputBench.* *.MemoryDiagnosisBench.* *.InsertThroughputBench.* *.VectorMarshallingBench.* *.FilterParsingBench.* *.EngineScaleReferenceBench.* --join
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *
 ```
 
-Named classes: `VectorMarshallingBench`, `QueryThroughputBench`, `InsertThroughputBench`, `MemoryDiagnosisBench`, `FilterParsingBench`, `EngineScaleReferenceBench` (+ `UpstreamEngineScaleBaseline` constants for Cohere 1M/10M). Legacy `ZVecPerformanceBenchmarks` (128-dim smoke) remains for quick local checks; it is not the primary baseline.
+**Job options** (BenchmarkDotNet): `short` (smoke), `medium` (README gate), `default` / `long` / `verylong` (more iterations). Invalid names like `MediumRun` / `ShortRun` are rejected; use lowercase `medium` / `short`.
+
+**Filter examples** (run a subset when iterating):
+
+```bash
+# Query latency + with/without vectors
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *QueryThroughputBench*
+
+# Memory / alloc diagnosis
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *MemoryDiagnosisBench*
+
+# Insert throughput
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *InsertThroughputBench*
+
+# Query-vector pin vs explicit copy
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *VectorMarshallingBench*
+
+# Filter AST Build() only (no native)
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *FilterParsingBench*
+
+# Local 10k Flat next to upstream VectorDBBench doc context
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *EngineScaleReferenceBench*
+
+# Legacy 128-dim smoke (not the primary README baseline)
+dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j short -f *ZVecPerformanceBenchmarks*
+```
+
+**Benchmark classes in `testing/ZVec.NET.Benchmarks`:**
+
+| Class | Role | Notes |
+|-------|------|--------|
+| `QueryThroughputBench` | Primary query latency (10k + warm 128) | `Query_Sync` / `Query_WarmTinyCorpus` use `includeVector: false`; `Query_Sync_WithVectors` is the materialization path |
+| `MemoryDiagnosisBench` | GC alloc per query / fetch | `Query_768Dim` vs `Query_768Dim_WithVectors`; `Fetch_ScalarOnly` |
+| `InsertThroughputBench` | Single + batch insert | Batch size 1000; docs built in `IterationSetup` |
+| `VectorMarshallingBench` | Query-vector pin vs `ToArray()` copy | Result vectors off so alloc delta is marshalling, not topk copies |
+| `FilterParsingBench` | Managed filter `Build()` only | No native collection; `Build_SimpleFilter` / `Build_CompoundFilter` |
+| `EngineScaleReferenceBench` | Local 10k Flat + prints upstream Cohere 1M/10M context | Does **not** re-run VectorDBBench |
+| `ZVecPerformanceBenchmarks` | Legacy **128-dim** smoke insert/query | Not the primary README baseline; keep for quick local checks only |
+
+Also in the project (not a BDN class): `UpstreamEngineScaleBaseline` / `BenchmarkEnvironment` constants for workload labels and published upstream figures.
 
 ---
 

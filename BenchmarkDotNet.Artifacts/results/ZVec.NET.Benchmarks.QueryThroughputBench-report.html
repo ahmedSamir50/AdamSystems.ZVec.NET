@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>ZVec.NET.Benchmarks.QueryThroughputBench-20260717-214822</title>
+<title>ZVec.NET.Benchmarks.QueryThroughputBench-20260717-221912</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -16,19 +16,20 @@
 BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8875)
 Intel Core i7-8850H CPU 2.60GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
 .NET SDK 10.0.110
-  [Host]   : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
-  ShortRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  [Host]    : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  MediumRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
 </code></pre>
-<pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
-WarmupCount=3  
+<pre><code>Job=MediumRun  IterationCount=15  LaunchCount=2  
+WarmupCount=10  
 </code></pre>
 
 <table>
-<thead><tr><th>Method        </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Rank</th><th>Gen0</th><th>Gen1</th><th>Allocated</th>
+<thead><tr><th>Method          </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Median</th><th>Ratio</th><th>RatioSD</th><th>Rank</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
 </tr>
-</thead><tbody><tr><td>Query_Sync</td><td>3,334.8 &mu;s</td><td>3,434.5 &mu;s</td><td>188.26 &mu;s</td><td>3</td><td>7.8125</td><td>-</td><td>44.35 KB</td>
-</tr><tr><td>Query_WithFilter</td><td>1,769.0 &mu;s</td><td>350.5 &mu;s</td><td>19.21 &mu;s</td><td>2</td><td>-</td><td>-</td><td>5.57 KB</td>
-</tr><tr><td>Query_WarmTinyCorpus</td><td>494.8 &mu;s</td><td>968.8 &mu;s</td><td>53.10 &mu;s</td><td>1</td><td>8.7891</td><td>0.9766</td><td>44.27 KB</td>
+</thead><tbody><tr><td>Query_Sync</td><td>2,881.3 &mu;s</td><td>190.61 &mu;s</td><td>279.39 &mu;s</td><td>2,878.5 &mu;s</td><td>1.01</td><td>0.14</td><td>3</td><td>-</td><td>6.82 KB</td><td>1.00</td>
+</tr><tr><td>Query_Sync_WithVectors</td><td>2,566.4 &mu;s</td><td>55.45 &mu;s</td><td>81.28 &mu;s</td><td>2,540.1 &mu;s</td><td>0.90</td><td>0.09</td><td>3</td><td>7.8125</td><td>40.5 KB</td><td>5.93</td>
+</tr><tr><td>Query_WithFilter</td><td>1,426.3 &mu;s</td><td>29.36 &mu;s</td><td>40.19 &mu;s</td><td>1,423.1 &mu;s</td><td>0.50</td><td>0.05</td><td>2</td><td>-</td><td>1.73 KB</td><td>0.25</td>
+</tr><tr><td>Query_WarmTinyCorpus</td><td>511.5 &mu;s</td><td>141.60 &mu;s</td><td>207.55 &mu;s</td><td>389.5 &mu;s</td><td>0.18</td><td>0.07</td><td>1</td><td>1.4648</td><td>6.74 KB</td><td>0.99</td>
 </tr></tbody></table>
 </body>
 </html>

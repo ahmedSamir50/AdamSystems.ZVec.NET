@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>ZVec.NET.Benchmarks.MemoryDiagnosisBench-20260717-214759</title>
+<title>ZVec.NET.Benchmarks.MemoryDiagnosisBench-20260717-221640</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -16,18 +16,19 @@
 BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8875)
 Intel Core i7-8850H CPU 2.60GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
 .NET SDK 10.0.110
-  [Host]   : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
-  ShortRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  [Host]    : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  MediumRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
 </code></pre>
-<pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
-WarmupCount=3  
+<pre><code>Job=MediumRun  IterationCount=15  LaunchCount=2  
+WarmupCount=10  
 </code></pre>
 
 <table>
-<thead><tr><th>Method    </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Allocated</th>
+<thead><tr><th>Method            </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Allocated</th>
 </tr>
-</thead><tbody><tr><td>Query_768Dim</td><td>3,134.2 &mu;s</td><td>860.42 &mu;s</td><td>47.16 &mu;s</td><td>7.8125</td><td>44.35 KB</td>
-</tr><tr><td>Fetch_ScalarOnly</td><td>210.1 &mu;s</td><td>38.59 &mu;s</td><td>2.12 &mu;s</td><td>0.2441</td><td>1.22 KB</td>
+</thead><tbody><tr><td>Query_768Dim</td><td>2,821.3 &mu;s</td><td>182.56 &mu;s</td><td>261.82 &mu;s</td><td>-</td><td>6987 B</td>
+</tr><tr><td>Query_768Dim_WithVectors</td><td>3,160.5 &mu;s</td><td>617.17 &mu;s</td><td>885.13 &mu;s</td><td>7.8125</td><td>41466 B</td>
+</tr><tr><td>Fetch_ScalarOnly</td><td>193.2 &mu;s</td><td>9.57 &mu;s</td><td>13.72 &mu;s</td><td>-</td><td>904 B</td>
 </tr></tbody></table>
 </body>
 </html>

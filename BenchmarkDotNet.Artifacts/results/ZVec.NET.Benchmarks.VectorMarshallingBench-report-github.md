@@ -3,14 +3,14 @@
 BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8875)
 Intel Core i7-8850H CPU 2.60GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
 .NET SDK 10.0.110
-  [Host]   : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
-  ShortRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  [Host]    : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  MediumRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
 
-Job=ShortRun  IterationCount=3  LaunchCount=1  
-WarmupCount=3  
+Job=MediumRun  IterationCount=15  LaunchCount=2  
+WarmupCount=10  
 
 ```
-| Method               | Mean     | Error    | StdDev    | Ratio | RatioSD | Gen0   | Allocated | Alloc Ratio |
-|--------------------- |---------:|---------:|----------:|------:|--------:|-------:|----------:|------------:|
-| Query_ReadOnlyMemory | 3.433 ms | 5.084 ms | 0.2787 ms |  1.00 |    0.10 | 7.8125 |  44.35 KB |        1.00 |
-| Query_ExplicitCopy   | 3.522 ms | 7.172 ms | 0.3931 ms |  1.03 |    0.13 | 7.8125 |  47.37 KB |        1.07 |
+| Method               | Mean     | Error     | StdDev    | Ratio | RatioSD | Allocated | Alloc Ratio |
+|--------------------- |---------:|----------:|----------:|------:|--------:|----------:|------------:|
+| Query_ReadOnlyMemory | 4.289 ms | 0.8236 ms | 1.2328 ms |  1.08 |    0.42 |    6.9 KB |        1.00 |
+| Query_ExplicitCopy   | 2.612 ms | 0.1014 ms | 0.1454 ms |  0.66 |    0.18 |   9.92 KB |        1.44 |
