@@ -5,6 +5,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using ZVec.NET.DependencyInjection;
+using ZVec.NET.Tests.Helpers;
 
 namespace ZVec.NET.Tests.Unit.DependencyInjection;
 
@@ -96,6 +97,8 @@ public class ZVecDependencyInjectionTests
     [Fact]
     public async Task HostShutdown_DisposesFactory()
     {
+        RealNativeAvailability.SkipIfUnavailable();
+
         var previousBypass = ZVecDefaults.Version.BypassAbiCheck;
         try
         {
@@ -121,6 +124,8 @@ public class ZVecDependencyInjectionTests
     [Fact]
     public async Task ZVecHealthCheck_WhenInitialized_ReturnsHealthy()
     {
+        RealNativeAvailability.SkipIfUnavailable();
+
         var previousBypass = ZVecDefaults.Version.BypassAbiCheck;
         try
         {

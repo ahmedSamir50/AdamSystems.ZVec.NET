@@ -37,7 +37,7 @@ jobs:
             rid: win-arm64
             test: false
             optional: true
-            cmake_extra: "-A ARM64"
+            cmake_extra: ""
           - os: ubuntu-latest
             rid: linux-x64
             test: true
@@ -104,26 +104,20 @@ jobs:
         working-directory: src/Native/ZVec.Native
         run: |
           cmake -B "build-${{ matrix.rid }}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             ${{ matrix.cmake_extra }} \
             -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF \
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON \
             -S .
 
-      - name: Configure CMake (Windows x64)
-        if: matrix.rid == 'win-x64'
+      # win-x64 and win-arm64 both use Ninja + MSVC from msvc-dev-cmd (not VS generator).
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
         working-directory: src/Native/ZVec.Native
         shell: pwsh
         run: |
           cmake -B "build-${{ matrix.rid }}" -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
-            -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
-            -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
-
-      - name: Configure CMake (Windows ARM64)
-        if: matrix.rid == 'win-arm64'
-        working-directory: src/Native/ZVec.Native
-        shell: pwsh
-        run: |
-          cmake -B "build-${{ matrix.rid }}" -G "Visual Studio 17 2022" -A ARM64 `
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 `
             -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
 

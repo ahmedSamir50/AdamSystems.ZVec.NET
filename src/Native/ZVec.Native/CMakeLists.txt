@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.26)
 project(ZvecNativeBridge CXX C)
 
+# Vendored thirdparty (e.g. googletest 1.10) still declares cmake_minimum_required < 3.5.
+# CMake 4+ rejects those unless this policy floor is set (matches local _configure_ninja.bat).
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Allow vendored thirdparty cmake_minimum_required < 3.5" FORCE)
+
 # Require C++17 (matches Alibaba ZVec)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -3,7 +3,8 @@
 set -euo pipefail
 
 ABI="${1:-arm64-v8a}"
-API_LEVEL="${ANDROID_API_LEVEL:-24}"
+# API ≥ 28 required for std::aligned_alloc (bionic); 34 matches upstream zvec Android CI.
+API_LEVEL="${ANDROID_API_LEVEL:-34}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 NATIVE="$ROOT/src/Native/ZVec.Native"
 
@@ -27,6 +28,7 @@ TOOLCHAIN="$NDK/build/cmake/android.toolchain.cmake"
 cmake -S "$NATIVE" -B "$BUILD_DIR" \
   -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
   -DANDROID_ABI="$ABI" \
   -DANDROID_PLATFORM="android-${API_LEVEL}" \

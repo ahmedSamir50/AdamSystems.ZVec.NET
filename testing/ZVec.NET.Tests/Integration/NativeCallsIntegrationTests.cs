@@ -17,6 +17,8 @@ public class NativeCallsIntegrationTests : IClassFixture<ZVecRealNativeFixture>,
     public NativeCallsIntegrationTests(ZVecRealNativeFixture fixture)
     {
         _fixture = fixture;
+        // Must run before Initialize — otherwise DllNotFoundException fails the suite instead of Skip.
+        _fixture.SkipIfNotAvailable();
         _testDir = Path.Combine(Path.GetTempPath(), $"zvec-native-calls-{Guid.NewGuid()}");
         Directory.CreateDirectory(_testDir);
         _factory = new ZVecFactory();
