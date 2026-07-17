@@ -93,6 +93,45 @@ public class ZVecCollectionQueryTests : IDisposable
     }
 
     [Fact]
+    public void Query_WithDocumentId_ResolvesVectorAndReturnsHits()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        col.Insert(ZVecDoc.Create(
+            "doc1",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["vec"] = new float[] { 1f, 0f } }));
+
+        var results = col.Query(new ZVecQuery { FieldName = "vec", DocumentId = "doc1" }, topk: 1);
+        results.Should().NotBeEmpty();
+        results[0].Id.Should().Be("doc1");
+    }
+
+    [Fact]
+    public void Query_IncludeVectorFalse_OmitsDenseVectors()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        col.Insert(ZVecDoc.Create(
+            "doc1",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["vec"] = new float[] { 1f, 0f } }));
+
+        var withVectors = col.Query(
+            new ZVecQuery { FieldName = "vec", Vector = new float[] { 1f, 0f } },
+            topk: 1,
+            includeVector: true);
+        withVectors.Should().NotBeEmpty();
+        withVectors[0].DenseVectors.Should().ContainKey("vec");
+
+        var without = col.Query(
+            new ZVecQuery { FieldName = "vec", Vector = new float[] { 1f, 0f } },
+            topk: 1,
+            includeVector: false);
+        without.Should().NotBeEmpty();
+        without[0].DenseVectors.Should().BeEmpty();
+    }
+
+    [Fact]
+#pragma warning disable CS0618
     public void QueryGroupBy_ThrowsNotSupportedException()
     {
         if (_factory is null || !_factory.IsInitialized) return;
@@ -115,6 +154,7 @@ public class ZVecCollectionQueryTests : IDisposable
         var act = () => col.QueryGroupBy(null!);
         act.Should().Throw<ArgumentNullException>();
     }
+#pragma warning restore CS0618
 
     [Fact]
     public async Task QueryAsync_MultiQuery_CancelledToken_ThrowsOperationCanceledException()

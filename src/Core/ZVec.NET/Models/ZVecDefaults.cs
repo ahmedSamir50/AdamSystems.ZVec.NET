@@ -333,7 +333,11 @@ public static class ZVecDefaults
         public const string FactoryNotInitialized = "ZVecFactory is not initialized. Call Initialize() or InitializeAsync() first.";        
 
         /// <summary>Message shown when Destroy is called more than once on a collection.</summary>
-        public const string CollectionAlreadyDestroyed = "This collection has already been destroyed.";        
+        public const string CollectionAlreadyDestroyed = "This collection has already been destroyed.";
+
+        /// <summary>Message shown when Destroy is called after Dispose has already closed the handle.</summary>
+        public const string DestroyAfterDispose =
+            "Cannot destroy a collection that has already been disposed (closed). Dispose closes the handle without deleting on-disk data; Destroy must be called instead of Dispose when deletion is required.";
 
         /// <summary>Message shown when the native library fails to allocate a document.</summary>
         public const string NativeDocCreateFailed = "Failed to create native document (zvec_doc_create returned null).";
@@ -450,5 +454,45 @@ public static class ZVecDefaults
         /// <summary>ABI mismatch message format: requires &gt;= min with major == requiredMajor. Args: minVersion, requiredMajor, foundVersion.</summary>
         public const string AbiMismatchRequiresMinSameMajor =
             "ZVec ABI version mismatch. Requires native library version >= '{0}' with major == {1}, but found: '{2}'. Please update your native binaries.";
+
+        /// <summary>Typed mapping: document type has no identity property. Arg: type name.</summary>
+        public const string MappingIdRequired =
+            "Type '{0}' must declare exactly one identity: a property named Id/ID or marked with [ZVecId].";
+
+        /// <summary>Typed mapping: multiple identity properties. Arg: type name.</summary>
+        public const string MappingDuplicateId =
+            "Type '{0}' has more than one identity property ([ZVecId] or Id/ID convention).";
+
+        /// <summary>Typed mapping: vector property missing dimension. Args: type name, property name.</summary>
+        public const string MappingVectorDimensionRequired =
+            "Vector property '{1}' on type '{0}' requires a positive Dimension via [ZVecVector].";
+
+        /// <summary>Typed mapping: unsupported CLR type for a scalar field. Args: type name, property name, clr type.</summary>
+        public const string MappingUnsupportedFieldType =
+            "Property '{1}' on type '{0}' has unsupported scalar type '{2}' for ZVec field mapping.";
+
+        /// <summary>Typed mapping: expression does not resolve to a mapped property. Arg: type name.</summary>
+        public const string MappingMemberExpressionRequired =
+            "Expression must be a property access on '{0}' (for example p => p.Category).";
+
+        /// <summary>Typed mapping: property is not part of the mapped model. Args: type name, property name.</summary>
+        public const string MappingUnknownProperty =
+            "Property '{1}' is not mapped on type '{0}'.";
+
+        /// <summary>Typed mapping: schema mismatch between CLR type and native collection. Args: type name, detail.</summary>
+        public const string MappingSchemaMismatch =
+            "Schema for type '{0}' does not match the open collection: {1}";
+
+        /// <summary>Typed mapping: EnsureSchema cannot add vector columns. Args: type name, vector storage name.</summary>
+        public const string MappingEnsureSchemaCannotAddVector =
+            "EnsureSchema cannot add vector column '{1}' for type '{0}'. Recreate the collection or use a schema that already includes the vector.";
+
+        /// <summary>Typed mapping: AddColumn supports scalar fields only. Args: type name, property name.</summary>
+        public const string MappingAddColumnScalarsOnly =
+            "AddColumn via typed API supports scalar fields only. Property '{1}' on '{0}' is a vector.";
+
+        /// <summary>Typed expression filter: unsupported expression node. Arg: node description.</summary>
+        public const string MappingExpressionUnsupported =
+            "Unsupported filter expression: {0}. Supported: ==, !=, &lt;, &lt;=, &gt;, &gt;=, &amp;&amp;, ||, !, null checks, and string equality.";
     }
 }

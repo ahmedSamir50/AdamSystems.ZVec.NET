@@ -76,7 +76,7 @@ public class SafeHandleLeakTests : IClassFixture<ZVecRealNativeFixture>
 
             weakRef.Should().NotBeNull();
             weakRef!.IsAlive.Should().BeFalse(
-                "managed ZVecCollection is collectable without Dispose once the factory releases tracking");
+                "managed ZVecCollection is collectable after Shutdown disposes tracked collections and the local reference ends");
         }
         finally
         {

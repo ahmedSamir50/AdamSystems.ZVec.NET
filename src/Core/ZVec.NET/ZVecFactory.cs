@@ -14,8 +14,13 @@ namespace ZVec.NET;
 /// of the native singleton even under highly concurrent test runners.
 /// </para>
 /// <para>
-/// Open collection handles are tracked in a <see cref="ConcurrentDictionary{TKey,TValue}"/>
-/// so that <see cref="Shutdown"/> can signal all outstanding collections.
+/// Open collections are tracked with <b>strong</b> references in a
+/// <see cref="ConcurrentDictionary{TKey,TValue}"/> so that <see cref="Shutdown"/> can
+/// dispose every outstanding collection before calling native <c>zvec_shutdown</c>.
+/// Callers should still dispose collections they own; Shutdown is a safety net for process teardown.
+/// </para>
+/// <para>
+/// Async factory APIs are cancellation-aware wrappers around synchronous native calls.
 /// </para>
 /// </remarks>
 public sealed class ZVecFactory : IZvecFactory
@@ -53,9 +58,8 @@ public sealed class ZVecFactory : IZvecFactory
     }
 
     // =========================================================================
-    // Open collection tracking — weak references so GC can still finalize
-    // collections independently if the user forgets to dispose them.
-    // ConcurrentDictionary provides lock-free reads; write locks are per-slot.
+    // Open collection tracking — strong references so Shutdown can close them
+    // before zvec_shutdown. ConcurrentDictionary provides lock-free reads.
     // =========================================================================
     internal readonly ConcurrentDictionary<nint, ZVecCollection> OpenCollections
         = new();
@@ -126,18 +130,47 @@ public sealed class ZVecFactory : IZvecFactory
     // =========================================================================
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Cancels outstanding call tokens, disposes every tracked open collection (close-only),
+    /// then shuts down the native library when this is the last live factory.
+    /// </remarks>
     public void Shutdown()
     {
+        ZVecCollection[] toClose;
         lock (_globalInitLock)
         {
             if (_state != FactoryState.Initialized)
             {
-                return; // Not initialized, or already shut down — no-op.
+                return; // Not initialized, already shutting down, or already shut down — no-op.
             }
 
-            // Signal all tracked collections that the factory is shutting down.
+            // Mark ShutDown immediately so concurrent Shutdown calls bail out while we close collections
+            // with the native library still initialized.
+            _state = FactoryState.ShutDown;
             _shutdownCts.Cancel();
+            toClose = OpenCollections.Values.ToArray();
             OpenCollections.Clear();
+        }
+
+        // Dispose outside the init lock to avoid deadlocking with IsInitialized / SafeHandle guards.
+        foreach (var col in toClose)
+        {
+            try
+            {
+                col.Dispose();
+            }
+            catch
+            {
+                // Best-effort close during teardown.
+            }
+        }
+
+        lock (_globalInitLock)
+        {
+            if (_state != FactoryState.ShutDown)
+            {
+                return;
+            }
 
             // Only shutdown the native library when the last factory is shut down.
             _globalNativeInitCount--;

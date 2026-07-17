@@ -13,7 +13,7 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
 
     public nint Handle => _handle;
 
-    public NativeQueryBuilder(ZVecQuery query, int topk, string? filter)
+    public NativeQueryBuilder(ZVecQuery query, int topk, string? filter, bool includeVector = true)
     {
         _handle = NativeMethods.zvec_vector_query_create();
         if (_handle == IntPtr.Zero)
@@ -50,7 +50,7 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
             ApplyQueryParams(query.QueryParams);
 
             ZVecError.ThrowIfFailed(
-                (ZVecErrorCode)NativeMethods.zvec_vector_query_set_include_vector(_handle, true), 
+                (ZVecErrorCode)NativeMethods.zvec_vector_query_set_include_vector(_handle, includeVector), 
                 nameof(NativeMethods.zvec_vector_query_set_include_vector));
 
             if (query.Fts != null)

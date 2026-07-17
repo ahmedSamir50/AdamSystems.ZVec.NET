@@ -72,6 +72,7 @@ public class EngineScaleReferenceBench
 
         return _collection.Query(
             new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
-            topk: ZVecDefaults.Query.Topk);
+            topk: ZVecDefaults.Query.Topk,
+            includeVector: false);
     }
 }

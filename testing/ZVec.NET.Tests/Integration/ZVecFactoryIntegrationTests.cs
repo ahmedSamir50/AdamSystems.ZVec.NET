@@ -154,6 +154,45 @@ public class ZVecFactoryIntegrationTests : IClassFixture<ZVecRealNativeFixture>,
         (Directory.Exists(_testPath) || File.Exists(_testPath)).Should().BeTrue();
     }
 
+    [Fact]
+    public void Shutdown_ClosesOpenCollections_ThenAllowsReinitialize()
+    {
+        _fixture.SkipIfNotAvailable();
+
+        _factory = new ZVecFactory();
+        _factory.Initialize();
+
+        var schema = new ZVecCollectionSchema
+        {
+            Name = "shutdown_close",
+            Vectors =
+            [
+                new ZVecVectorSchema
+                {
+                    Name = "embedding",
+                    DataType = ZVecDataType.VectorFp32,
+                    Dimension = 4,
+                    IndexParam = new ZVecFlatIndexParam()
+                }
+            ]
+        };
+
+        var col = _factory.CreateAndOpen(_testPath, schema);
+        _factory.OpenCollections.Should().NotBeEmpty();
+
+        _factory.Shutdown();
+        _factory.IsInitialized.Should().BeFalse();
+        _factory.OpenCollections.Should().BeEmpty();
+
+        var useDisposed = () => col.GetStats();
+        useDisposed.Should().Throw<ObjectDisposedException>();
+
+        // Close-only Shutdown preserves on-disk data; re-init and Open should succeed.
+        _factory.Initialize();
+        using var reopened = _factory.Open(_testPath);
+        reopened.Should().NotBeNull();
+    }
+
     public void Dispose()
     {
         _factory?.Dispose();

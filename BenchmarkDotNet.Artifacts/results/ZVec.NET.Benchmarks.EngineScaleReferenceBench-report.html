@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>ZVec.NET.Benchmarks.EngineScaleReferenceBench-20260717-221130</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8875)
+Intel Core i7-8850H CPU 2.60GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET SDK 10.0.110
+  [Host]    : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  MediumRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Job=MediumRun  IterationCount=15  LaunchCount=2  
+WarmupCount=10  
+</code></pre>
+
+<table>
+<thead><tr><th>Method                                 </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Allocated</th>
+</tr>
+</thead><tbody><tr><td>Local_10k_Flat_Query_vs_Upstream_8500plus_QPS</td><td>3.517 ms</td><td>0.2986 ms</td><td>0.4469 ms</td><td>6.9 KB</td>
+</tr></tbody></table>
+</body>
+</html>

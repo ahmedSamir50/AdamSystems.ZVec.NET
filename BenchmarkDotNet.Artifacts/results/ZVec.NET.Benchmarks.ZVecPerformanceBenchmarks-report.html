@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>ZVec.NET.Benchmarks.ZVecPerformanceBenchmarks-20260717-185757</title>
+<title>ZVec.NET.Benchmarks.ZVecPerformanceBenchmarks-20260717-222355</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -16,16 +16,18 @@
 BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8875)
 Intel Core i7-8850H CPU 2.60GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
 .NET SDK 10.0.110
-  [Host]     : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
-  DefaultJob : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  [Host]    : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  MediumRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
 </code></pre>
-<pre><code></code></pre>
+<pre><code>Job=MediumRun  IterationCount=15  LaunchCount=2  
+WarmupCount=10  
+</code></pre>
 
 <table>
 <thead><tr><th>Method  </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Allocated</th>
 </tr>
-</thead><tbody><tr><td>InsertDocument</td><td>3,308.9 ns</td><td>59.87 ns</td><td>110.98 ns</td><td>0.1030</td><td>496 B</td>
-</tr><tr><td>QueryVector</td><td>516.3 ns</td><td>10.39 ns</td><td>26.46 ns</td><td>0.0439</td><td>208 B</td>
+</thead><tbody><tr><td>InsertDocument</td><td>3,282.8 ns</td><td>127.46 ns</td><td>182.80 ns</td><td>0.1106</td><td>528 B</td>
+</tr><tr><td>QueryVector</td><td>515.9 ns</td><td>17.57 ns</td><td>26.30 ns</td><td>0.0439</td><td>208 B</td>
 </tr></tbody></table>
 </body>
 </html>

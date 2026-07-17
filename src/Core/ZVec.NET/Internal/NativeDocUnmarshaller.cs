@@ -5,7 +5,10 @@ namespace ZVec.NET.Internal;
 
 internal static class NativeDocUnmarshaller
 {
-    public static unsafe ZVecDoc Unmarshal(nint docPtr, ZVecCollectionSchema? schema)
+    public static unsafe ZVecDoc Unmarshal(
+        nint docPtr,
+        IReadOnlyDictionary<string, ZVecDataType>? fieldTypeMap,
+        bool includeVector = true)
     {
         if (docPtr == IntPtr.Zero)
             throw new ArgumentNullException(nameof(docPtr));
@@ -22,67 +25,98 @@ internal static class NativeDocUnmarshaller
         // 2. Get Score
         float score = NativeMethods.zvec_doc_get_score(docPtr);
 
-        var fields = new Dictionary<string, object>();
-        var denseVectors = new Dictionary<string, ReadOnlyMemory<float>>();
-        var sparseVectors = new Dictionary<string, IReadOnlyDictionary<int, float>>();
+        var fields = new Dictionary<string, object>(StringComparer.Ordinal);
+        Dictionary<string, ReadOnlyMemory<float>>? denseVectors = includeVector
+            ? new Dictionary<string, ReadOnlyMemory<float>>(StringComparer.Ordinal)
+            : null;
+        Dictionary<string, IReadOnlyDictionary<int, float>>? sparseVectors = includeVector
+            ? new Dictionary<string, IReadOnlyDictionary<int, float>>(StringComparer.Ordinal)
+            : null;
 
-        // 3. Extract Fields
         int rc = NativeMethods.zvec_doc_get_field_names(docPtr, out nint namesPtr, out nuint count);
-        if (rc != 0 || namesPtr == IntPtr.Zero || count == 0) 
+        if (rc != 0 || namesPtr == IntPtr.Zero || count == 0)
         {
-            return new ZVecDoc { Id = pk, Score = score, Fields = fields, DenseVectors = denseVectors, SparseVectors = sparseVectors };
+            return new ZVecDoc
+            {
+                Id = pk,
+                Score = score,
+                Fields = fields,
+                DenseVectors = denseVectors ?? EmptyDense,
+                SparseVectors = sparseVectors ?? EmptySparse
+            };
         }
 
         try
         {
-            var ptrArray = new nint[count];
-            Marshal.Copy(namesPtr, ptrArray, 0, (int)count);
-
+            nint* namePtrs = (nint*)namesPtr;
             for (int i = 0; i < (int)count; i++)
             {
-                string fieldName = Marshal.PtrToStringUTF8(ptrArray[i])!;
-                
-                // Determine Data Type from Schema
-                ZVecDataType? dataType = null;
-                if (schema != null)
-                {
-                    var scalarField = schema.Fields.FirstOrDefault(f => f.Name == fieldName);
-                    if (scalarField != null) dataType = scalarField.DataType;
-                    else
-                    {
-                        var vectorField = schema.Vectors.FirstOrDefault(v => v.Name == fieldName);
-                        if (vectorField != null) dataType = vectorField.DataType;
-                    }
-                }
+                string fieldName = Marshal.PtrToStringUTF8(namePtrs[i])!;
+                if (fieldTypeMap is null || !fieldTypeMap.TryGetValue(fieldName, out ZVecDataType dataType))
+                    continue;
 
-                if (!dataType.HasValue) continue; // Cannot unmarshal without knowing the type
+                if (!includeVector && IsVectorDataType(dataType))
+                    continue;
 
-                ExtractFieldValue(docPtr, fieldName, dataType.Value, fields, denseVectors, sparseVectors);
+                ExtractFieldValue(docPtr, fieldName, dataType, fields, denseVectors, sparseVectors);
             }
         }
         finally
         {
-            // CRITICAL: zvec_doc_get_field_names allocates an array of string pointers (char**) where EACH inner string is also allocated.
-            // Using a plain zvec_free(namesPtr) would leak all the inner strings and corrupt heap tracking.
-            // We MUST use zvec_free_str_array to properly free both the outer array and the inner strings.
             NativeMethods.zvec_free_str_array(namesPtr, count);
         }
 
-        return new ZVecDoc { Id = pk, Score = score, Fields = fields, DenseVectors = denseVectors, SparseVectors = sparseVectors };
+        return new ZVecDoc
+        {
+            Id = pk,
+            Score = score,
+            Fields = fields,
+            DenseVectors = denseVectors ?? EmptyDense,
+            SparseVectors = sparseVectors ?? EmptySparse
+        };
+    }
+
+    /// <summary>Legacy overload used when only a schema DTO is available (builds a one-shot map).</summary>
+    public static ZVecDoc Unmarshal(nint docPtr, ZVecCollectionSchema? schema) =>
+        Unmarshal(docPtr, BuildMap(schema), includeVector: true);
+
+    private static readonly IReadOnlyDictionary<string, ReadOnlyMemory<float>> EmptyDense =
+        new Dictionary<string, ReadOnlyMemory<float>>();
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<int, float>> EmptySparse =
+        new Dictionary<string, IReadOnlyDictionary<int, float>>();
+
+    internal static bool IsVectorDataType(ZVecDataType dataType) =>
+        dataType is >= ZVecDataType.VectorBinary32 and <= ZVecDataType.VectorInt16
+            or >= ZVecDataType.SparseVectorFp16 and <= ZVecDataType.SparseVectorFp32;
+
+    private static Dictionary<string, ZVecDataType>? BuildMap(ZVecCollectionSchema? schema)
+    {
+        if (schema is null)
+            return null;
+
+        var map = new Dictionary<string, ZVecDataType>(
+            schema.Fields.Count + schema.Vectors.Count, StringComparer.Ordinal);
+        foreach (var f in schema.Fields)
+            map[f.Name] = f.DataType;
+        foreach (var v in schema.Vectors)
+            map[v.Name] = v.DataType;
+        return map;
     }
 
     private static unsafe void ExtractFieldValue(
-        nint docPtr, 
-        string fieldName, 
-        ZVecDataType dataType, 
+        nint docPtr,
+        string fieldName,
+        ZVecDataType dataType,
         Dictionary<string, object> fields,
-        Dictionary<string, ReadOnlyMemory<float>> denseVectors,
-        Dictionary<string, IReadOnlyDictionary<int, float>> sparseVectors)
+        Dictionary<string, ReadOnlyMemory<float>>? denseVectors,
+        Dictionary<string, IReadOnlyDictionary<int, float>>? sparseVectors)
     {
-        // Sparse FP32: only zvec_doc_get_field_value_copy supports SPARSE_VECTOR_*.
-        // Layout from c_api.cc: [nnz:size_t][uint32 indices...][float values...] (caller frees).
         if (dataType == ZVecDataType.SparseVectorFp32)
         {
+            if (sparseVectors is null)
+                return;
+
             var rcSparse = NativeMethods.zvec_doc_get_field_value_copy(
                 docPtr, fieldName, (int)dataType, out nint sparsePtr, out nuint sparseSize);
             if (rcSparse != 0 || sparsePtr == IntPtr.Zero || sparseSize < (nuint)sizeof(nuint))
@@ -114,7 +148,6 @@ internal static class NativeDocUnmarshaller
             return;
         }
 
-        // zvec_doc_get_field_value_pointer returns (const void** value, size_t* value_size)
         var rc = NativeMethods.zvec_doc_get_field_value_pointer(docPtr, fieldName, (int)dataType, out nint valuePtr, out nuint valueSize);
         if (rc != 0 || valuePtr == IntPtr.Zero) return;
 
@@ -142,15 +175,15 @@ internal static class NativeDocUnmarshaller
                 fields[fieldName] = *(double*)valuePtr;
                 break;
             case ZVecDataType.String:
-                // valuePtr points to the UTF-8 string data, valueSize is its byte length
                 if (valueSize > 0)
                     fields[fieldName] = Marshal.PtrToStringUTF8(valuePtr, (int)valueSize) ?? string.Empty;
                 else
                     fields[fieldName] = string.Empty;
                 break;
             case ZVecDataType.VectorFp32:
-                // valuePtr is float*, valueSize is byte count → element count = valueSize / 4
-                if (valuePtr != IntPtr.Zero && valueSize > 0)
+                if (denseVectors is null)
+                    return;
+                if (valueSize > 0)
                 {
                     int floatCount = (int)(valueSize / sizeof(float));
                     float[] floatArray = GC.AllocateUninitializedArray<float>(floatCount);
@@ -158,7 +191,6 @@ internal static class NativeDocUnmarshaller
                     denseVectors[fieldName] = floatArray;
                 }
                 break;
-            // Additional types can be implemented as needed
         }
     }
 }

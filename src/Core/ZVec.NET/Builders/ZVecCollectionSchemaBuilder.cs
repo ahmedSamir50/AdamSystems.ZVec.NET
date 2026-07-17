@@ -1,3 +1,5 @@
+using ZVec.NET.Mapping;
+
 namespace ZVec.NET;
 
 /// <summary>
@@ -18,6 +20,22 @@ public sealed class ZVecCollectionSchemaBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         _name = name;
+    }
+
+    /// <summary>
+    /// Creates a schema builder from a mapped document type (single typed entry point).
+    /// Field and vector names come from conventions and <c>ZVec.NET.Mapping</c> attributes.
+    /// </summary>
+    /// <typeparam name="T">Concrete document type with an identity property.</typeparam>
+    public static ZVecCollectionSchemaBuilder From<T>() where T : class
+    {
+        var model = ZVecTypeModel.Get<T>();
+        var builder = new ZVecCollectionSchemaBuilder(model.CollectionName);
+        foreach (var field in model.Fields)
+            builder.AddField(field.ToFieldSchema());
+        foreach (var vector in model.Vectors)
+            builder.AddVector(vector.ToVectorSchema());
+        return builder;
     }
 
     /// <summary>

@@ -54,7 +54,8 @@ public class VectorMarshallingBench
 
         return _collection.Query(
             new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryMemory },
-            topk: ZVecDefaults.Query.Topk);
+            topk: ZVecDefaults.Query.Topk,
+            includeVector: false);
     }
 
     [Benchmark]
@@ -66,6 +67,7 @@ public class VectorMarshallingBench
         float[] copy = _queryArray.ToArray();
         return _collection.Query(
             new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = copy },
-            topk: ZVecDefaults.Query.Topk);
+            topk: ZVecDefaults.Query.Topk,
+            includeVector: false);
     }
 }
