@@ -8,6 +8,7 @@ public class InsertThroughputBench
     private ZVecFactory _factory = null!;
     private IZvecCollection _collection = null!;
     private ZVecDoc[] _batch = null!;
+    private float[] _vector = null!;
     private int _batchCursor;
     private string _tempPath = null!;
 
@@ -20,10 +21,20 @@ public class InsertThroughputBench
         _tempPath = Path.Combine(Path.GetTempPath(), $"zvec_bench_insert_{Guid.NewGuid():N}");
         _collection = _factory.CreateAndOpen(_tempPath, BenchmarkEnvironment.CreateSchema("insert_bench"));
 
-        var vector = BenchmarkEnvironment.CreateVector();
+        _vector = BenchmarkEnvironment.CreateVector();
         _batch = new ZVecDoc[BenchmarkEnvironment.BatchInsertSize];
+    }
+
+    /// <summary>Build unique-ID batch outside the measured window so insert path is not dominated by doc construction.</summary>
+    [IterationSetup(Target = nameof(Insert_Batch))]
+    public void PrepareBatch()
+    {
+        if (!_factory.IsInitialized)
+            return;
+
+        int batchId = Interlocked.Increment(ref _batchCursor);
         for (int i = 0; i < _batch.Length; i++)
-            _batch[i] = BenchmarkEnvironment.CreateDoc($"batch_{i:D4}", vector, $"batch document {i}");
+            _batch[i] = BenchmarkEnvironment.CreateDoc($"b{batchId}_{i:D4}", _vector, $"batch {batchId}-{i}");
     }
 
     [GlobalCleanup]
@@ -53,8 +64,10 @@ public class InsertThroughputBench
         if (!_factory.IsInitialized)
             return new ZVecStatus { Code = ZVecErrorCode.Ok };
 
-        var vector = BenchmarkEnvironment.CreateVector(fill: 0.25f);
-        var doc = BenchmarkEnvironment.CreateDoc($"single_{Interlocked.Increment(ref _batchCursor):D6}", vector, "single insert");
+        var doc = BenchmarkEnvironment.CreateDoc(
+            $"single_{Interlocked.Increment(ref _batchCursor):D6}",
+            _vector,
+            "single insert");
         return _collection.Insert(doc);
     }
 
@@ -63,11 +76,6 @@ public class InsertThroughputBench
     {
         if (!_factory.IsInitialized)
             return new ZVecStatus { Code = ZVecErrorCode.Ok };
-
-        int batchId = Interlocked.Increment(ref _batchCursor);
-        var vector = BenchmarkEnvironment.CreateVector();
-        for (int i = 0; i < _batch.Length; i++)
-            _batch[i] = BenchmarkEnvironment.CreateDoc($"b{batchId}_{i:D3}", vector, $"batch {batchId}-{i}");
 
         return _collection.Insert(_batch);
     }

@@ -7,8 +7,21 @@ internal static class BenchmarkEnvironment
     public const int EmbeddingDimension = 768;
     public const string VectorField = "vec";
     public const string ContentField = "content";
-    public const int SeedDocCount = 128;
-    public const int BatchInsertSize = 64;
+
+    /// <summary>Primary corpus for query/memory benches (README single-vector / allocation targets).</summary>
+    public const int SeedDocCount = 10_000;
+
+    /// <summary>Small corpus for warm-query latency (README “small corpus” row — not pure P/Invoke).</summary>
+    public const int TinyCorpusSeedCount = 128;
+
+    /// <summary>Batch size for insert throughput (README &gt; 50k docs/sec target).</summary>
+    public const int BatchInsertSize = 1000;
+
+    /// <summary>
+    /// Binding-suite corpus size. Distinct from upstream VectorDBBench Cohere 1M/10M
+    /// (<see cref="UpstreamEngineScaleBaseline"/>).
+    /// </summary>
+    public const string WorkloadLabel = "768-dim Flat / 10k docs / batch 1000 (SDK binding suite)";
 
     public static bool TryInitialize(out ZVecFactory factory)
     {
@@ -64,11 +77,19 @@ internal static class BenchmarkEnvironment
 
     public static void SeedCollection(IZvecCollection collection, float[] vector, int count)
     {
-        var docs = new ZVecDoc[count];
-        for (int i = 0; i < count; i++)
-            docs[i] = CreateDoc($"seed_{i:D4}", vector, $"seed document {i}");
+        const int chunkSize = 1000;
+        for (int offset = 0; offset < count; offset += chunkSize)
+        {
+            int n = Math.Min(chunkSize, count - offset);
+            var docs = new ZVecDoc[n];
+            for (int i = 0; i < n; i++)
+            {
+                int id = offset + i;
+                docs[i] = CreateDoc($"seed_{id:D5}", vector, $"seed document {id}");
+            }
 
-        collection.Insert(docs);
+            collection.Insert(docs);
+        }
     }
 
     public static ZVecFilterBuilder SampleFilter() =>

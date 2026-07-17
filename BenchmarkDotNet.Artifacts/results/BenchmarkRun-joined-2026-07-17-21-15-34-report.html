@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>BenchmarkRun-joined-2026-07-17-21-15-34</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8875)
+Intel Core i7-8850H CPU 2.60GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET SDK 10.0.110
+  [Host]   : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  ShortRun : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
+WarmupCount=3  
+</code></pre>
+
+<table>
+<thead><tr><th>Type            </th><th>Method        </th><th>InvocationCount</th><th>UnrollFactor</th><th>Mean      </th><th>Error      </th><th>StdDev    </th><th>Ratio</th><th>RatioSD</th><th>Rank</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>FilterParsingBench</td><td>Build_SimpleFilter</td><td>Default</td><td>16</td><td>57.28 ns</td><td>62.66 ns</td><td>3.435 ns</td><td>0.000</td><td>0.00</td><td>1</td><td>0.0272</td><td>-</td><td>128 B</td><td>0.003</td>
+</tr><tr><td>InsertThroughputBench</td><td>Insert_Single</td><td>Default</td><td>16</td><td>54,886.21 ns</td><td>71,144.16 ns</td><td>3,899.652 ns</td><td>0.020</td><td>0.00</td><td>3</td><td>0.2441</td><td>-</td><td>1360 B</td><td>0.030</td>
+</tr><tr><td>MemoryDiagnosisBench</td><td>Query_768Dim</td><td>Default</td><td>16</td><td>2,545,310.03 ns</td><td>429,634.33 ns</td><td>23,549.707 ns</td><td>0.940</td><td>0.05</td><td>7</td><td>7.8125</td><td>-</td><td>45410 B</td><td>1.000</td>
+</tr><tr><td>QueryThroughputBench</td><td>Query_Sync</td><td>Default</td><td>16</td><td>2,460,976.56 ns</td><td>937,654.27 ns</td><td>51,395.995 ns</td><td>0.909</td><td>0.05</td><td>7</td><td>7.8125</td><td>-</td><td>45410 B</td><td>1.000</td>
+</tr><tr><td>VectorMarshallingBench</td><td>Query_ReadOnlyMemory</td><td>Default</td><td>16</td><td>2,714,846.48 ns</td><td>3,180,774.60 ns</td><td>174,348.990 ns</td><td>1.003</td><td>0.08</td><td>7</td><td>7.8125</td><td>-</td><td>45410 B</td><td>1.000</td>
+</tr><tr><td>FilterParsingBench</td><td>Build_CompoundFilter</td><td>Default</td><td>16</td><td>197.28 ns</td><td>345.38 ns</td><td>18.931 ns</td><td>0.000</td><td>0.00</td><td>2</td><td>0.1154</td><td>-</td><td>544 B</td><td>0.012</td>
+</tr><tr><td>MemoryDiagnosisBench</td><td>Fetch_ScalarOnly</td><td>Default</td><td>16</td><td>183,523.04 ns</td><td>25,604.47 ns</td><td>1,403.467 ns</td><td>0.068</td><td>0.00</td><td>4</td><td>0.2441</td><td>-</td><td>1248 B</td><td>0.027</td>
+</tr><tr><td>QueryThroughputBench</td><td>Query_WithFilter</td><td>Default</td><td>16</td><td>1,449,144.01 ns</td><td>622,034.28 ns</td><td>34,095.798 ns</td><td>0.535</td><td>0.03</td><td>6</td><td>-</td><td>-</td><td>5705 B</td><td>0.126</td>
+</tr><tr><td>VectorMarshallingBench</td><td>Query_ExplicitCopy</td><td>Default</td><td>16</td><td>2,563,488.28 ns</td><td>849,796.84 ns</td><td>46,580.232 ns</td><td>0.947</td><td>0.05</td><td>7</td><td>7.8125</td><td>-</td><td>48506 B</td><td>1.068</td>
+</tr><tr><td>QueryThroughputBench</td><td>Query_WarmTinyCorpus</td><td>Default</td><td>16</td><td>317,840.38 ns</td><td>71,149.24 ns</td><td>3,899.930 ns</td><td>0.117</td><td>0.01</td><td>5</td><td>9.2773</td><td>0.9766</td><td>45328 B</td><td>0.998</td>
+</tr><tr><td>InsertThroughputBench</td><td>Insert_Batch</td><td>1</td><td>1</td><td>56,558,700.00 ns</td><td>127,513,631.07 ns</td><td>6,989,452.423 ns</td><td>?</td><td>?</td><td>1</td><td>-</td><td>-</td><td>464480 B</td><td>?</td>
+</tr></tbody></table>
+</body>
+</html>

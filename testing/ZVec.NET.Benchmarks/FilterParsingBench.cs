@@ -3,6 +3,7 @@ using ZVec.NET.Query;
 
 namespace ZVec.NET.Benchmarks;
 
+[MemoryDiagnoser]
 public class FilterParsingBench
 {
     private ZVecFilterBuilder _simpleFilter = null!;
@@ -16,7 +17,7 @@ public class FilterParsingBench
 
         _compoundFilter = ZVecFilterBuilder.Create()
             .Where("publish_year", ZVecCompareOp.Gt, 1936)
-            .And(ZVecFilterBuilder.Create().ContainAny("category", "fiction", "romance"));
+            .And(b => b.ContainAny("category", "fiction", "romance"));
     }
 
     [Benchmark]
@@ -29,11 +30,5 @@ public class FilterParsingBench
     public string Build_CompoundFilter()
     {
         return _compoundFilter.Build();
-    }
-
-    [Benchmark]
-    public string ToString_CompoundFilter()
-    {
-        return _compoundFilter.ToString()!;
     }
 }

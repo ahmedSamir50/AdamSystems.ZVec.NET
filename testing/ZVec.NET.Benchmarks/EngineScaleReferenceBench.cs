@@ -2,9 +2,14 @@ using BenchmarkDotNet.Attributes;
 
 namespace ZVec.NET.Benchmarks;
 
-/// <summary>US-E19.1 / US-E20.4 — GC allocation per 768-dim query (target &lt; 256 B).</summary>
+/// <summary>
+/// Surfaces published upstream VectorDBBench engine-scale figures alongside the
+/// local binding suite. These methods do <b>not</b> download Cohere 1M/10M or run
+/// VectorDBBench — they document the official published baseline for README /
+/// report correlation. Local QPS is derived from <see cref="QueryThroughputBench"/>.
+/// </summary>
 [MemoryDiagnoser]
-public class MemoryDiagnosisBench
+public class EngineScaleReferenceBench
 {
     private ZVecFactory _factory = null!;
     private IZvecCollection _collection = null!;
@@ -14,16 +19,21 @@ public class MemoryDiagnosisBench
     [GlobalSetup]
     public void Setup()
     {
+        Console.WriteLine(UpstreamEngineScaleBaseline.SummaryLine);
+        Console.WriteLine(
+            $"Published: {UpstreamEngineScaleBaseline.Cohere10MCase} → " +
+            $"{UpstreamEngineScaleBaseline.Cohere10MPublishedQps} QPS, " +
+            $"index build {UpstreamEngineScaleBaseline.Cohere10MPublishedIndexBuild}. " +
+            $"Also: {UpstreamEngineScaleBaseline.Cohere1MCase}. Docs: {UpstreamEngineScaleBaseline.BenchmarksDocUrl}");
+
         if (!BenchmarkEnvironment.TryInitialize(out _factory))
             return;
 
-        _tempPath = Path.Combine(Path.GetTempPath(), $"zvec_bench_memory_{Guid.NewGuid():N}");
-        _collection = _factory.CreateAndOpen(_tempPath, BenchmarkEnvironment.CreateSchema("memory_bench"));
-
+        _tempPath = Path.Combine(Path.GetTempPath(), $"zvec_bench_engine_ref_{Guid.NewGuid():N}");
+        _collection = _factory.CreateAndOpen(_tempPath, BenchmarkEnvironment.CreateSchema("engine_ref"));
         var vector = BenchmarkEnvironment.CreateVector();
         _queryVector = vector;
         BenchmarkEnvironment.SeedCollection(_collection, vector, BenchmarkEnvironment.SeedDocCount);
-
         _ = _collection.Query(
             new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
             topk: ZVecDefaults.Query.Topk);
@@ -50,8 +60,12 @@ public class MemoryDiagnosisBench
         }
     }
 
-    [Benchmark]
-    public IReadOnlyList<ZVecDoc> Query_768Dim()
+    /// <summary>
+    /// Local binding-suite query (10k Flat) — report Mean and convert to QPS in README
+    /// next to published Cohere 10M 8500+ QPS.
+    /// </summary>
+    [Benchmark(Description = "Local_10k_Flat_Query_vs_Upstream_8500plus_QPS")]
+    public IReadOnlyList<ZVecDoc> Local_10k_Query_ForEngineScaleContext()
     {
         if (!_factory.IsInitialized)
             return [];
@@ -59,14 +73,5 @@ public class MemoryDiagnosisBench
         return _collection.Query(
             new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
             topk: ZVecDefaults.Query.Topk);
-    }
-
-    [Benchmark]
-    public ZVecDoc? Fetch_ScalarOnly()
-    {
-        if (!_factory.IsInitialized)
-            return null;
-
-        return _collection.Fetch("seed_00000", includeVector: false);
     }
 }
