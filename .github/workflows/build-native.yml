@@ -2,7 +2,7 @@ name: Build Native (desktop)
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, development, "release/**"]
     paths:
       - "src/Native/**"
       - "build/ci/**"

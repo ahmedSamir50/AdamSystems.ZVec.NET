@@ -1,5 +1,10 @@
 name: Publish NuGet
 
+# nuget.org publish is release-line only:
+# - Tags: v* whose commit is on a release/* branch (guard below).
+# - workflow_dispatch: emergency only; prefer tagging on release/* so the same guard applies.
+#   When dispatching from the UI, run it from a release/* branch ref when possible.
+
 on:
   push:
     tags:
@@ -11,7 +16,35 @@ permissions:
   id-token: write   # NuGet Trusted Publishing (OIDC)
 
 jobs:
+  guard-release-line:
+    name: require release/* commit
+    runs-on: ubuntu-latest
+    steps:
+      # Tag pushes only fetch the tag by default — pull release/* heads so the guard can see them.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fail unless SHA is on release/*
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA}"
+          git fetch --no-tags origin '+refs/heads/release/*:refs/remotes/origin/release/*'
+          if git branch -r --contains "$SHA" | grep -E 'origin/release/' >/dev/null; then
+            echo "OK: $SHA is reachable from a release/* branch."
+            git branch -r --contains "$SHA" | grep -E 'origin/release/' || true
+            exit 0
+          fi
+          echo "::error::Publish blocked: commit $SHA is not on any release/* branch."
+          echo "Tag or dispatch only from the release train (e.g. release/1.0)."
+          echo "event=$EVENT_NAME ref=$REF"
+          exit 1
+
   pack:
+    needs: guard-release-line
     uses: ./.github/workflows/pack.yml
 
   publish:

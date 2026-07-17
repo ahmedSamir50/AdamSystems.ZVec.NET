@@ -3,6 +3,8 @@ name: Pack NuGet
 on:
   workflow_dispatch:
   push:
+    branches:
+      - "release/**"
     tags:
       - "v*"
   workflow_call:

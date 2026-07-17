@@ -516,7 +516,80 @@ Also in the project (not a BDN class): `UpstreamEngineScaleBaseline` / `Benchmar
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
 | **ABI floor** | `ZVecNativeAbi` | Minimum `0.5.1`, same major |
 
-NuGet version example: `1.0.0-alpha.1+zvec.0.5.1` — SDK `1.0.0-alpha.1` wrapping ZVec C++ `0.5.1`.
+NuGet version example: `1.0.0-alpha.1+zvec.0.5.1` — SDK `1.0.0-alpha.1` wrapping ZVec C++ `0.5.1`. Do **not** put TFM or branch names into the version string.
+
+### Git vs NuGet (branch ≠ version)
+
+| Concept | Example | Where it lives |
+|---------|---------|----------------|
+| Git branch (train) | `release/1.0` | Git — long-lived for all 1.0.x |
+| Git tag (one ship) | `v1.0.0-alpha.1` | Git — **no** `+zvec…` in the tag |
+| NuGet / csproj Version | `1.0.0-alpha.1+zvec.0.5.1` | `ZVec.NET.csproj` |
+
+There is **no** branch named `release/1.0.0-alpha.1+zvec.0.5.1`. `+zvec.0.5.1` is build metadata only.
+
+### Branch topology
+
+```mermaid
+flowchart LR
+  feat[feature branches]
+  dev[development]
+  main[main]
+  rel["release/1.0"]
+  tag["tag v1.0.0-alpha.1"]
+
+  feat --> dev
+  dev -->|"PR merge"| main
+  main -->|"cut release line"| rel
+  rel -->|"tag for nuget.org"| tag
+  rel -->|"hotfix commits"| rel
+  rel -->|"merge backfixes"| main
+  main -->|"merge"| dev
+```
+
+| Branch | Role |
+|--------|------|
+| **`development`** | Daily integration; open `feature/*` / `bugfix/*` PRs here |
+| **`main`** | Stable trunk; parent of every `release/*` cut |
+| **`release/1.0`** | 1.0.x maintenance (alphas, RTM, patches via tags) |
+
+**Contributors:** branch off **`development`**. **Hotfixes** for a shipped train: branch off **`release/X.Y`**, PR back into that release line, then merge back to `main` → `development` when the fix still applies.
+
+```mermaid
+flowchart TB
+  subgraph daily [Daily work]
+    feat[feature_or_bugfix_branch]
+    devel[development]
+    feat -->|"PR"| devel
+    devel -->|"PR"| mainBr[main]
+  end
+  subgraph ship [Ship and maintain 1.0]
+    mainBr -->|"cut once"| rel10[release_1.0]
+    rel10 -->|"tag"| t1[v1.0.0-alpha.1]
+    hf[hotfix_branch]
+    rel10 -->|"checkout base"| hf
+    hf -->|"PR"| rel10
+    rel10 -->|"tag"| t2[v1.0.0-alpha.2]
+    rel10 -->|"merge back"| mainBr
+    mainBr -->|"merge"| devel
+  end
+```
+
+**Examples**
+
+```text
+# Normal feature
+git checkout development && git pull
+git checkout -b feature/fix-filter-null
+# PR → development
+
+# Hotfix published 1.0 train
+git checkout release/1.0 && git pull
+git checkout -b hotfix/1.0-null-filter
+# PR → release/1.0 → bump Version → tag v1.0.0-alpha.2 → merge back to main
+```
+
+nuget.org publish is **tag-only** and the tagged commit must be on `release/*` (CI guard). Full policy, CI table, and first-tag steps: [CONTRIBUTING.md](CONTRIBUTING.md) (Branching & releases).
 
 At startup the ABI gate requires:
 1. `zvec_check_version(MinimumMajor, MinimumMinor, MinimumPatch)` (native ≥ minimum), **and**
@@ -564,7 +637,8 @@ ZVec.NET/
 We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 - Local development setup (C++ submodule init + CMake build)
-- Branching strategy (`feature/*` off `dev`)
+- Branching topology (`development` → `main` → `release/1.0` → tag), mermaid diagrams, and examples
+- `feature/*` / `bugfix/*` off **`development`**; `hotfix/*` off **`release/X.Y`**
 - API shape guidelines (DI-first, Builder pattern, full `type.h` enum coverage)
 - Zero-allocation rules on hot paths
 - Testing approach (real native library; tests Skip when the DLL is unavailable)
