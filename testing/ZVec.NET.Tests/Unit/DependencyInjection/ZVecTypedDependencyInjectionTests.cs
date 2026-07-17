@@ -34,6 +34,29 @@ public class ZVecTypedDependencyInjectionTests
         }
     }
 
+    [Fact]
+    public void AddZVecCollectionOfT_CreateFalse_DoesNotForceSchema()
+    {
+        var previousBypass = ZVecDefaults.Version.BypassAbiCheck;
+        try
+        {
+            ZVecDefaults.Version.BypassAbiCheck = true;
+            var services = new ServiceCollection();
+            services.AddZVec();
+            services.AddZVecCollection<DiProduct>(o =>
+            {
+                o.Path = "open_only";
+                o.Create = false;
+            });
+
+            services.Should().Contain(d => d.ServiceType == typeof(IZvecCollection<DiProduct>));
+        }
+        finally
+        {
+            ZVecDefaults.Version.BypassAbiCheck = previousBypass;
+        }
+    }
+
     private sealed class DiProduct
     {
         public string Id { get; set; } = "";

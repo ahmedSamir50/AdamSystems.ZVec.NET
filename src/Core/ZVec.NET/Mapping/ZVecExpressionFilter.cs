@@ -9,9 +9,25 @@ namespace ZVec.NET.Mapping;
 /// Translates typed boolean expressions into native ZVec filter strings.
 /// Shared engine — callable from future adapters without a second visitor.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Supported: comparisons (<c>==</c> <c>!=</c> <c>&lt;</c> <c>&lt;=</c> <c>&gt;</c> <c>&gt;=</c>,
+/// constant on either side), boolean trees (<c>&amp;&amp;</c> <c>||</c> <c>!</c>), and null checks.
+/// Property names resolve through <see cref="ZVecTypeModel"/> (including <see cref="ZVecFieldAttribute"/> storage overrides).
+/// </para>
+/// <para>
+/// Unsupported shapes (method calls such as <c>StartsWith</c>, indexers, etc.) throw <see cref="ZVecException"/>.
+/// Use <see cref="IZvecCollection{T}.Untyped"/> with <see cref="ZVecFilterBuilder"/> for advanced filters.
+/// </para>
+/// </remarks>
 public static class ZVecExpressionFilter
 {
-    /// <summary>Translates <paramref name="filter"/> for type <typeparamref name="T"/>.</summary>
+    /// <summary>
+    /// Translates <paramref name="filter"/> for type <typeparamref name="T"/> into a native filter string.
+    /// </summary>
+    /// <typeparam name="T">Mapped document type.</typeparam>
+    /// <param name="filter">Boolean expression over <typeparamref name="T"/> properties.</param>
+    /// <returns>Native ZVec filter string.</returns>
     public static string Translate<T>(Expression<Func<T, bool>> filter) where T : class
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -19,7 +35,13 @@ public static class ZVecExpressionFilter
         return Translate(model, filter);
     }
 
-    /// <summary>Translates using a precomputed type model (reuse seam).</summary>
+    /// <summary>
+    /// Translates using a precomputed type model (reuse seam).
+    /// </summary>
+    /// <typeparam name="T">Mapped document type.</typeparam>
+    /// <param name="model">Cached mapping metadata for <typeparamref name="T"/>.</param>
+    /// <param name="filter">Boolean expression over <typeparamref name="T"/> properties.</param>
+    /// <returns>Native ZVec filter string.</returns>
     public static string Translate<T>(ZVecTypeModel model, Expression<Func<T, bool>> filter) where T : class
     {
         ArgumentNullException.ThrowIfNull(model);

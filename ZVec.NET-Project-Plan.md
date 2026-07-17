@@ -74,11 +74,12 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 | Test Strategy | Real native + Skip when DLL missing; `SetMockLibrary` only for missing-path failure tests | Mock C++ project retired (E17 canceled) |
 | NuGet Layout | Single `.nupkg` with `runtimes/{rid}/native/` | Runtime resolves RID natives; no custom `build/*.props` for RID packing |
 | P/Invoke Style | `[LibraryImport]` (source generator) | Compile-time marshalling; faster than `[DllImport]` |
-| Public API style | DI-first (`IZvecFactory` / `IZvecCollection`) + selective builders | Hostable in ASP.NET Core, MAUI, Blazor Server |
-| Factory / Builder | Factory for open/create; builders for schema + filters | Immutable configs vs native resource lifecycle |
+| Public API style | DI-first (`IZvecFactory` / `IZvecCollection` / `IZvecCollection<T>`) + builders + typed ODM | Hostable in ASP.NET Core, MAUI, Blazor Server; typed recommended, `ZVecDoc` escape hatch |
+| Factory / Builder | Factory for open/create; builders for schema + filters; `From<T>()` for typed schema | Immutable configs vs native resource lifecycle |
 | C++ type surface (v1) | Full wrap — every `type.h` enum + every index-param class | Match C++ library; align with [llms-full.txt](https://zvec.org/llms-full.txt) DB sections |
 | Docs audit source | Fresh snapshot [`docs/llms-full.txt`](docs/llms-full.txt) | Re-audit when upstream docs change |
-| LINQ | On results only | Engine predicates stay FilterBuilder + query objects |
+| LINQ | On results only; typed expression filters → native filter strings | No custom `IQueryable` provider; `ZVecFilterBuilder` remains for dynamic filters |
+| Typed ODM (E23) | `ZVec.NET.Mapping` + `IZvecCollection<T>` + `AddZVecCollection<T>` | One mapper/expression engine; E24 = future separate `ZVec.NET.VectorData` package |
 | Public API shape | **Sync + async** entry points | Sync = lowest latency after RW lock; async = bounded offload for ASP.NET |
 | Concurrency gates | Interlocked for lifecycle state; native C++ owns operation-level thread safety | No managed-side RW lock — `Interlocked.CompareExchange`/`Exchange` for factory/collection state transitions; native `std::atomic` for its own global config. The planned `AsyncReaderWriterLock` was canceled (redundant with native guarantees, correctness concerns) |
 | Native version gate | Prefer `zvec_check_version` / int major/minor/patch; string version is diagnostics only | Fail fast on ABI mismatch; never free static version string |
@@ -119,7 +120,7 @@ Audit basis: remote `https://zvec.org/llms-full.txt` saved as [`docs/llms-full.t
 | Inspect (schema/stats/options/path) | `zvec_collection_get_schema` / `stats` / `options` | Collection properties | Covered |
 | Optimize | `zvec_collection_optimize` | `Optimize` / `OptimizeAsync` | Covered |
 | Schema + field/vector indexes | schema + `zvec_index_params_*` | SchemaBuilder + IndexParams | Covered |
-| Schema evolution (add/alter/drop column, create/drop index) | `zvec_collection_add_column`, schema alter/drop, index add/drop | DDL methods on `IZvecCollection` (sync + async) | Covered |
+| Schema evolution (add/alter/drop column, create/drop index) | `zvec_collection_add_column`, schema alter/drop, index add/drop | DDL methods on `IZvecCollection` / typed `IZvecCollection<T>` (sync + async). Native `add_column` and typed `EnsureSchema` add **nullable numeric** columns only — put string/array fields in the create-time schema. | Covered |
 | Insert / Upsert / Update / Delete / DeleteByFilter | matching `zvec_collection_*` | Sync + `*Async` CRUD | Covered |
 | Fetch | `zvec_collection_fetch` | `Fetch` / `FetchAsync` (single → `ZVecDoc?`; batch → dictionary) | Covered |
 | Query single / multi / filter / hybrid | `zvec_collection_query`, multi-query APIs | `Query` / `QueryAsync` | Covered |
@@ -325,13 +326,15 @@ ZVec.NET/                    # repo / product root
 │   │       ├── ZVec.NET.csproj
 │   │       ├── Abstractions/
 │   │       │   ├── IZvecFactory.cs         # Open/create collections (sync + async)
-│   │       │   └── IZvecCollection.cs      # Sync + async CRUD + query + DDL
+│   │       │   ├── IZvecCollection.cs      # Sync + async CRUD + query + DDL (dynamic)
+│   │       │   └── IZvecCollectionOfT.cs   # Typed ODM façade IZvecCollection<T>
+│   │       ├── Mapping/                    # ZVec.NET.Mapping — attrs, TypeModel, Mapper, ExpressionFilter
 │   │       ├── DependencyInjection/
-│   │       │   ├── ZVecServiceCollectionExtensions.cs  # AddZVec / AddZVecCollection
+│   │       │   ├── ZVecServiceCollectionExtensions.cs  # AddZVec / AddZVecCollection / AddZVecCollection<T>
 │   │       │   ├── ZVecOptions.cs          # Global init (incl. MemoryLimitMb)
 │   │       │   └── ZVecCollectionRegistrationOptions.cs
 │   │       ├── Builders/
-│   │       │   └── ZVecCollectionSchemaBuilder.cs
+│   │       │   └── ZVecCollectionSchemaBuilder.cs  # + From<T>()
 │   │       ├── Interop/
 │   │       │   ├── NativeMethods.cs        # [LibraryImport] from c_api.h
 │   │       │   ├── SafeZvecHandle.cs
@@ -709,6 +712,15 @@ services.AddZVec(options =>
     options.MemoryLimitMb = 512;               // global — maps to zvec_config_data_set_memory_limit
 });
 
+// Recommended — typed ODM (schema defaults to From<Product>())
+services.AddZVecCollection<Product>(options =>
+{
+    options.Path = path;
+    options.EnableMmap = true;
+    options.MaxConcurrentReads = Environment.ProcessorCount;
+});
+
+// Advanced — dynamic / string-keyed (explicit schema)
 services.AddZVecCollection("products", options =>
 {
     options.Path = path;
@@ -718,7 +730,7 @@ services.AddZVecCollection("products", options =>
 });
 ```
 
-**Host guidance:** ASP.NET Core / Blazor Server / MAUI — factory and named collections as **singletons**. Prefer injecting `IZvecCollection`. When the host stops, disposing the factory singleton runs `zvec_shutdown`. Blazor WASM is out of scope for v1.
+**Host guidance:** ASP.NET Core / Blazor Server / MAUI — factory and named collections as **singletons**. Prefer injecting `IZvecCollection<T>`; use `.Untyped` or keyed `IZvecCollection` for the dynamic escape hatch. When the host stops, disposing the factory singleton runs `zvec_shutdown`. Blazor WASM is out of scope for v1.
 
 ### 7.2 Collection API — `IZvecCollection`
 
@@ -1756,8 +1768,9 @@ public class QueryThroughputBench
 
 ### Recently Completed Epics
 - **Epic E14 (Schema DDL)**: Fully implemented DDL methods in `ZVecCollection` (`AddColumn`, `DropColumn`, `AlterColumn`, etc.) and validated with tests.
-- **Epic E16 (Dependency Injection)**: Integrated `Microsoft.Extensions.DependencyInjection` with `AddZVec` and `AddZVecCollection` using keyed singletons and DI options.
+- **Epic E16 (Dependency Injection)**: Integrated `Microsoft.Extensions.DependencyInjection` with `AddZVec` and `AddZVecCollection` / `AddZVecCollection<T>` using keyed singletons and DI options.
 - **Epic E18 (Integration Tests)** / **Epic E19 (Memory & Concurrency)**: Real-native coverage with Skip; ABI min+same-major (`ZVecNativeAbi`); platform gates; SemaphoreSlim throttles.
+- **Epic E23 (Typed ODM)**: `ZVec.NET.Mapping`, `IZvecCollection<T>`, `From<T>()`, expression filters, typed DDL + additive `EnsureSchema`, `AddZVecCollection<T>`. Dynamic `ZVecDoc` / string filters remain as escape hatch. **E24** (`ZVec.NET.VectorData`) deferred as a future separate package.
 
 ### Canceled Epics
 - **Epic E17 (Mock Native Library)**: 🗑️ Canceled — mock C++ project retired; real native + Skip is the test strategy.
