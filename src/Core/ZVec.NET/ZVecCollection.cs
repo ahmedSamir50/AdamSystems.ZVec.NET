@@ -1,7 +1,5 @@
 using ZVec.NET.Internal;
-using ZVec.NET.Interop;
 using ZVec.NET.Query;
-using System.Runtime.InteropServices;
 
 namespace ZVec.NET;
 
@@ -13,43 +11,39 @@ namespace ZVec.NET;
 /// <b>Dispose vs Destroy semantics:</b><br/>
 /// <see cref="Dispose"/>/<see cref="DisposeAsync"/> → <c>zvec_collection_close</c> (data is preserved).<br/>
 /// <see cref="Destroy"/>/<see cref="DestroyAsync"/> → <c>zvec_collection_destroy</c> then close (data is deleted).
+/// Calling <see cref="Destroy"/> after <see cref="Dispose"/> throws <see cref="ObjectDisposedException"/>.
 /// </para>
 /// <para>
-/// <b>Thread safety:</b> Idempotency and mutual exclusion for all disposal paths are achieved
-/// with <see cref="Interlocked.Exchange(ref int, ref int)"/> on <c>int</c> flags — no custom lock.
-/// This mirrors the BCL <see cref="SafeHandle"/> pattern.
+/// <b>Thread safety:</b> Idempotency for disposal paths uses <see cref="Interlocked"/> flags.
+/// The native handle is owned by a <see cref="Interop.SafeZvecHandle"/> (close-only on finalizer/Dispose).
+/// </para>
+/// <para>
+/// <b>Async APIs:</b> <c>*Async</c> methods are cancellation-aware wrappers around synchronous native calls
+/// (they complete on the caller thread; they are not thread-pool offloads).
+/// </para>
+/// <para>
+/// <b>DocumentId queries:</b> Resolving <see cref="ZVecQuery.DocumentId"/> performs an extra Fetch
+/// (with vectors) before the search — expect an additional native round-trip.
 /// </para>
 /// </remarks>
 public sealed class ZVecCollection : IZvecCollection
 {
-    // Raw native handle — we manage it manually (not via SafeHandle) so we can
-    // control close-vs-destroy ordering precisely.
-    private readonly nint _handle;
-
-    // 0 = alive, 1 = disposed. Interlocked.Exchange guarantees exactly-once close
-    // even under concurrent Dispose + DisposeAsync.
-    private int _disposed;
-
-    // 0 = not destroyed, 1 = destroyed. Prevents double-destroy.
-    private int _destroyed;
+    private readonly CollectionNativeContext _ctx;
+    private readonly CollectionWriteOps _writes;
+    private readonly CollectionReadOps _reads;
+    private readonly CollectionDdlOps _ddl;
 
     /// <inheritdoc/>
     public string Path { get; }
 
     /// <inheritdoc/>
-    public ZVecCollectionSchema? Schema { get; private set; }
+    public ZVecCollectionSchema? Schema => _ctx.Schema;
 
     /// <inheritdoc/>
-    public ZVecCollectionOptions Options => _options;
+    public ZVecCollectionOptions Options => _ctx.Options;
 
     /// <inheritdoc/>
     public ZVecCollectionStats Stats => GetStats();
-
-    // Token cancelled when ZVecFactory.Shutdown() is called.
-    private readonly CancellationToken _factoryShutdownToken;
-    private readonly ZVecFactory _factory;
-    private readonly SemaphoreSlim? _readGate;
-    private readonly ZVecCollectionOptions _options;
 
     internal ZVecCollection(
         nint handle,
@@ -59,115 +53,33 @@ public sealed class ZVecCollection : IZvecCollection
         ZVecFactory factory,
         ZVecCollectionOptions? options = null)
     {
-        ArgumentOutOfRangeException.ThrowIfZero(handle, nameof(handle));
-        _handle = handle;
         Path = path;
-        Schema = schema;
-        _factoryShutdownToken = factoryShutdownToken;
-        _factory = factory;
-        _options = options ?? new ZVecCollectionOptions();
-
-        int maxReads = _options.MaxConcurrentReads;
-        if (maxReads > 0)
-            _readGate = new SemaphoreSlim(maxReads, maxReads);
+        _ctx = new CollectionNativeContext(
+            handle,
+            factory,
+            factoryShutdownToken,
+            options ?? new ZVecCollectionOptions(),
+            schema);
+        _writes = new CollectionWriteOps(_ctx);
+        _reads = new CollectionReadOps(_ctx);
+        _ddl = new CollectionDdlOps(_ctx);
     }
-
-    private void EnterNativeCall()
-    {
-        _factory.EnterNativeCall(_factoryShutdownToken);
-    }
-
-    private void ExitNativeCall()
-    {
-        _factory.ExitNativeCall();
-    }
-
-    private void EnterRead()
-    {
-        EnterNativeCall();
-        try
-        {
-            _readGate?.Wait(_factoryShutdownToken);
-        }
-        catch
-        {
-            ExitNativeCall();
-            throw;
-        }
-    }
-
-    private void ExitRead()
-    {
-        try
-        {
-            _readGate?.Release();
-        }
-        finally
-        {
-            ExitNativeCall();
-        }
-    }
-
-    // =========================================================================
-    // Lifecycle — Dispose / DisposeAsync
-    // =========================================================================
 
     /// <summary>
     /// Closes the collection. Idempotent — safe to call multiple times and
     /// concurrently with <see cref="DisposeAsync"/>.
     /// </summary>
-    public void Dispose()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return; // Already closed — no-op.
+    public void Dispose() => _ctx.Dispose();
 
-        // Capture result but don't throw during disposal per .NET conventions.
-        // Only call native close if the factory is initialized — otherwise the native
-        // library resources are invalid and calling close would cause an Access Violation.
-        // This mirrors the documented guard in SafeZvecHandle.ReleaseHandle().
-        if (_factory.IsInitialized)
-            _ = NativeMethods.zvec_collection_close(_handle);
-        _factory.OpenCollections.TryRemove(_handle, out _);
-        _readGate?.Dispose();
-    }
-
-    /// <summary>
-    /// Asynchronously closes the collection. Idempotent.
-    /// </summary>
+    /// <inheritdoc/>
     public ValueTask DisposeAsync()
     {
         Dispose();
         return ValueTask.CompletedTask;
     }
 
-    // =========================================================================
-    // Lifecycle — Destroy / DestroyAsync
-    // =========================================================================
-
     /// <inheritdoc/>
-    /// <remarks>
-    /// Calls <c>zvec_collection_destroy</c> (deletes on-disk data) first, then
-    /// <c>zvec_collection_close</c>. The destroy → close ordering is required by the
-    /// native C API contract. Subsequent calls (including <see cref="Dispose"/>) are no-ops.
-    /// </remarks>
-    public void Destroy()
-    {
-        // Guard: only one caller can execute the destroy path.
-        if (Interlocked.Exchange(ref _destroyed, 1) != 0)
-            return; // Already destroyed — no-op.
-
-        // Atomically claim the right to clean up the native handle.
-        // If Dispose() already ran, we cannot safely call native destroy.
-        if (Interlocked.Exchange(ref _disposed, 1) == 0)
-        {
-            if (_factory.IsInitialized)
-            {
-                _ = NativeMethods.zvec_collection_destroy(_handle);
-                _ = NativeMethods.zvec_collection_close(_handle);
-            }
-            _factory.OpenCollections.TryRemove(_handle, out _);
-        }
-    }
+    public void Destroy() => _ctx.Destroy();
 
     /// <inheritdoc/>
     public ValueTask DestroyAsync(CancellationToken ct = default)
@@ -177,153 +89,12 @@ public sealed class ZVecCollection : IZvecCollection
         return ValueTask.CompletedTask;
     }
 
-    private void ThrowIfDisposed()
-    {
-        if (Interlocked.CompareExchange(ref _disposed, 0, 0) == 1)
-        {
-            throw new ObjectDisposedException(nameof(ZVecCollection));
-        }
-    }
-
-    // =========================================================================
-    // Epic E11 — Stats
-    // =========================================================================
-
     /// <inheritdoc/>
-    public ZVecCollectionStats GetStats()
-    {
-        ThrowIfDisposed();
+    public ZVecCollectionStats GetStats() => _reads.GetStats();
 
-        EnterRead();
-        try
-        {
-            int rc = NativeMethods.zvec_collection_get_stats(_handle, out nint statsPtr);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(GetStats));
-
-            try
-            {
-                ulong docCount = NativeMethods.zvec_collection_stats_get_doc_count(statsPtr);
-                nuint indexCount = NativeMethods.zvec_collection_stats_get_index_count(statsPtr);
-                var completeness = new Dictionary<string, float>((int)indexCount);
-
-                for (nuint i = 0; i < indexCount; i++)
-                {
-                    nint namePtr = NativeMethods.zvec_collection_stats_get_index_name(statsPtr, i);
-                    string name = namePtr != IntPtr.Zero
-                        ? Marshal.PtrToStringUTF8(namePtr) ?? string.Empty
-                        : string.Empty;
-                    completeness[name] = NativeMethods.zvec_collection_stats_get_index_completeness(statsPtr, i);
-                }
-
-                return new ZVecCollectionStats
-                {
-                    DocCount = (long)docCount,
-                    IndexCompleteness = completeness
-                };
-            }
-            finally
-            {
-                NativeMethods.zvec_collection_stats_destroy(statsPtr);
-            }
-        }
-        finally
-        {
-            ExitRead();
-        }
-    }
-
-    // =========================================================================
-    // Epic E12 — CRUD
-    // =========================================================================
-
-    public ZVecStatus Insert(ZVecDoc doc)
-    {
-        ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(doc);
-
-        EnterNativeCall();
-        try
-        {
-            using var builder = NativeDocBuilder.Build(doc);
-            nint handle = builder.Handle;
-            unsafe
-            {
-                nint* ptr = &handle;
-                var rc = NativeMethods.zvec_collection_insert(
-                    _handle, (nint)ptr, 1, out nuint success, out nuint error);
-                ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Insert));
-                return new ZVecStatus { Code = (ZVecErrorCode)rc };
-            }
-        }
-        finally
-        {
-            ExitNativeCall();
-        }
-    }
-
-    public ZVecStatus Insert(ReadOnlySpan<ZVecDoc> docs)
-    {
-        ThrowIfDisposed();
-        if (docs.IsEmpty) return new ZVecStatus { Code = ZVecErrorCode.Ok };
-
-        var builders = new NativeDocBuilder[docs.Length];
-        nint[] ptrs = new nint[docs.Length];
-        try
-        {
-            for (int i = 0; i < docs.Length; i++)
-            {
-                builders[i] = NativeDocBuilder.Build(docs[i]);
-                ptrs[i] = builders[i].Handle;
-            }
-
-            unsafe
-            {
-                fixed (nint* p = ptrs)
-                {
-                    var rc = NativeMethods.zvec_collection_insert(
-                        _handle, (nint)p, (nuint)docs.Length, out nuint success, out nuint error);
-                    ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Insert));
-                    return new ZVecStatus { Code = (ZVecErrorCode)rc };
-                }
-            }
-        }
-        finally
-        {
-            foreach (var b in builders) b?.Dispose();
-        }
-    }
-
-    public IReadOnlyList<ZVecWriteResult> InsertWithResults(ReadOnlySpan<ZVecDoc> docs)
-    {
-        ThrowIfDisposed();
-        if (docs.IsEmpty) return [];
-
-        var builders = new NativeDocBuilder[docs.Length];
-        nint[] ptrs = new nint[docs.Length];
-        try
-        {
-            for (int i = 0; i < docs.Length; i++)
-            {
-                builders[i] = NativeDocBuilder.Build(docs[i]);
-                ptrs[i] = builders[i].Handle;
-            }
-
-            unsafe
-            {
-                fixed (nint* p = ptrs)
-                {
-                    var rc = NativeMethods.zvec_collection_insert_with_results(
-                        _handle, (nint)p, (nuint)docs.Length, out nint resultsPtr, out nuint resCount);
-                    ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(InsertWithResults));
-                    return UnmarshalWriteResults(resultsPtr, resCount);
-                }
-            }
-        }
-        finally
-        {
-            foreach (var b in builders) b?.Dispose();
-        }
-    }
+    public ZVecStatus Insert(ZVecDoc doc) => _writes.Insert(doc);
+    public ZVecStatus Insert(ReadOnlySpan<ZVecDoc> docs) => _writes.Insert(docs);
+    public IReadOnlyList<ZVecWriteResult> InsertWithResults(ReadOnlySpan<ZVecDoc> docs) => _writes.InsertWithResults(docs);
 
     public ValueTask<ZVecStatus> InsertAsync(ZVecDoc doc, CancellationToken ct = default)
     {
@@ -339,80 +110,9 @@ public sealed class ZVecCollection : IZvecCollection
         return ValueTask.FromResult(InsertWithResults(docs.ToArray()));
     }
 
-    public ZVecStatus Update(ZVecDoc doc)
-    {
-        ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(doc);
-        return Update([doc]);
-    }
-
-    public ZVecStatus Update(ReadOnlySpan<ZVecDoc> docs)
-    {
-        ThrowIfDisposed();
-        if (docs.IsEmpty) return new ZVecStatus { Code = ZVecErrorCode.Ok };
-
-        var builders = new NativeDocBuilder[docs.Length];
-        nint[] ptrs = new nint[docs.Length];
-        EnterNativeCall();
-        try
-        {
-            for (int i = 0; i < docs.Length; i++)
-            {
-                builders[i] = NativeDocBuilder.Build(docs[i]);
-                ptrs[i] = builders[i].Handle;
-            }
-
-            unsafe
-            {
-                fixed (nint* p = ptrs)
-                {
-                    var rc = NativeMethods.zvec_collection_update(
-                        _handle, (nint)p, (nuint)docs.Length, out nuint success, out nuint error);
-                    ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Update));
-                    return new ZVecStatus { Code = (ZVecErrorCode)rc };
-                }
-            }
-        }
-        finally
-        {
-            foreach (var b in builders) b?.Dispose();
-            ExitNativeCall();
-        }
-    }
-
-    public IReadOnlyList<ZVecWriteResult> UpdateWithResults(ReadOnlySpan<ZVecDoc> docs)
-    {
-        ThrowIfDisposed();
-        if (docs.IsEmpty) return [];
-
-        var builders = new NativeDocBuilder[docs.Length];
-        nint[] ptrs = new nint[docs.Length];
-        EnterNativeCall();
-        try
-        {
-            for (int i = 0; i < docs.Length; i++)
-            {
-                builders[i] = NativeDocBuilder.Build(docs[i]);
-                ptrs[i] = builders[i].Handle;
-            }
-
-            unsafe
-            {
-                fixed (nint* p = ptrs)
-                {
-                    var rc = NativeMethods.zvec_collection_update_with_results(
-                        _handle, (nint)p, (nuint)docs.Length, out nint resultsPtr, out nuint resCount);
-                    ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(UpdateWithResults));
-                    return UnmarshalWriteResults(resultsPtr, resCount);
-                }
-            }
-        }
-        finally
-        {
-            foreach (var b in builders) b?.Dispose();
-            ExitNativeCall();
-        }
-    }
+    public ZVecStatus Update(ZVecDoc doc) => _writes.Update(doc);
+    public ZVecStatus Update(ReadOnlySpan<ZVecDoc> docs) => _writes.Update(docs);
+    public IReadOnlyList<ZVecWriteResult> UpdateWithResults(ReadOnlySpan<ZVecDoc> docs) => _writes.UpdateWithResults(docs);
 
     public ValueTask<ZVecStatus> UpdateAsync(ZVecDoc doc, CancellationToken ct = default)
     {
@@ -428,80 +128,9 @@ public sealed class ZVecCollection : IZvecCollection
         return ValueTask.FromResult(Update(docs.ToArray()));
     }
 
-    public ZVecStatus Upsert(ZVecDoc doc)
-    {
-        ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(doc);
-        return Upsert([doc]);
-    }
-
-    public ZVecStatus Upsert(ReadOnlySpan<ZVecDoc> docs)
-    {
-        ThrowIfDisposed();
-        if (docs.IsEmpty) return new ZVecStatus { Code = ZVecErrorCode.Ok };
-
-        var builders = new NativeDocBuilder[docs.Length];
-        nint[] ptrs = new nint[docs.Length];
-        EnterNativeCall();
-        try
-        {
-            for (int i = 0; i < docs.Length; i++)
-            {
-                builders[i] = NativeDocBuilder.Build(docs[i]);
-                ptrs[i] = builders[i].Handle;
-            }
-
-            unsafe
-            {
-                fixed (nint* p = ptrs)
-                {
-                    var rc = NativeMethods.zvec_collection_upsert(
-                        _handle, (nint)p, (nuint)docs.Length, out nuint success, out nuint error);
-                    ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Upsert));
-                    return new ZVecStatus { Code = (ZVecErrorCode)rc };
-                }
-            }
-        }
-        finally
-        {
-            foreach (var b in builders) b?.Dispose();
-            ExitNativeCall();
-        }
-    }
-
-    public IReadOnlyList<ZVecWriteResult> UpsertWithResults(ReadOnlySpan<ZVecDoc> docs)
-    {
-        ThrowIfDisposed();
-        if (docs.IsEmpty) return [];
-
-        var builders = new NativeDocBuilder[docs.Length];
-        nint[] ptrs = new nint[docs.Length];
-        EnterNativeCall();
-        try
-        {
-            for (int i = 0; i < docs.Length; i++)
-            {
-                builders[i] = NativeDocBuilder.Build(docs[i]);
-                ptrs[i] = builders[i].Handle;
-            }
-
-            unsafe
-            {
-                fixed (nint* p = ptrs)
-                {
-                    var rc = NativeMethods.zvec_collection_upsert_with_results(
-                        _handle, (nint)p, (nuint)docs.Length, out nint resultsPtr, out nuint resCount);
-                    ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(UpsertWithResults));
-                    return UnmarshalWriteResults(resultsPtr, resCount);
-                }
-            }
-        }
-        finally
-        {
-            foreach (var b in builders) b?.Dispose();
-            ExitNativeCall();
-        }
-    }
+    public ZVecStatus Upsert(ZVecDoc doc) => _writes.Upsert(doc);
+    public ZVecStatus Upsert(ReadOnlySpan<ZVecDoc> docs) => _writes.Upsert(docs);
+    public IReadOnlyList<ZVecWriteResult> UpsertWithResults(ReadOnlySpan<ZVecDoc> docs) => _writes.UpsertWithResults(docs);
 
     public ValueTask<ZVecStatus> UpsertAsync(ZVecDoc doc, CancellationToken ct = default)
     {
@@ -517,106 +146,10 @@ public sealed class ZVecCollection : IZvecCollection
         return ValueTask.FromResult(Upsert(docs.ToArray()));
     }
 
-    public ZVecStatus Delete(string pk)
-    {
-        ThrowIfDisposed();
-        ArgumentException.ThrowIfNullOrWhiteSpace(pk);
-
-        unsafe
-        {
-            // CRITICAL: We MUST append \0 before GetBytes because the native C API expects null-terminated const char*.
-            var utf8Pk = System.Text.Encoding.UTF8.GetBytes(pk + "\0");
-            fixed (byte* pPk = utf8Pk)
-            {
-                nint* pArray = stackalloc nint[] { (nint)pPk };
-                var rc = NativeMethods.zvec_collection_delete(
-                    _handle, (nint)pArray, 1, out nuint success, out nuint error);
-                ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Delete));
-                return new ZVecStatus { Code = (ZVecErrorCode)rc };
-            }
-        }
-    }
-
-    public ZVecStatus Delete(ReadOnlySpan<string> pks)
-    {
-        ThrowIfDisposed();
-        if (pks.IsEmpty) return new ZVecStatus { Code = ZVecErrorCode.Ok };
-
-        unsafe
-        {
-            var utf8Pks = new byte[pks.Length][];
-            nint[] ptrs = new nint[pks.Length];
-            var handles = new GCHandle[pks.Length];
-            
-            try
-            {
-                for (int i = 0; i < pks.Length; i++)
-                {
-                    // CRITICAL: We MUST append \0 before GetBytes because the native C API expects null-terminated const char*.
-                    utf8Pks[i] = System.Text.Encoding.UTF8.GetBytes(pks[i] + "\0");
-                    handles[i] = GCHandle.Alloc(utf8Pks[i], GCHandleType.Pinned);
-                    ptrs[i] = handles[i].AddrOfPinnedObject();
-                }
-
-                fixed (nint* p = ptrs)
-                {
-                    var rc = NativeMethods.zvec_collection_delete(
-                        _handle, (nint)p, (nuint)pks.Length, out nuint success, out nuint error);
-                    ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Delete));
-                    return new ZVecStatus { Code = (ZVecErrorCode)rc };
-                }
-            }
-            finally
-            {
-                foreach (var h in handles) if (h.IsAllocated) h.Free();
-            }
-        }
-    }
-
-    public IReadOnlyList<ZVecWriteResult> DeleteWithResults(ReadOnlySpan<string> pks)
-    {
-        ThrowIfDisposed();
-        if (pks.IsEmpty) return [];
-
-        unsafe
-        {
-            var utf8Pks = new byte[pks.Length][];
-            nint[] ptrs = new nint[pks.Length];
-            var handles = new GCHandle[pks.Length];
-            
-            try
-            {
-                for (int i = 0; i < pks.Length; i++)
-                {
-                    // CRITICAL: We MUST append \0 before GetBytes because the native C API expects null-terminated const char*.
-                    utf8Pks[i] = System.Text.Encoding.UTF8.GetBytes(pks[i] + "\0");
-                    handles[i] = GCHandle.Alloc(utf8Pks[i], GCHandleType.Pinned);
-                    ptrs[i] = handles[i].AddrOfPinnedObject();
-                }
-
-                fixed (nint* p = ptrs)
-                {
-                    var rc = NativeMethods.zvec_collection_delete_with_results(
-                        _handle, (nint)p, (nuint)pks.Length, out nint resultsPtr, out nuint resCount);
-                    ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(DeleteWithResults));
-                    return UnmarshalWriteResults(resultsPtr, resCount);
-                }
-            }
-            finally
-            {
-                foreach (var h in handles) if (h.IsAllocated) h.Free();
-            }
-        }
-    }
-
-    public ZVecStatus DeleteByFilter(string filter)
-    {
-        ThrowIfDisposed();
-        ArgumentException.ThrowIfNullOrWhiteSpace(filter);
-        var rc = NativeMethods.zvec_collection_delete_by_filter(_handle, filter);
-        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(DeleteByFilter));
-        return new ZVecStatus { Code = (ZVecErrorCode)rc };
-    }
+    public ZVecStatus Delete(string pk) => _writes.Delete(pk);
+    public ZVecStatus Delete(ReadOnlySpan<string> pks) => _writes.Delete(pks);
+    public IReadOnlyList<ZVecWriteResult> DeleteWithResults(ReadOnlySpan<string> pks) => _writes.DeleteWithResults(pks);
+    public ZVecStatus DeleteByFilter(string filter) => _writes.DeleteByFilter(filter);
 
     public ValueTask<ZVecStatus> DeleteAsync(string pk, CancellationToken ct = default)
     {
@@ -638,58 +171,8 @@ public sealed class ZVecCollection : IZvecCollection
         return ValueTask.FromResult(DeleteByFilter(filter));
     }
 
-    public ZVecDoc? Fetch(string pk, bool includeVector = false)
-    {
-        ThrowIfDisposed();
-        ArgumentException.ThrowIfNullOrWhiteSpace(pk);
-
-        var list = Fetch([pk], includeVector);
-        return list.Count > 0 ? list[0] : null;
-    }
-
-    public IReadOnlyList<ZVecDoc> Fetch(ReadOnlySpan<string> pks, bool includeVector = false)
-    {
-        ThrowIfDisposed();
-        if (pks.IsEmpty) return [];
-
-        EnterRead();
-        try
-        {
-            unsafe
-            {
-                var utf8Pks = new byte[pks.Length][];
-                nint[] ptrs = new nint[pks.Length];
-                var handles = new GCHandle[pks.Length];
-
-                try
-                {
-                    for (int i = 0; i < pks.Length; i++)
-                    {
-                        // CRITICAL: We MUST append \0 before GetBytes because the native C API expects null-terminated const char*.
-                        utf8Pks[i] = System.Text.Encoding.UTF8.GetBytes(pks[i] + "\0");
-                        handles[i] = GCHandle.Alloc(utf8Pks[i], GCHandleType.Pinned);
-                        ptrs[i] = handles[i].AddrOfPinnedObject();
-                    }
-
-                    fixed (nint* p = ptrs)
-                    {
-                        var rc = NativeMethods.zvec_collection_fetch(
-                            _handle, (nint)p, (nuint)pks.Length, IntPtr.Zero, 0, includeVector, out nint docsPtr, out nuint docsCount);
-                        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Fetch));
-                        return UnmarshalDocs(docsPtr, docsCount);
-                    }
-                }
-                finally
-                {
-                    foreach (var h in handles) if (h.IsAllocated) h.Free();
-                }
-            }
-        }
-        finally
-        {
-            ExitRead();
-        }
-    }
+    public ZVecDoc? Fetch(string pk, bool includeVector = false) => _reads.Fetch(pk, includeVector);
+    public IReadOnlyList<ZVecDoc> Fetch(ReadOnlySpan<string> pks, bool includeVector = false) => _reads.Fetch(pks, includeVector);
 
     public ValueTask<ZVecDoc?> FetchAsync(string pk, bool includeVector = false, CancellationToken ct = default)
     {
@@ -705,149 +188,45 @@ public sealed class ZVecCollection : IZvecCollection
         return ValueTask.FromResult(Fetch(pks.ToArray(), includeVector));
     }
 
-    private unsafe IReadOnlyList<ZVecWriteResult> UnmarshalWriteResults(nint resultsPtr, nuint count)
-    {
-        if (resultsPtr == IntPtr.Zero || count == 0) return [];
-        
-        var list = new List<ZVecWriteResult>((int)count);
-        try
-        {
-            // CRITICAL: resultsPtr is an array of structs (zvec_write_result_t*), NOT an array of pointers (zvec_write_result_t**).
-            // It must be read by calculating the offset of each struct using its size, rather than copying pointers.
-            // Treating it as an array of pointers will dereference garbage memory and cause catastrophic access violations.
-            int structSize = Marshal.SizeOf<ZVecWriteResultNative>();
-            for (int i = 0; i < (int)count; i++)
-            {
-                var ptr = IntPtr.Add(resultsPtr, i * structSize);
-                var nativeRes = Marshal.PtrToStructure<ZVecWriteResultNative>(ptr);
-                list.Add(new ZVecWriteResult
-                {
-                    Code = (ZVecErrorCode)nativeRes.Code,
-                    Message = nativeRes.Message != IntPtr.Zero ? Marshal.PtrToStringUTF8(nativeRes.Message) : null
-                });
-            }
-        }
-        finally
-        {
-            NativeMethods.zvec_write_results_free(resultsPtr, count);
-        }
-        
-        return list;
-    }
+    public IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk = 10, string? filter = null, bool includeVector = true) =>
+        _reads.Query(query, topk, filter, includeVector);
 
-    private unsafe IReadOnlyList<ZVecDoc> UnmarshalDocs(nint docsPtr, nuint count)
-    {
-        if (docsPtr == IntPtr.Zero || count == 0) return [];
-
-        var list = new List<ZVecDoc>((int)count);
-        try
-        {
-            var ptrArray = new nint[count];
-            Marshal.Copy(docsPtr, ptrArray, 0, (int)count);
-
-            for (int i = 0; i < (int)count; i++)
-            {
-                var doc = NativeDocUnmarshaller.Unmarshal(ptrArray[i], Schema);
-                list.Add(doc);
-            }
-        }
-        finally
-        {
-            NativeMethods.zvec_docs_free(docsPtr, count);
-        }
-        
-        return list;
-    }
-
-    // =========================================================================
-    // Epic E13 — Query
-    // =========================================================================
-
-    public IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk = 10, string? filter = null)
-    {
-        ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(query);
-
-        query = PrepareQuery(query);
-        if (RequiresMultiQuery(query))
-            return Query([query], topk, filter: filter);
-
-        EnterRead();
-        try
-        {
-            using var builder = new NativeQueryBuilder(query, topk, filter);
-
-            int rc = NativeMethods.zvec_collection_query(
-                _handle,
-                builder.Handle,
-                out nint resultsPtr,
-                out nuint resultCount);
-
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Query));
-
-            return UnmarshalDocs(resultsPtr, resultCount);
-        }
-        finally
-        {
-            ExitRead();
-        }
-    }
-
-    public IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk, ZVecFilterBuilder filter)
+    public IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk, ZVecFilterBuilder filter, bool includeVector = true)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        return Query(query, topk, filter.Build());
+        return Query(query, topk, filter.Build(), includeVector);
     }
 
     public IReadOnlyList<ZVecDoc> Query(
         IReadOnlyList<ZVecQuery> queries,
         int topk = 10,
         ZVecReranker? reranker = null,
-        string? filter = null)
-    {
-        ThrowIfDisposed();
-        if (queries is null || queries.Count == 0) return [];
-
-        var prepared = new ZVecQuery[queries.Count];
-        for (int i = 0; i < queries.Count; i++)
-            prepared[i] = PrepareQuery(queries[i]);
-
-        EnterRead();
-        try
-        {
-            using var builder = new Internal.NativeMultiQueryBuilder(prepared, topk, reranker, filter);
-            int rc = NativeMethods.zvec_collection_multi_query(
-                _handle,
-                builder.Handle,
-                out nint resultsPtr,
-                out nuint resultCount);
-
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Query));
-
-            return UnmarshalDocs(resultsPtr, resultCount);
-        }
-        finally
-        {
-            ExitRead();
-        }
-    }
+        string? filter = null,
+        bool includeVector = true) =>
+        _reads.Query(queries, topk, reranker, filter, includeVector);
 
     public IReadOnlyList<ZVecDoc> Query(
         IReadOnlyList<ZVecQuery> queries,
         int topk,
         ZVecReranker? reranker,
-        ZVecFilterBuilder filter)
+        ZVecFilterBuilder filter,
+        bool includeVector = true)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        return Query(queries, topk, reranker, filter.Build());
+        return Query(queries, topk, reranker, filter.Build(), includeVector);
     }
 
-    public ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(ZVecQuery query, int topk = 10, string? filter = null, CancellationToken ct = default)
+    public ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(
+        ZVecQuery query,
+        int topk = 10,
+        string? filter = null,
+        bool includeVector = true,
+        CancellationToken ct = default)
     {
         if (ct.IsCancellationRequested) return ValueTask.FromCanceled<IReadOnlyList<ZVecDoc>>(ct);
         try
         {
-            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(query, topk, filter));
+            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(query, topk, filter, includeVector));
         }
         catch (Exception ex)
         {
@@ -855,12 +234,17 @@ public sealed class ZVecCollection : IZvecCollection
         }
     }
 
-    public ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(ZVecQuery query, int topk, ZVecFilterBuilder filter, CancellationToken ct = default)
+    public ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(
+        ZVecQuery query,
+        int topk,
+        ZVecFilterBuilder filter,
+        bool includeVector = true,
+        CancellationToken ct = default)
     {
         if (ct.IsCancellationRequested) return ValueTask.FromCanceled<IReadOnlyList<ZVecDoc>>(ct);
         try
         {
-            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(query, topk, filter));
+            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(query, topk, filter, includeVector));
         }
         catch (Exception ex)
         {
@@ -873,12 +257,13 @@ public sealed class ZVecCollection : IZvecCollection
         int topk = 10,
         ZVecReranker? reranker = null,
         string? filter = null,
+        bool includeVector = true,
         CancellationToken ct = default)
     {
         if (ct.IsCancellationRequested) return ValueTask.FromCanceled<IReadOnlyList<ZVecDoc>>(ct);
         try
         {
-            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(queries, topk, reranker, filter));
+            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(queries, topk, reranker, filter, includeVector));
         }
         catch (Exception ex)
         {
@@ -891,12 +276,13 @@ public sealed class ZVecCollection : IZvecCollection
         int topk,
         ZVecReranker? reranker,
         ZVecFilterBuilder filter,
+        bool includeVector = true,
         CancellationToken ct = default)
     {
         if (ct.IsCancellationRequested) return ValueTask.FromCanceled<IReadOnlyList<ZVecDoc>>(ct);
         try
         {
-            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(queries, topk, reranker, filter));
+            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(queries, topk, reranker, filter, includeVector));
         }
         catch (Exception ex)
         {
@@ -904,19 +290,25 @@ public sealed class ZVecCollection : IZvecCollection
         }
     }
 
+    /// <inheritdoc/>
+    [Obsolete(ZVecDefaults.Errors.NativeGroupByQueryNotSupported)]
     public IReadOnlyList<ZVecDoc> QueryGroupBy(ZVecGroupByQuery groupQuery)
     {
-        ThrowIfDisposed();
+        _ctx.ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(groupQuery);
         throw new NotSupportedException(ZVecDefaults.Errors.NativeGroupByQueryNotSupported);
     }
 
+    /// <inheritdoc/>
+    [Obsolete(ZVecDefaults.Errors.NativeGroupByQueryNotSupported)]
     public ValueTask<IReadOnlyList<ZVecDoc>> QueryGroupByAsync(ZVecGroupByQuery groupQuery, CancellationToken ct = default)
     {
         if (ct.IsCancellationRequested) return ValueTask.FromCanceled<IReadOnlyList<ZVecDoc>>(ct);
         try
         {
+#pragma warning disable CS0618
             return new ValueTask<IReadOnlyList<ZVecDoc>>(QueryGroupBy(groupQuery));
+#pragma warning restore CS0618
         }
         catch (Exception ex)
         {
@@ -924,181 +316,21 @@ public sealed class ZVecCollection : IZvecCollection
         }
     }
 
-    private static bool RequiresMultiQuery(ZVecQuery query) =>
-        query.SparseVector is { Count: > 0 };
+    public void AddColumn(ZVecFieldSchema field, string? defaultExpression = null) =>
+        _ddl.AddColumn(field, defaultExpression);
 
-    private ZVecQuery PrepareQuery(ZVecQuery query)
-    {
-        if (string.IsNullOrWhiteSpace(query.DocumentId))
-            return query;
+    public void DropColumn(string columnName) => _ddl.DropColumn(columnName);
 
-        if (query.Vector.HasValue || query.SparseVector is { Count: > 0 } || query.Fts != null)
-            throw new ArgumentException(ZVecDefaults.Errors.QueryDocumentIdConflict, nameof(query));
+    public void AlterColumn(string columnName, string? newName = null, ZVecFieldSchema? newSchema = null) =>
+        _ddl.AlterColumn(columnName, newName, newSchema);
 
-        var doc = Fetch(query.DocumentId, includeVector: true);
-        if (doc is null)
-            throw new KeyNotFoundException(string.Format(ZVecDefaults.Errors.QueryDocumentNotFound, query.DocumentId));
+    public void CreateIndex(string columnName, ZVecIndexParam indexParam) =>
+        _ddl.CreateIndex(columnName, indexParam);
 
-        if (doc.DenseVectors.TryGetValue(query.FieldName, out var dense))
-        {
-            return new ZVecQuery
-            {
-                FieldName = query.FieldName,
-                Vector = dense,
-                Fts = query.Fts,
-                QueryParams = query.QueryParams
-            };
-        }
+    public void DropIndex(string columnName) => _ddl.DropIndex(columnName);
 
-        if (doc.SparseVectors.TryGetValue(query.FieldName, out var sparse))
-        {
-            return new ZVecQuery
-            {
-                FieldName = query.FieldName,
-                SparseVector = sparse,
-                Fts = query.Fts,
-                QueryParams = query.QueryParams
-            };
-        }
+    public void Optimize() => _ddl.Optimize();
 
-        throw new ArgumentException(
-            string.Format(ZVecDefaults.Errors.QueryFieldNotOnDocument, query.FieldName, query.DocumentId),
-            nameof(query));
-    }
-
-    // =========================================================================
-    // Epic E14 — DDL
-    // =========================================================================
-
-    public void AddColumn(ZVecFieldSchema field, string? defaultExpression = null)
-    {
-        ThrowIfDisposed();
-        EnterNativeCall();
-        try
-        {
-            using var builder = new NativeFieldSchemaBuilder(field);
-            int rc = NativeMethods.zvec_collection_add_column(_handle, builder.Handle, defaultExpression ?? string.Empty);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddColumn));
-        }
-        finally
-        {
-            ExitNativeCall();
-        }
-
-        if (Schema != null)
-        {
-            var fields = Schema.Fields.ToList();
-            fields.Add(field);
-            Schema = new ZVecCollectionSchema { Name = Schema.Name, Fields = fields, Vectors = Schema.Vectors };
-        }
-    }
-
-    public void DropColumn(string columnName)
-    {
-        ThrowIfDisposed();
-        EnterNativeCall();
-        try
-        {
-            int rc = NativeMethods.zvec_collection_drop_column(_handle, columnName);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(DropColumn));
-        }
-        finally
-        {
-            ExitNativeCall();
-        }
-
-        if (Schema != null)
-        {
-            var fields = Schema.Fields.Where(f => f.Name != columnName).ToList();
-            var vectors = Schema.Vectors.Where(v => v.Name != columnName).ToList();
-            Schema = new ZVecCollectionSchema { Name = Schema.Name, Fields = fields, Vectors = vectors };
-        }
-    }
-
-    public void AlterColumn(string columnName, string? newName = null, ZVecFieldSchema? newSchema = null)
-    {
-        ThrowIfDisposed();
-        EnterNativeCall();
-        try
-        {
-            using var builder = newSchema != null ? new NativeFieldSchemaBuilder(newSchema) : null;
-            int rc = NativeMethods.zvec_collection_alter_column(
-                _handle,
-                columnName,
-                newName,
-                builder?.Handle ?? IntPtr.Zero);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AlterColumn));
-        }
-        finally
-        {
-            ExitNativeCall();
-        }
-
-        if (Schema != null)
-        {
-            var fields = Schema.Fields.ToList();
-            var target = fields.FirstOrDefault(f => f.Name == columnName);
-            if (target != null)
-            {
-                var replacement = newSchema ?? target;
-                var finalField = new ZVecFieldSchema
-                {
-                    Name = newName ?? replacement.Name,
-                    DataType = replacement.DataType,
-                    Nullable = replacement.Nullable
-                };
-                fields[fields.IndexOf(target)] = finalField;
-                Schema = new ZVecCollectionSchema { Name = Schema.Name, Fields = fields, Vectors = Schema.Vectors };
-            }
-        }
-    }
-
-    public void CreateIndex(string columnName, ZVecIndexParam indexParam)
-    {
-        ThrowIfDisposed();
-        EnterNativeCall();
-        try
-        {
-            using var builder = new NativeIndexParamBuilder(indexParam);
-            int rc = NativeMethods.zvec_collection_create_index(_handle, columnName, builder.Handle);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(CreateIndex));
-        }
-        finally
-        {
-            ExitNativeCall();
-        }
-    }
-
-    public void DropIndex(string columnName)
-    {
-        ThrowIfDisposed();
-        EnterNativeCall();
-        try
-        {
-            int rc = NativeMethods.zvec_collection_drop_index(_handle, columnName);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(DropIndex));
-        }
-        finally
-        {
-            ExitNativeCall();
-        }
-    }
-
-    public void Optimize()
-    {
-        ThrowIfDisposed();
-        EnterNativeCall();
-        try
-        {
-            int rc = NativeMethods.zvec_collection_optimize(_handle);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Optimize));
-        }
-        finally
-        {
-            ExitNativeCall();
-        }
-    }
-    
     public ValueTask AddColumnAsync(ZVecFieldSchema field, string? defaultExpression = null, CancellationToken ct = default)
     {
         if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
@@ -1183,4 +415,3 @@ public sealed class ZVecCollection : IZvecCollection
         }
     }
 }
-

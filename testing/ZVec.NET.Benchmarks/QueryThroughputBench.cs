@@ -4,8 +4,9 @@ namespace ZVec.NET.Benchmarks;
 
 /// <summary>
 /// Sync query latency on the local binding suite (10k Flat).
-/// Upstream engine scale (VectorDBBench Cohere 1M/10M, homepage 8500+ QPS) is
-/// <see cref="UpstreamEngineScaleBaseline"/> — not comparable 1:1 to these means.
+/// Primary latency benches use <c>includeVector: false</c> (search + id/score/scalars).
+/// <see cref="Query_Sync_WithVectors"/> documents the full materialization path.
+/// Upstream engine scale is <see cref="UpstreamEngineScaleBaseline"/>.
 /// </summary>
 [MemoryDiagnoser]
 [RankColumn]
@@ -14,7 +15,7 @@ public class QueryThroughputBench
     private ZVecFactory _factory = null!;
     private IZvecCollection _collection = null!;
     private IZvecCollection _tinyCollection = null!;
-    private ReadOnlyMemory<float> _queryVector = default;
+    private ZVecQuery _query = null!;
     private string _tempPath = null!;
     private string _tinyTempPath = null!;
 
@@ -25,7 +26,7 @@ public class QueryThroughputBench
             return;
 
         var vector = BenchmarkEnvironment.CreateVector();
-        _queryVector = vector;
+        _query = new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = vector };
 
         _tempPath = Path.Combine(Path.GetTempPath(), $"zvec_bench_query_{Guid.NewGuid():N}");
         _collection = _factory.CreateAndOpen(_tempPath, BenchmarkEnvironment.CreateSchema("query_bench"));
@@ -35,13 +36,8 @@ public class QueryThroughputBench
         _tinyCollection = _factory.CreateAndOpen(_tinyTempPath, BenchmarkEnvironment.CreateSchema("query_tiny"));
         BenchmarkEnvironment.SeedCollection(_tinyCollection, vector, BenchmarkEnvironment.TinyCorpusSeedCount);
 
-        // Warm native path once before timed iterations.
-        _ = _collection.Query(
-            new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
-            topk: ZVecDefaults.Query.Topk);
-        _ = _tinyCollection.Query(
-            new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
-            topk: ZVecDefaults.Query.Topk);
+        _ = _collection.Query(_query, topk: ZVecDefaults.Query.Topk, includeVector: false);
+        _ = _tinyCollection.Query(_query, topk: ZVecDefaults.Query.Topk, includeVector: false);
     }
 
     [GlobalCleanup]
@@ -54,15 +50,24 @@ public class QueryThroughputBench
         TryDeleteDir(_tinyTempPath);
     }
 
-    [Benchmark]
+    /// <summary>Primary 10k Flat latency (no result vectors).</summary>
+    [Benchmark(Baseline = true)]
     public IReadOnlyList<ZVecDoc> Query_Sync()
     {
         if (!_factory.IsInitialized)
             return [];
 
-        return _collection.Query(
-            new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
-            topk: ZVecDefaults.Query.Topk);
+        return _collection.Query(_query, topk: ZVecDefaults.Query.Topk, includeVector: false);
+    }
+
+    /// <summary>Full materialization path (topk vectors copied) — documents ~44 KB alloc floor.</summary>
+    [Benchmark]
+    public IReadOnlyList<ZVecDoc> Query_Sync_WithVectors()
+    {
+        if (!_factory.IsInitialized)
+            return [];
+
+        return _collection.Query(_query, topk: ZVecDefaults.Query.Topk, includeVector: true);
     }
 
     [Benchmark]
@@ -72,13 +77,14 @@ public class QueryThroughputBench
             return [];
 
         return _collection.Query(
-            new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
+            _query,
             topk: ZVecDefaults.Query.Topk,
-            filter: BenchmarkEnvironment.SampleFilter());
+            filter: BenchmarkEnvironment.SampleFilter(),
+            includeVector: false);
     }
 
     /// <summary>
-    /// Warm query on a tiny Flat corpus — proxy for “sync call overhead”, not a no-op P/Invoke stub.
+    /// Warm query on a tiny Flat corpus — binding/search overhead with includeVector=false.
     /// </summary>
     [Benchmark]
     public IReadOnlyList<ZVecDoc> Query_WarmTinyCorpus()
@@ -86,9 +92,7 @@ public class QueryThroughputBench
         if (!_factory.IsInitialized)
             return [];
 
-        return _tinyCollection.Query(
-            new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
-            topk: ZVecDefaults.Query.Topk);
+        return _tinyCollection.Query(_query, topk: ZVecDefaults.Query.Topk, includeVector: false);
     }
 
     private static void DestroyCollection(ref IZvecCollection collection)

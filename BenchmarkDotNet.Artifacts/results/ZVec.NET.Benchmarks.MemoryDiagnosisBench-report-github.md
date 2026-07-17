@@ -10,7 +10,7 @@ Job=ShortRun  IterationCount=3  LaunchCount=1
 WarmupCount=3  
 
 ```
-| Method         | Mean       | Error      | StdDev    | Gen0   | Allocated |
-|--------------- |-----------:|-----------:|----------:|-------:|----------:|
-| InsertDocument | 4,026.6 ns | 2,275.8 ns | 124.75 ns | 0.1144 |     560 B |
-| QueryVector    |   542.4 ns |   306.7 ns |  16.81 ns | 0.0439 |     208 B |
+| Method           | Mean       | Error     | StdDev   | Gen0   | Allocated |
+|----------------- |-----------:|----------:|---------:|-------:|----------:|
+| Query_768Dim     | 3,134.2 μs | 860.42 μs | 47.16 μs | 7.8125 |  44.35 KB |
+| Fetch_ScalarOnly |   210.1 μs |  38.59 μs |  2.12 μs | 0.2441 |   1.22 KB |

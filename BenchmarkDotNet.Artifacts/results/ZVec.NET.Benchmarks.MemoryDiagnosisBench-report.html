@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>ZVec.NET.Benchmarks.ZVecPerformanceBenchmarks-20260717-214918</title>
+<title>ZVec.NET.Benchmarks.MemoryDiagnosisBench-20260717-214759</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -24,10 +24,10 @@ WarmupCount=3
 </code></pre>
 
 <table>
-<thead><tr><th>Method  </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Allocated</th>
+<thead><tr><th>Method    </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Allocated</th>
 </tr>
-</thead><tbody><tr><td>InsertDocument</td><td>4,026.6 ns</td><td>2,275.8 ns</td><td>124.75 ns</td><td>0.1144</td><td>560 B</td>
-</tr><tr><td>QueryVector</td><td>542.4 ns</td><td>306.7 ns</td><td>16.81 ns</td><td>0.0439</td><td>208 B</td>
+</thead><tbody><tr><td>Query_768Dim</td><td>3,134.2 &mu;s</td><td>860.42 &mu;s</td><td>47.16 &mu;s</td><td>7.8125</td><td>44.35 KB</td>
+</tr><tr><td>Fetch_ScalarOnly</td><td>210.1 &mu;s</td><td>38.59 &mu;s</td><td>2.12 &mu;s</td><td>0.2441</td><td>1.22 KB</td>
 </tr></tbody></table>
 </body>
 </html>

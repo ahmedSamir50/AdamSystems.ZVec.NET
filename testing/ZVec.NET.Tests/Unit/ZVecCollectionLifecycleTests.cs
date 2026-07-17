@@ -96,6 +96,17 @@ public class ZVecCollectionLifecycleTests : IDisposable
 
 
     [Fact]
+    public void Collection_Destroy_AfterDispose_ThrowsObjectDisposedException()
+    {
+        if (_factory is null || !_factory.IsInitialized) return;
+        var col = CreateCollection();
+        col.Dispose();
+
+        var act = () => col.Destroy();
+        act.Should().Throw<ObjectDisposedException>();
+    }
+
+    [Fact]
     public void Collection_Destroy_CalledTwice_IsIdempotent()
     {
         if (_factory is null || !_factory.IsInitialized) return;

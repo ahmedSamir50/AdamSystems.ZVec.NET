@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>ZVec.NET.Benchmarks.ZVecPerformanceBenchmarks-20260717-214918</title>
+<title>ZVec.NET.Benchmarks.InsertThroughputBench-20260717-214740</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -24,10 +24,10 @@ WarmupCount=3
 </code></pre>
 
 <table>
-<thead><tr><th>Method  </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Allocated</th>
+<thead><tr><th>Method </th><th>InvocationCount</th><th>UnrollFactor</th><th>Mean  </th><th>Error  </th><th>StdDev </th><th>Gen0</th><th>Allocated</th>
 </tr>
-</thead><tbody><tr><td>InsertDocument</td><td>4,026.6 ns</td><td>2,275.8 ns</td><td>124.75 ns</td><td>0.1144</td><td>560 B</td>
-</tr><tr><td>QueryVector</td><td>542.4 ns</td><td>306.7 ns</td><td>16.81 ns</td><td>0.0439</td><td>208 B</td>
+</thead><tbody><tr><td>Insert_Single</td><td>Default</td><td>16</td><td>58.13 &mu;s</td><td>94.69 &mu;s</td><td>5.190 &mu;s</td><td>0.2441</td><td>1.39 KB</td>
+</tr><tr><td>Insert_Batch</td><td>1</td><td>1</td><td>63,777.35 &mu;s</td><td>200,990.91 &mu;s</td><td>11,016.990 &mu;s</td><td>-</td><td>453.59 KB</td>
 </tr></tbody></table>
 </body>
 </html>

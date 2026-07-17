@@ -18,7 +18,7 @@
 | **Pin-based vector pipelines** | `ReadOnlyMemory&lt;float&gt;` on hot paths — no intermediate `float[]` copies on the query pin path (measure with `MemoryDiagnosisBench`) |
 | **Sync + Async APIs** | Lowest-latency sync path for batch jobs; async `ValueTask` APIs for ASP.NET Core (cooperative cancel; no thread-pool offload today) |
 | **DI-first design** | `AddZVec()` / `AddZVecCollection()` — works with ASP.NET Core, MAUI, Blazor Server out of the box |
-| **Safe native lifecycle** | Collection handles use `nint` + `Interlocked` dispose/destroy; query/doc helpers use `SafeHandle` where ownership is short-lived |
+| **Safe native lifecycle** | Collection handles owned by `SafeZvecHandle` (close-only); `Dispose` closes, `Destroy` deletes then closes; `Shutdown` disposes all tracked open collections before `zvec_shutdown` |
 | **Cross-platform NuGet (planned)** | Target RIDs: win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 — full multi-RID packaging is Epic E21 |
 | **Full ZVec DB coverage** | HNSW, Flat, IVF, HNSW-RaBitQ, DiskANN, Vamana, Invert, FTS indexes; hybrid search; schema evolution; in-DB RRF/Weighted rerankers |
 | **Idiomatic C#** | .NET naming guidelines, `ValueTask`, `CancellationToken`, fluent builders |
@@ -30,7 +30,7 @@
 ZVec.NET is built for thread-safe use against the native engine:
 
 1. **Instance-based factory:** `ZVecFactory` tracks its own state and open collection handles. A process-wide `lock` ensures exactly-once native library initialization (`zvec_initialize`).
-2. **Collection lifecycle:** Open collections hold a raw `nint` handle. `Dispose` / `Destroy` use `Interlocked` flags (idempotent). Short-lived query/doc native objects use `SafeHandle` helpers.
+2. **Collection lifecycle:** Open collections own a `SafeZvecHandle`. `Dispose` closes (data preserved); `Destroy` deletes on-disk data then closes. `Destroy` after `Dispose` throws `ObjectDisposedException`. `ZVecFactory.Shutdown` disposes every tracked open collection before native shutdown. Short-lived query/doc native objects also use `SafeHandle` helpers.
 3. **Optional throttles:** `MaxConcurrentNativeCalls` / `MaxConcurrentReads` use `SemaphoreSlim` when &gt; 0; `0` means unlimited. The canceled managed RW lock (E9) is not used — native ZVec is already thread-safe.
 4. **Zero-copy pipelines:** Hot paths pin `ReadOnlyMemory<float>` and pass pointers to native code. Performance targets are below (not published latency claims until benchmarks stabilize).
 
@@ -140,10 +140,12 @@ foreach (var hit in results)
                         │
           ┌─────────────▼──────────────┐
           │   ZVec.NET SDK             │
-          │  IZvecFactory / IZvecCollection  │
+          │  IZvecFactory / IZvecCollection │
+          │  (+ Lifecycle/Writes/Queries/Ddl) │
           │  Builders / DTOs / DI        │
           ├──────────────────────────────┤
-          │  Interlocked lifecycle gate   │
+          │  Collection*Ops + CallGate   │
+          │  SafeZvecHandle (collection) │
           │  SafeHandle helpers (query/doc)│
           │  [LibraryImport] P/Invoke    │
           └─────────────┬──────────────┘
@@ -232,24 +234,24 @@ var filter = ZVecFilterBuilder.Create()
 
 ### Sync + Async
 
-Every mutating/querying operation exposes both sync and async variants:
+Every mutating/querying operation exposes both sync and async variants. Async methods are **cancellation-aware wrappers** around synchronous native P/Invoke (they complete on the caller thread — not a thread-pool offload).
 
 ```csharp
 // Sync (lowest latency — P/Invoke on caller thread)
 var results = col.Query(query, topk: 10);
 
-// Async (ValueTask; currently completes synchronously after the native call —
-// not a thread-pool offload). Pass CancellationToken for cooperative cancel before/around the call.
+// Async (ValueTask; completes synchronously after the native call)
 var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
 ```
 
+Queries that set `ZVecQuery.DocumentId` perform an extra `Fetch` (with vectors) before search — expect an additional native round-trip.
 ---
 
 ## Performance
 
-Workload for primary numbers: **768-dim Flat**, `win-x64`, native ZVec `v0.5.1-35-g1afdea8`, .NET 8.0.29, Intel Core i7-8850H, BenchmarkDotNet **ShortRun** (2026-07-17). Query/memory benches seed **10_000** docs; insert batch size **1000**.
+Workload for primary numbers: **768-dim Flat**, `win-x64`, native ZVec `v0.5.1-35-g1afdea8`, .NET 8.0.29, Intel Core i7-8850H, BenchmarkDotNet **ShortRun** (2026-07-17, re-run after Core lifetime/ops split). Query/memory benches seed **10_000** docs; insert batch size **1000**. ShortRun Error margins are wide — treat means as directional.
 
-**Why these differ from older smoke numbers:** an earlier table used legacy `ZVecPerformanceBenchmarks` (**128-dim**, empty/tiny corpus). That path reported ~ns latency and ~208 B allocated. The primary suite below uses **768-dim / 10k Flat** and materializes **topk=10** results (including vectors), so mean latency is in milliseconds and Allocated is dominated by result unmarshalling (~10 × 768 × 4 B ≈ 30 KB of vector bytes alone, ~45 KB total) — not a silent P/Invoke regression. Filtered query (`Query_WithFilter`, one match) allocating ~5.7 KB shows the same pin path with a smaller result set.
+**Why these differ from older smoke numbers:** an earlier table used legacy `ZVecPerformanceBenchmarks` (**128-dim**, empty/tiny corpus). That path reported ~ns latency and ~208 B allocated. The primary suite below uses **768-dim / 10k Flat** and materializes **topk=10** results (including vectors), so mean latency is in milliseconds and Allocated is dominated by result unmarshalling (~10 × 768 × 4 B ≈ 30 KB of vector bytes alone, ~44 KB total) — not a silent P/Invoke regression. Filtered query (`Query_WithFilter`, one match) allocating ~5.6 KB shows the same pin path with a smaller result set.
 
 ### Upstream engine scale (VectorDBBench — published)
 
@@ -260,46 +262,46 @@ Official ZVec [Benchmarks](https://zvec.org/en/docs/db/benchmarks/) use VectorDB
 | `Performance768D1M` | Cohere **1M** × 768-d | See VectorDBBench run on docs page | Engine scale |
 | `Performance768D10M` | Cohere **10M** × 768-d | Homepage **8500+ QPS**; index build **~1 hour** | Engine scale |
 
-These are **not** apples-to-apples with the 10k Flat SDK binding suite. A single-threaded inverse of local query mean (~2.46 ms → ~400 QPS) is a different metric shape than concurrent VectorDBBench QPS at 10M.
+These are **not** apples-to-apples with the 10k Flat SDK binding suite. A single-threaded inverse of local query mean (~3.3 ms → ~300 QPS) is a different metric shape than concurrent VectorDBBench QPS at 10M.
 
 ### Binding suite: .NET vs Python vs Node.js (same machine, 10k Flat)
 
-Ephemeral parity scripts (Python `zvec` **0.5.1**, Node `@zvec/zvec` **0.5.0** via `npm install --registry https://registry.npmjs.org/`) were run once on the same host and discarded — not kept in this repo. Official docs do not publish this 10k Flat recipe.
+Ephemeral parity scripts (Python `zvec` **0.5.1**, Node `@zvec/zvec` **0.5.0** via `npm install --registry https://registry.npmjs.org/`) were run once on the same host and discarded — not kept in this repo. Official docs do not publish this 10k Flat recipe. Python/Node columns are historical; .NET column refreshed with the latest ShortRun.
 
 | Metric | .NET (ours) | Python | Node.js |
 |--------|-------------|--------|---------|
-| Warm query (128 docs, topk=10) | **0.318 ms** | 0.396 ms | 1.594 ms |
-| Query (10k docs, topk=10) | **2.46 ms** | 3.180 ms | 4.103 ms |
-| Batch insert (1000 docs) | **~17.7k docs/sec** | ~15.2k docs/sec | ~5.8k docs/sec |
-| GC alloc / query (topk=10 + vectors) | 45.4 KB | n/a | n/a |
+| Warm query (128 docs, topk=10) | **0.495 ms** | 0.396 ms | 1.594 ms |
+| Query (10k docs, topk=10) | **3.33 ms** | 3.180 ms | 4.103 ms |
+| Batch insert (1000 docs) | **~15.7k docs/sec** | ~15.2k docs/sec | ~5.8k docs/sec |
+| GC alloc / query (topk=10 + vectors) | 44.4 KB | n/a | n/a |
 
 ### Targets vs measured (.NET)
 
 | Metric | Target | Measured | Status |
 |--------|--------|----------|--------|
-| Warm query, tiny corpus (128 docs, topk=10) | &lt; 50 µs | 318 µs (`Query_WarmTinyCorpus`) | Miss — full warm query, not a no-op P/Invoke stub |
-| Single-vector query (10k docs, topk=10) | &lt; 1 ms | 2.46 ms (`Query_Sync`) | Miss |
-| Batch insert (1000 docs) | &gt; 50k docs/sec | ~17.7k docs/sec (`Insert_Batch`, 56.6 ms/batch) | Miss |
-| GC allocation per query (pin path, 10k / topk=10) | &lt; 256 B | 45.4 KB (`Query_768Dim` / `Query_Sync`) | Miss — dominated by **result materialization** (not query-vector marshalling) |
+| Warm query, tiny corpus (128 docs, topk=10) | &lt; 50 µs | 495 µs (`Query_WarmTinyCorpus`) | Miss — full warm query, not a no-op P/Invoke stub |
+| Single-vector query (10k docs, topk=10) | &lt; 1 ms | 3.33 ms (`Query_Sync`) | Miss |
+| Batch insert (1000 docs) | &gt; 50k docs/sec | ~15.7k docs/sec (`Insert_Batch`, 63.8 ms/batch) | Miss |
+| GC allocation per query (pin path, 10k / topk=10) | &lt; 256 B | 44.4 KB (`Query_768Dim` / `Query_Sync`) | Miss — dominated by **result materialization** (not query-vector marshalling) |
 
-**Allocation split:** the query vector still uses `ReadOnlyMemory<float>` + `Memory.Pin()` (no intermediate `float[]` copy). Pin vs explicit copy is **45.4 KB** vs **48.5 KB** (`Query_ReadOnlyMemory` vs `Query_ExplicitCopy`) — the ~3 KB delta is the marshalling comparison; the ~45 KB floor is returning topk docs with vectors.
+**Allocation split:** the query vector still uses `ReadOnlyMemory<float>` + `Memory.Pin()` (no intermediate `float[]` copy). Pin vs explicit copy is **44.4 KB** vs **47.4 KB** (`Query_ReadOnlyMemory` vs `Query_ExplicitCopy`) — the ~3 KB delta is the marshalling comparison; the ~44 KB floor is returning topk docs with vectors.
 
 ### Measured suite (primary, .NET BDN)
 
 | Method | Mean | Allocated |
 |--------|------|----------:|
-| `Query_Sync` (10k docs) | 2.46 ms | 45.4 KB |
-| `Query_WithFilter` (10k docs) | 1.45 ms | 5.7 KB |
-| `Query_WarmTinyCorpus` (128 docs) | 318 µs | 45.3 KB |
-| `Query_768Dim` | 2.55 ms | 45.4 KB |
-| `Query_ReadOnlyMemory` (pin) | 2.71 ms | 45.4 KB |
-| `Query_ExplicitCopy` | 2.56 ms | 48.5 KB |
-| `Fetch_ScalarOnly` | 184 µs | 1.2 KB |
-| `Insert_Single` | 54.9 µs | 1.4 KB |
-| `Insert_Batch` (1000 docs) | 56.6 ms | 464 KB |
-| `Build_SimpleFilter` | 57 ns | 128 B |
-| `Build_CompoundFilter` | 197 ns | 544 B |
-| `Local_10k_Query_ForEngineScaleContext` | same as `Query_Sync` (~2.46 ms) | 45.4 KB |
+| `Query_Sync` (10k docs) | 3.33 ms | 44.4 KB |
+| `Query_WithFilter` (10k docs) | 1.77 ms | 5.6 KB |
+| `Query_WarmTinyCorpus` (128 docs) | 495 µs | 44.3 KB |
+| `Query_768Dim` | 3.13 ms | 44.4 KB |
+| `Query_ReadOnlyMemory` (pin) | 3.43 ms | 44.4 KB |
+| `Query_ExplicitCopy` | 3.52 ms | 47.4 KB |
+| `Fetch_ScalarOnly` | 210 µs | 1.2 KB |
+| `Insert_Single` | 58.1 µs | 1.4 KB |
+| `Insert_Batch` (1000 docs) | 63.8 ms | 454 KB |
+| `Build_SimpleFilter` | 59 ns | 128 B |
+| `Build_CompoundFilter` | 217 ns | 544 B |
+| `Local_10k_Query_ForEngineScaleContext` | ~3.08 ms | 44.4 KB |
 
 ### How to reproduce (.NET)
 
@@ -338,16 +340,17 @@ ZVec.NET/
 │   ├── Native/ZVec.Native/           # CMake -> upstream zvec_c_api
 │   │   └── external/zvec/            # Git submodule (alibaba/zvec)
 │   └── Core/ZVec.NET/                # Published assembly (PackageId: ZVec.NET)
-│       ├── Abstractions/              # IZvecFactory, IZvecCollection
+│       ├── Abstractions/              # IZvecFactory, IZvecCollection (+ role interfaces)
+│       ├── Concurrency/              # CollectionCallGate
 │       ├── DependencyInjection/      # AddZVec, AddZVecCollection, ZVecOptions
 │       ├── Builders/                 # SchemaBuilder
 │       ├── Interop/                  # NativeMethods, SafeHandles, NativeLibraryResolver
-│       ├── Internal/                 # NativeDocBuilder, NativeQueryBuilder, etc.
+│       ├── Internal/                 # Collection*Ops, native builders/unmarshallers
 │       ├── Models/                   # ZVecDoc, ZVecStatus, enums
 │       ├── IndexParams/              # All 8 index param types
 │       ├── Query/                    # ZVecQuery, ZVecFtsQuery, ZVecReranker, FilterBuilder
 │       ├── ZVecFactory.cs
-│       ├── ZVecCollection.cs
+│       ├── ZVecCollection.cs         # Thin façade over Collection*Ops
 │       └── ZVecNativeAbi.cs
 ├── testing/
 │   ├── ZVec.NET.Tests/               # xUnit + FluentAssertions (real native + Skip)

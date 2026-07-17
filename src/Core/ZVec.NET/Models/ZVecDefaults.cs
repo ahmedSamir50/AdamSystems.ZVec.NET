@@ -333,7 +333,11 @@ public static class ZVecDefaults
         public const string FactoryNotInitialized = "ZVecFactory is not initialized. Call Initialize() or InitializeAsync() first.";        
 
         /// <summary>Message shown when Destroy is called more than once on a collection.</summary>
-        public const string CollectionAlreadyDestroyed = "This collection has already been destroyed.";        
+        public const string CollectionAlreadyDestroyed = "This collection has already been destroyed.";
+
+        /// <summary>Message shown when Destroy is called after Dispose has already closed the handle.</summary>
+        public const string DestroyAfterDispose =
+            "Cannot destroy a collection that has already been disposed (closed). Dispose closes the handle without deleting on-disk data; Destroy must be called instead of Dispose when deletion is required.";
 
         /// <summary>Message shown when the native library fails to allocate a document.</summary>
         public const string NativeDocCreateFailed = "Failed to create native document (zvec_doc_create returned null).";

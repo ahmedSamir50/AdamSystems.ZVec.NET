@@ -2,13 +2,15 @@ using BenchmarkDotNet.Attributes;
 
 namespace ZVec.NET.Benchmarks;
 
-/// <summary>US-E19.1 / US-E20.4 — GC allocation per 768-dim query (target &lt; 256 B).</summary>
+/// <summary>
+/// GC allocation diagnosis. Tier A uses includeVector=false; Tier B documents vector materialization floor.
+/// </summary>
 [MemoryDiagnoser]
 public class MemoryDiagnosisBench
 {
     private ZVecFactory _factory = null!;
     private IZvecCollection _collection = null!;
-    private ReadOnlyMemory<float> _queryVector = default;
+    private ZVecQuery _query = null!;
     private string _tempPath = null!;
 
     [GlobalSetup]
@@ -21,12 +23,10 @@ public class MemoryDiagnosisBench
         _collection = _factory.CreateAndOpen(_tempPath, BenchmarkEnvironment.CreateSchema("memory_bench"));
 
         var vector = BenchmarkEnvironment.CreateVector();
-        _queryVector = vector;
+        _query = new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = vector };
         BenchmarkEnvironment.SeedCollection(_collection, vector, BenchmarkEnvironment.SeedDocCount);
 
-        _ = _collection.Query(
-            new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
-            topk: ZVecDefaults.Query.Topk);
+        _ = _collection.Query(_query, topk: ZVecDefaults.Query.Topk, includeVector: false);
     }
 
     [GlobalCleanup]
@@ -50,15 +50,24 @@ public class MemoryDiagnosisBench
         }
     }
 
+    /// <summary>Tier A — search without copying result vectors.</summary>
     [Benchmark]
     public IReadOnlyList<ZVecDoc> Query_768Dim()
     {
         if (!_factory.IsInitialized)
             return [];
 
-        return _collection.Query(
-            new ZVecQuery { FieldName = BenchmarkEnvironment.VectorField, Vector = _queryVector },
-            topk: ZVecDefaults.Query.Topk);
+        return _collection.Query(_query, topk: ZVecDefaults.Query.Topk, includeVector: false);
+    }
+
+    /// <summary>Tier B — full materialization (~44 KB floor from topk vectors).</summary>
+    [Benchmark]
+    public IReadOnlyList<ZVecDoc> Query_768Dim_WithVectors()
+    {
+        if (!_factory.IsInitialized)
+            return [];
+
+        return _collection.Query(_query, topk: ZVecDefaults.Query.Topk, includeVector: true);
     }
 
     [Benchmark]

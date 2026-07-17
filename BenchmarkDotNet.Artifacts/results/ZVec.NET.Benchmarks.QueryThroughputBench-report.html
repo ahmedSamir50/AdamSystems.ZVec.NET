@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>ZVec.NET.Benchmarks.ZVecPerformanceBenchmarks-20260717-214918</title>
+<title>ZVec.NET.Benchmarks.QueryThroughputBench-20260717-214822</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -24,10 +24,11 @@ WarmupCount=3
 </code></pre>
 
 <table>
-<thead><tr><th>Method  </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Allocated</th>
+<thead><tr><th>Method        </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Rank</th><th>Gen0</th><th>Gen1</th><th>Allocated</th>
 </tr>
-</thead><tbody><tr><td>InsertDocument</td><td>4,026.6 ns</td><td>2,275.8 ns</td><td>124.75 ns</td><td>0.1144</td><td>560 B</td>
-</tr><tr><td>QueryVector</td><td>542.4 ns</td><td>306.7 ns</td><td>16.81 ns</td><td>0.0439</td><td>208 B</td>
+</thead><tbody><tr><td>Query_Sync</td><td>3,334.8 &mu;s</td><td>3,434.5 &mu;s</td><td>188.26 &mu;s</td><td>3</td><td>7.8125</td><td>-</td><td>44.35 KB</td>
+</tr><tr><td>Query_WithFilter</td><td>1,769.0 &mu;s</td><td>350.5 &mu;s</td><td>19.21 &mu;s</td><td>2</td><td>-</td><td>-</td><td>5.57 KB</td>
+</tr><tr><td>Query_WarmTinyCorpus</td><td>494.8 &mu;s</td><td>968.8 &mu;s</td><td>53.10 &mu;s</td><td>1</td><td>8.7891</td><td>0.9766</td><td>44.27 KB</td>
 </tr></tbody></table>
 </body>
 </html>
