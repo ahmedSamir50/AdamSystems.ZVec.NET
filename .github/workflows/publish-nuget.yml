@@ -137,11 +137,14 @@ jobs:
           ls -la artifacts/nuget
           test -n "$(ls artifacts/nuget/ZVec.NET.*.nupkg 2>/dev/null | head -n1)"
 
+      # NuGet/login `user` = nuget.org username of the person who CREATED the Trusted
+      # Publishing policy — NOT the package owner org (AdamSystems). Wrong value → HTTP 401
+      # "No matching trust policy owned by user …". Set repo secret NUGET_USER.
       - name: NuGet login (OIDC Trusted Publishing)
         id: login
         uses: NuGet/login@v1
         with:
-          user: AdamSystems
+          user: ${{ secrets.NUGET_USER }}
         continue-on-error: true
 
       - name: Push (Trusted Publishing)
@@ -159,12 +162,14 @@ jobs:
         if: steps.login.outcome != 'success'
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_USER_SET: ${{ secrets.NUGET_USER != '' }}
         run: |
           if [ -z "${NUGET_API_KEY:-}" ]; then
             echo "::error::Trusted Publishing failed and secrets.NUGET_API_KEY is not set."
-            echo "Create a nuget.org Trusted Publishing policy for ahmedSamir50/AdamSystems.ZVec.NET" >&2
-            echo "workflow file publish-nuget.yml (see CONTRIBUTING.md), OR set NUGET_API_KEY." >&2
-            echo "NuGet/login user must be the policy creator username (workflow uses: AdamSystems)." >&2
+            echo "Policy exists under package owner AdamSystems, but NuGet/login must use the" >&2
+            echo "POLICY CREATOR nuget.org username via secrets.NUGET_USER (not AdamSystems)." >&2
+            echo "Also click 'Activate for 7 days' on nuget.org if the policy is pending." >&2
+            echo "NUGET_USER secret set: ${NUGET_USER_SET}" >&2
             exit 1
           fi
           shopt -s nullglob

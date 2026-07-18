@@ -181,15 +181,15 @@ Publish fails with `No matching trust policy owned by user 'AdamSystems'` until 
 
 **Option A — Trusted Publishing (preferred)**
 
-1. Sign in to [nuget.org](https://www.nuget.org/) as the account that will own the policy (usually **AdamSystems**).
-2. Avatar → **Trusted Publishing** → create a policy:
+1. Sign in to [nuget.org](https://www.nuget.org/) and open **Trusted Publishing**. Confirm a policy exists for:
    - **Repository Owner:** `ahmedSamir50`
    - **Repository:** `AdamSystems.ZVec.NET`
-   - **Workflow File:** `publish-nuget.yml` (filename only — no `.github/workflows/`)
-   - **Environment:** leave empty (this workflow does not use a GitHub Environment)
-   - **Policy owner:** AdamSystems (or your org) so it can publish that owner’s packages
-3. In [`.github/workflows/publish-nuget.yml`](.github/workflows/publish-nuget.yml), `NuGet/login` `user:` must be the **nuget.org username of the policy creator** (often the same as the owner; if nuget.org says “use the username of the policy creator, not the policy owner”, put the creator’s username there).
-4. Re-run the failed **Publish NuGet** job (or re-dispatch with the Pack `source_run_id`). No need to rebuild natives.
+   - **Workflow File:** `publish-nuget.yml`
+   - **Package owner:** AdamSystems  
+   If the UI shows “Use within N day(s)” / **Activate for 7 days**, click activate so the bootstrap window is open.
+2. Note the **nuget.org username you are logged in as** (avatar menu) — that is the **policy creator**. It is often *not* `AdamSystems` when AdamSystems is the package/org owner.
+3. GitHub repo → Settings → Secrets and variables → Actions → add **`NUGET_USER`** = that creator username (profile name, not email). The workflow passes it to `NuGet/login`. Using the owner name `AdamSystems` here causes HTTP 401 “No matching trust policy…”.
+4. Re-run the failed **Publish NuGet** job (or re-dispatch with the Pack `source_run_id`). No natives rebuild.
 
 **Option B — API key fallback**
 
