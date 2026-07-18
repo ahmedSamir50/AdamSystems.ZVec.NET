@@ -1,8 +1,8 @@
 ﻿diff --git a/thirdparty/arrow/CMakeLists.txt b/thirdparty/arrow/CMakeLists.txt
-index d6d926d..4a7a710 100644
+index d6d926d..b8e4c01 100644
 --- a/thirdparty/arrow/CMakeLists.txt
 +++ b/thirdparty/arrow/CMakeLists.txt
-@@ -129,14 +129,16 @@ elseif (MSVC)
+@@ -129,19 +129,22 @@ elseif (MSVC)
          -DARROW_USE_STATIC_CRT=${ZVEC_USE_STATIC_CRT}
          "-DCMAKE_MSVC_RUNTIME_LIBRARY=${_ARROW_MSVC_RUNTIME}"
      )
@@ -22,3 +22,9 @@ index d6d926d..4a7a710 100644
                  BYPRODUCTS ${LIB_PARQUET} ${LIB_ARROW} ${LIB_COMPUTE} ${LIB_ACERO} ${LIB_ARROW_DEPENDS} ${LIB_ARROW_DATASET}
                  LOG_DOWNLOAD ON
                  LOG_CONFIGURE ON
+                 LOG_BUILD ON
+                 LOG_INSTALL ON
++                LOG_OUTPUT_ON_FAILURE ON
+         )
+ else ()
+     ExternalProject_Add(

@@ -137,24 +137,34 @@ jobs:
             -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
 
-      # Nested ExternalProject cmake (Lz4) runs at build time — must inherit policy floor
-      # (matches local _build_ninja.bat). Configure-step env alone is not enough.
-      - name: Build zvec_c_api
+      # Nested ExternalProject cmake (Lz4/Arrow) runs at build time — must inherit policy floor
+      # (matches local _build_ninja.bat). Dump EP logs in this step so hangs never skip them.
+      - name: Build zvec_c_api (Windows)
+        if: runner.os == 'Windows'
         working-directory: src/Native/ZVec.Native
+        shell: pwsh
+        timeout-minutes: 25
         env:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
           CMAKE_GENERATOR: Ninja
-        run: cmake --build "build-${{ matrix.rid }}" --config Release --target zvec_c_api
-
-      - name: Dump Windows ExternalProject configure logs on failure
-        if: failure() && runner.os == 'Windows'
-        shell: pwsh
         run: |
-          $root = "src/Native/ZVec.Native/build-${{ matrix.rid }}"
-          Get-ChildItem -Recurse $root -Filter "Lz4.BUILD-configure*.log" -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName }
-          Get-ChildItem -Recurse $root -Filter "ARROW.BUILD-configure*.log" -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName }
+          cmake --build "build-${{ matrix.rid }}" --config Release --target zvec_c_api -- -k 1
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $root = "build-${{ matrix.rid }}"
+            Get-ChildItem -Recurse $root -Filter "ARROW.BUILD-*.log" -ErrorAction SilentlyContinue |
+              ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName -ErrorAction SilentlyContinue }
+            Get-ChildItem -Recurse $root -Filter "Lz4.BUILD-*.log" -ErrorAction SilentlyContinue |
+              ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName -ErrorAction SilentlyContinue }
+            exit $code
+          }
+
+      - name: Build zvec_c_api (Unix)
+        if: runner.os != 'Windows'
+        working-directory: src/Native/ZVec.Native
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+        run: cmake --build "build-${{ matrix.rid }}" --config Release --target zvec_c_api
 
       - name: Locate and deploy native (Unix)
         if: runner.os != 'Windows'
