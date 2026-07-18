@@ -674,4 +674,4 @@ We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - **ZVec docs:** [zvec.org](https://zvec.org)
 - **Project Plan:** [ZVec.NET-Project-Plan.md](ZVec.NET-Project-Plan.md)
 - **Implementation Epics:** [ZVec.NET-Implementation-Plan.md](ZVec.NET-Implementation-Plan.md)
-- **NuGet:** [nuget.org/packages/ZVec.NET](https://www.nuget.org/packages/ZVec.NET/)
+- **NuGet:** [nuget.org/packages/ZVec.NET](https://www.nuget.org/packages/ZVec.NET/) 
