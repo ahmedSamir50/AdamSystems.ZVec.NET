@@ -17,5 +17,6 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="FluentAssertions" Version="6.12.2" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.14.0" />
+    <PackageVersion Include="ZVec.NET" Version="1.0.0-alpha.1" />
   </ItemGroup>
 </Project>

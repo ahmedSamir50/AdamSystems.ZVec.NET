@@ -659,7 +659,7 @@ internal static class VectorMarshaller
 
 > **Primary surface is DI + interfaces** under namespace **`ZVec.NET`**. All consumer imports use this root (plus `.DependencyInjection` / `.Query`). A thin static façade (scripting/console) may be added later; it must not be the only entry point.
 >
-> **Sync + async:** Every mutating/querying operation exposes both. Sync invokes P/Invoke on the caller thread (lowest latency). Async APIs are **cancellation-aware sync wrappers** (`ValueTask`) — they complete on the caller thread after the native call; they are **not** thread-pool offloads. Never add unbounded `Task.Run` around native calls (worsens ASP.NET thread-pool starvation). When optional gates are enabled (`MaxConcurrentNativeCalls` / `MaxConcurrentReads` &gt; 0), async paths await `SemaphoreSlim.WaitAsync` (gate wait only); mid-P/Invoke cancel remains best-effort. Bounded offload is a **future optional epic**, not the shipped model.
+> **Sync + async:** Every mutating/querying operation exposes both. Sync invokes P/Invoke on the caller thread (lowest latency). Async APIs are **cancellation-aware sync wrappers** (`ValueTask`) — they complete on the caller thread after the native call; they are **not** thread-pool offloads. Never add unbounded `Task.Run` around native calls (worsens ASP.NET thread-pool starvation). When optional gates are enabled (`MaxConcurrentNativeCalls` / `MaxConcurrentReads` > 0), async paths await `SemaphoreSlim.WaitAsync` (gate wait only); mid-P/Invoke cancel remains best-effort. Bounded offload is a **future optional epic**, not the shipped model.
 
 ### 7.1 Factory — `IZvecFactory`
 
@@ -1198,7 +1198,7 @@ model — **no custom managed-side RW lock** — because:
 1. **No managed-side RW lock** — The native C++ engine handles concurrent reads and exclusive writes internally. Managed code uses `Interlocked` for lifecycle state transitions only.
 2. **Sync path** — P/Invoke on caller thread. Lowest latency (console, batch jobs, MAUI background).
 3. **Async path** — Cancellation-aware sync wrappers (`ValueTask`). When optional gates are enabled, await `WaitAsync` for the gate only; then P/Invoke still runs on the continuation thread. Never unbounded `Task.Run` per request (worsens ASP.NET thread-pool starvation for sync native I/O). Bounded offload is deferred as a future optional epic.
-4. **Optional throttle** — `MaxConcurrentNativeCalls` (per factory) and `MaxConcurrentReads` (per collection) use `SemaphoreSlim` when &gt; 0; **`0` = unlimited**.
+4. **Optional throttle** — `MaxConcurrentNativeCalls` (per factory) and `MaxConcurrentReads` (per collection) use `SemaphoreSlim` when > 0; **`0` = unlimited**.
 5. **Native query threads** — `ZVecOptions.QueryThreads` is orthogonal (intra-query parallelism).
 6. **Dispose/Destroy safety** — `Interlocked.Exchange` on `_disposed`/`_destroyed` flags ensures lifecycle operations run exactly once, even under concurrent calls.
 8. **Batch over chatty P/Invoke** — Prefer list overloads.
@@ -1274,7 +1274,7 @@ No `build/*.props` for RID native packing — the .NET runtime resolves `runtime
     <Version>1.0.0-alpha.1+zvec.1.2.3</Version>
      <Authors>Ahmed Samir https://github.com/ahmedSamir50</Authors>
      <Company>Adam Systems EGY</Company>
-    <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (win/linux/mac, x64/arm64).</Description>
+    <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory<float>), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (win/linux/mac, x64/arm64).</Description>
     <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -1331,7 +1331,7 @@ Once the alpha NuGet package is published:
 | **Unit** | DTO serialization, filter building, enum mapping, SafeHandle lifecycle, ABI/platform gates | None (pure managed) | ~60 |
 | **Integration** | Full CRUD lifecycle, query accuracy, FTS, hybrid search, schema evolution | Real (Skip if missing) | ~40 |
 | **Memory** | Zero-allocation vector verification, SafeHandle leak detection, ArrayPool recycling | Real (Skip if missing) | ~15 |
-| **Concurrency** | Multi-threaded read/write; SemaphoreSlim when MaxConcurrent* &gt; 0 | Real (Skip if missing) | ~10 |
+| **Concurrency** | Multi-threaded read/write; SemaphoreSlim when MaxConcurrent* > 0 | Real (Skip if missing) | ~10 |
 
 ### 10.2 Mock Native Library — 🗑️ Canceled
 

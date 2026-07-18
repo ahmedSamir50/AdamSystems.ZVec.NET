@@ -12,7 +12,7 @@
     <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries.</Description>
     <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann;maui</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>1.0.0-beta.1 wrapping ZVec C++ 0.5.1. Shipped natives: win-x64, linux-x64, osx-arm64, android-arm64, android-x64. Not yet: win-arm64, linux-arm64, osx-x64, ios-arm64, iossimulator-arm64, maccatalyst-arm64 (upstream/cross-compile).</PackageReleaseNotes>
+    <PackageReleaseNotes>1.0.0-beta.1 wrapping ZVec C++ 0.5.1. Shipped natives: win-x64, linux-x64, osx-arm64, android-arm64, android-x64. Not yet: win-arm64, linux-arm64, osx-x64, ios-arm64, iossimulator-arm64, maccatalyst-arm64 — blocked by cross-building zvec bundled third parties (Arrow, FastPFOR/SIMDe, Lz4, host protoc); ships when CI is hard-green and pack always includes the RID. See README Native RIDs.</PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/ahmedSamir50/AdamSystems.ZVec.NET</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ahmedSamir50/AdamSystems.ZVec.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

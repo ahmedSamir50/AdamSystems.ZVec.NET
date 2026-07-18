@@ -1,6 +1,6 @@
 # ZVec.NET Samples (.NET 10 only)
 
-User demos for offline/edge RAG, semantic search, and recommendations.
+User demos for offline/edge RAG, semantic search, and recommendations. These host apps (ASP.NET, MAUI, Console) are what thin P/Invoke bindings typically lack.
 
 **Not part of the NuGet package.** Epic **E21** (packaging/CI) is deferred — these projects are `IsPackable=false`, live under `samples/`, and must never gate pack or default CI.
 

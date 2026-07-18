@@ -1,11 +1,32 @@
 # ZVec.NET
 
+[![NuGet](https://img.shields.io/nuget/v/ZVec.NET.svg)](https://www.nuget.org/packages/ZVec.NET/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-8.0%2B-512bd4.svg)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512bd4.svg)](https://dotnet.microsoft.com/)
+[![CI](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/workflows/build-managed.yml/badge.svg)](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/workflows/build-managed.yml)
 
-> **Beta** — `1.0.0-beta.1+zvec.0.5.1`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org after the first publish (tag `v1.0.0-beta.1`).
+> **Beta** — `1.0.0-beta.1+zvec.0.5.1`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.1`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
 
-**The definitive .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)**
+**Production .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)** — DI, typed ODM, async, SafeHandles, full indexes/FTS, and mobile RIDs. Not a thin P/Invoke wrapper.
+
+**Host demos:** [samples/](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/samples) — ASP.NET Minimal API, **MAUI Blazor Hybrid** (offline/edge RAG), and Console. See [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md).
+
+## Contents
+
+- [Why ZVec.NET?](#why-zvecnet)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Host patterns](#host-patterns)
+- [Architecture](#architecture)
+- [API Overview](#api-overview)
+- [Samples](#samples)
+- [Performance](#performance)
+- [Troubleshooting](#troubleshooting)
+- [Versioning](#versioning)
+- [Project structure](#project-structure)
+- [Contributing](#contributing)
+- [License](#license)
+- [Links](#links)
 
 ---
 
@@ -13,25 +34,76 @@
 
 | Feature | What it means for you |
 |---------|----------------------|
-| **Pin-based vector pipelines** | `ReadOnlyMemory&lt;float&gt;` on hot paths — no intermediate `float[]` copies on the query pin path (measure with `MemoryDiagnosisBench`) |
-| **Sync + Async APIs** | Lowest-latency sync path for batch jobs; async `ValueTask` APIs for ASP.NET Core (cooperative cancel; no thread-pool offload today) |
-| **DI-first design** | `AddZVec()` / `AddZVecCollection<T>()` — works with ASP.NET Core, MAUI, Blazor Server out of the box |
-| **Typed ODM** | Map POCOs with `ZVec.NET.Mapping` attributes — schema `From<T>()`, expression filters, typed CRUD/DDL without magic field strings |
+| **DI-first for hosts** | `AddZVec()` / `AddZVecCollection<T>()` — ASP.NET Core, MAUI, Blazor Server out of the box |
+| **Typed ODM** | Map POCOs with `ZVec.NET.Mapping` — schema `From<T>()`, expression filters, typed CRUD/DDL without magic field strings |
+| **Sync + Async APIs** | Lowest-latency sync for batch jobs; async `ValueTask` for ASP.NET Core (cooperative cancel; no thread-pool offload today) |
+| **Pin-based vector pipelines** | `ReadOnlyMemory<float>` on hot paths — no intermediate `float[]` copies on the query pin path |
 | **Safe native lifecycle** | Collection handles owned by `SafeZvecHandle` (close-only); `Dispose` closes, `Destroy` deletes then closes; `Shutdown` disposes all tracked open collections before `zvec_shutdown` |
-| **Cross-platform natives** | Single NuGet `ZVec.NET` with `runtimes/{rid}/native/` for **win-x64**, **linux-x64**, **osx-arm64**, **android-arm64/x64** in beta (more RIDs when CI is green) |
+| **Cross-platform natives** | Single NuGet `ZVec.NET` with `runtimes/{rid}/native/` for **win-x64**, **linux-x64**, **osx-arm64**, **android-arm64/x64** in beta |
 | **Full ZVec DB coverage** | HNSW, Flat, IVF, HNSW-RaBitQ, DiskANN, Vamana, Invert, FTS indexes; hybrid search; schema evolution; in-DB RRF/Weighted rerankers |
 | **Idiomatic C#** | .NET naming guidelines, `ValueTask`, `CancellationToken`, fluent builders |
 
+### Compared to NuGet package `Zvec`
+
+Both wrap Alibaba ZVec. Prefer **`ZVec.NET`** for ASP.NET / MAUI / app code; the other package is a thinner sync P/Invoke surface.
+
+| | `Zvec` ([TheBitBrine](https://www.nuget.org/packages/Zvec)) | `ZVec.NET` (this package) |
+|---|---|---|
+| Surface | Sync P/Invoke helpers | DI + typed ODM + sync/async |
+| Vectors | `float[]` | `ReadOnlyMemory<float>` pin path |
+| Indexes | HNSW / IVF / Flat / Invert | + RaBitQ, DiskANN, Vamana, FTS |
+| Platforms | Desktop RIDs | + Android (iOS planned); net8 / net9 / net10 |
+| Lifecycle | Dispose each document | SafeHandle collections; factory shutdown |
+
+Install this SDK as **`ZVec.NET`** — not `Zvec`.
+
 ---
 
-## Architecture & Concurrency
+## Requirements
 
-ZVec.NET is built for thread-safe use against the native engine:
+| Requirement | Detail |
+|-------------|--------|
+| **.NET** | TFMs `net8.0`, `net9.0`, `net10.0` (LTS floor: .NET 8) |
+| **PackageId** | **`ZVec.NET`** (not [`Zvec`](https://www.nuget.org/packages/Zvec)) |
+| **Native RID** | Matching `runtimes/{rid}/native/` binary in the package (see below) |
+| **Samples** | [.NET 10 SDK](https://dotnet.microsoft.com/download) only; not shipped in the NuGet package |
+| **Out of scope** | Blazor WebAssembly (no native RID) |
 
-1. **Instance-based factory:** `ZVecFactory` tracks its own state and open collection handles. A process-wide `lock` ensures exactly-once native library initialization (`zvec_initialize`).
-2. **Collection lifecycle:** Open collections own a `SafeZvecHandle`. `Dispose` closes (data preserved); `Destroy` deletes on-disk data then closes. `Destroy` after `Dispose` throws `ObjectDisposedException`. `ZVecFactory.Shutdown` disposes every tracked open collection before native shutdown. Short-lived query/doc native objects also use `SafeHandle` helpers.
-3. **Optional throttles:** `MaxConcurrentNativeCalls` / `MaxConcurrentReads` use `SemaphoreSlim` when &gt; 0; `0` means unlimited. The canceled managed RW lock (E9) is not used — native ZVec is already thread-safe.
-4. **Zero-copy pipelines:** Hot paths pin `ReadOnlyMemory<float>` and pass pointers to native code. Performance targets are below (not published latency claims until benchmarks stabilize).
+**Owner on nuget.org:** [AdamSystems](https://www.nuget.org/profiles/AdamSystems). **Source:** [ahmedSamir50/AdamSystems.ZVec.NET](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET).
+
+### Native RIDs (NuGet `runtimes/`)
+
+Managed TFMs are `net8.0` / `net9.0` / `net10.0` (samples need .NET 10). Natives ship under `runtimes/{rid}/native/`.
+
+**Why some RIDs are missing:** not unfinished C# P/Invoke — **cross-compiling Alibaba zvec’s bundled C++ third parties** (mainly Apache Arrow and FastPFOR/SIMDe, plus host `protoc`, and on Apple Lz4/Arrow macabi). ZVec.NET applies [CI-only patches](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/build/ci/patches) (not pushed to alibaba/zvec). A RID ships when that build is **reliably green** and pack always includes it in the nupkg — no calendar date promised. Engineering detail: [build/ci/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/build/ci/README.md#rid-ship-gate).
+
+#### Supported in `1.0.0-beta.1`
+
+| RID | Native file | Status |
+|-----|-------------|--------|
+| `win-x64` | `zvec_c_api.dll` | Pack-required; desktop CI tested |
+| `linux-x64` | `libzvec_c_api.so` | Pack-required; desktop CI tested |
+| `osx-arm64` | `libzvec_c_api.dylib` | Pack-required; desktop CI tested |
+| `android-arm64`, `android-x64` | `libzvec_c_api.so` | Intended ship RID (NDK CI); mobile jobs still soft-fail until hardened |
+
+#### Not yet shipped — cause and unblock
+
+| RID | Native file | Real reason | Unblock when |
+|-----|-------------|-------------|--------------|
+| `win-arm64` | `zvec_c_api.dll` | MSVC amd64→arm64 cross: FastPFOR needs SIMDe; Arrow PCG MSVC ARM64; host `protoc` (ARM64-built protoc cannot run on the x64 runner). Compile-only today (no Windows ARM64 run gate). | Optional CI job hard-green (no `continue-on-error`); pack always includes `runtimes/win-arm64`; release notes bump. Local patches bridge until upstream FastPFOR/Arrow accept fixes. |
+| `linux-arm64` | `libzvec_c_api.so` | Cross from x86_64: Arrow EP enables SSE unless told aarch64/NEON; OpenSSL off for cross; host x86_64 `protoc` (aarch64 protoc won’t exec on the runner). | Same gate: optional→required + always in nupkg. |
+| `osx-x64` | `libzvec_c_api.dylib` | Building `x86_64` on arm64 macOS runners: zvec auto-detects **host** arch for `-march` incorrectly (needs `CMAKE_OSX_ARCHITECTURES`). | Hard-green + pack include. |
+| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | Apple mobile/Catalyst CMake + third parties (iOS dual-STATIC `OUTPUT_NAME`, Lz4/Arrow macabi); host `protoc` (iOS-built protoc SIGKILL on Mac). Mobile workflow still `continue-on-error`. | Sustained green Apple-mobile CI + pack always ships those RIDs + MAUI device QA. |
+
+#### Never supported / feature limits (not a RID packaging issue)
+
+| Item | Why |
+|------|-----|
+| **Blazor WebAssembly** | No native `zvec_c_api` RID |
+| **HNSW-RaBitQ on ARM** | Upstream ISA (x86_64 + AVX2 only); SDK throws `PlatformNotSupportedException` before native call — see [Index Types](#index-types) |
+| **DiskANN on non-Linux** | Upstream Linux + **libaio** only; same SDK gate — see [Index Types](#index-types) |
+
+Package size grows with each RID. There is **no** fixed 50 MB gate — see pack workflow / release notes for measured size.
 
 ---
 
@@ -43,43 +115,7 @@ ZVec.NET is built for thread-safe use against the native engine:
 dotnet add package ZVec.NET --version 1.0.0-beta.1
 ```
 
-> **Requires .NET 8.0+ (LTS).** Version scheme: `1.0.0-beta.1+zvec.0.5.1` (SDK SemVer + pinned native). Supported TFMs are `lib/net8.0`, `lib/net9.0`, `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires desktop natives.
-
-### Native RIDs (NuGet `runtimes/`)
-
-#### Supported in `1.0.0-beta.1`
-
-| RID | Native file | Built by |
-|-----|-------------|----------|
-| `win-x64` | `zvec_c_api.dll` | GitHub Actions (Windows) |
-| `linux-x64` | `libzvec_c_api.so` | GitHub Actions (Ubuntu) |
-| `osx-arm64` | `libzvec_c_api.dylib` | GitHub Actions (macOS) |
-| `android-arm64`, `android-x64` | `libzvec_c_api.so` | Android NDK + CMake (CI) |
-
-#### Not yet shipped
-
-Blocked by upstream zvec / cross-compile issues on CI; will be added when those builds are green:
-
-| RID | Native file | Notes |
-|-----|-------------|-------|
-| `win-arm64` | `zvec_c_api.dll` | Optional CI; SIMDe / MSVC arch issues |
-| `linux-arm64` | `libzvec_c_api.so` | Optional CI; Arrow/OpenSSL cross |
-| `osx-x64` | `libzvec_c_api.dylib` | Optional CI; arch/march cross |
-| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | Optional mobile CI |
-
-Package size grows with each RID (desktop natives are already large). There is **no** fixed 50 MB gate — see pack workflow / release notes for measured size. Blazor WebAssembly is out of scope (no native RID).
-
-**Owner on nuget.org:** [AdamSystems](https://www.nuget.org/profiles/AdamSystems). **Source:** [ahmedSamir50/AdamSystems.ZVec.NET](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET). PackageId remains **`ZVec.NET`**.
-
-### Samples (Epic E25 — .NET 10 only)
-
-Live demos live under [`samples/`](samples/) (Console, ASP.NET Minimal API, **MAUI Blazor Hybrid** flagship for offline/edge RAG with LM Studio + Gemma 4). They are **not** part of the NuGet package and never gate packaging CI.
-
-```bash
-dotnet build samples/ZVec.NET.Samples.slnx
-```
-
-See [`samples/README.md`](samples/README.md) for prerequisites, MB-only datasets, and a manual smoke checklist.
+Version scheme: `1.0.0-beta.1+zvec.0.5.1` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires desktop natives.
 
 ### Two APIs
 
@@ -88,76 +124,11 @@ See [`samples/README.md`](samples/README.md) for prerequisites, MB-only datasets
 | **Typed (recommended)** | `IZvecCollection<T>`, `ZVecCollectionSchemaBuilder.From<T>()`, `AddZVecCollection<T>`, expression filters (`p => p.Category == x`). Compile-time field safety via `ZVec.NET.Mapping`. |
 | **Dynamic (escape hatch)** | `IZvecCollection`, `ZVecDoc`, string field names, `ZVecFilterBuilder.Where("…")`, `AddZVecCollection("key", …)`. Tooling, dynamic schemas, parity with Python/Node shapes. |
 
-Typed is a thin façade over dynamic (`IZvecCollection<T>.Untyped`). Contributor guidance for contributors: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Typed is a thin façade over dynamic (`IZvecCollection<T>.Untyped`).
 
 **DDL note:** native `add_column` / typed `EnsureSchema` only add **nullable numeric** columns. Put string/array fields in the create-time schema.
 
-### ASP.NET Core / Blazor Server (typed — recommended)
-
-```csharp
-// Program.cs
-using ZVec.NET.DependencyInjection;
-using ZVec.NET.Mapping;
-
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddZVec(options =>
-{
-    options.LogLevel = ZVecLogLevel.Warn;
-    options.QueryThreads = -1;
-    options.MemoryLimitMb = 512;
-});
-
-builder.Services.AddZVecCollection<Product>(options =>
-{
-    options.Path = "/data/products";
-    options.EnableMmap = true;
-    // Schema defaults to ZVecCollectionSchemaBuilder.From<Product>()
-});
-
-var app = builder.Build();
-```
-
-```csharp
-using ZVec.NET.Mapping;
-
-public sealed class Product
-{
-    public string Id { get; set; } = "";
-    public string Title { get; set; } = "";
-    public string Category { get; set; } = "";
-
-    [ZVecVector(768, Metric = ZVecMetricType.Cosine, M = 32, EfConstruction = 256)]
-    public ReadOnlyMemory<float> Embedding { get; set; }
-}
-
-// Inject anywhere
-public class ProductService(IZvecCollection<Product> products)
-{
-    public async Task<IReadOnlyList<ZVecHit<Product>>> SearchAsync(
-        ReadOnlyMemory<float> queryVector,
-        string? category = null)
-    {
-        return await products.QueryAsync(
-            p => p.Embedding,
-            queryVector,
-            topK: 10,
-            filter: category is null ? null : p => p.Category == category);
-    }
-}
-```
-
-**Mapping rules:** `Product` is a plain document POCO — it does **not** implement `IZvecCollection`. Inject / hold `IZvecCollection<Product>` (the collection handle). Schema comes from `ZVecCollectionSchemaBuilder.From<Product>()` / `AddZVecCollection<Product>`.
-
-| Member | Required? | Rule |
-|--------|-----------|------|
-| Identity | Yes (exactly one) | Convention: public `string Id` / `ID`, **or** `[ZVecId]` |
-| Vector properties | **Yes** `[ZVecVector(dim, …)]` | Dimension / metric / index cannot be inferred from `ReadOnlyMemory<float>` alone |
-| Scalar properties | Usually none | Mapped by property name + CLR type; optional `[ZVecField("storageName")]` / `Nullable` |
-| Skip a property | `[ZVecIgnore]` | |
-| Collection name | Optional `[ZVecCollection("name")]` | Defaults to the CLR type name |
-
-### Console / Batch (typed, no DI)
+### Console / script (typed — shortest path)
 
 ```csharp
 using ZVec.NET;
@@ -190,27 +161,41 @@ var doc = again.Fetch("p1"); // Title / Category present — not Id+Score only
 _ = reopened.Schema;         // non-null; bound for unmarshalling
 ```
 
+### Document model (`Product`)
+
+```csharp
+using ZVec.NET.Mapping;
+
+public sealed class Product
+{
+    public string Id { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Category { get; set; } = "";
+
+    [ZVecVector(768, Metric = ZVecMetricType.Cosine, M = 32, EfConstruction = 256)]
+    public ReadOnlyMemory<float> Embedding { get; set; }
+}
+```
+
+`Product` is a plain document POCO — it does **not** implement `IZvecCollection`. Inject / hold `IZvecCollection<Product>`. Schema comes from `ZVecCollectionSchemaBuilder.From<Product>()` / `AddZVecCollection<Product>`.
+
+| Member | Required? | Rule |
+|--------|-----------|------|
+| Identity | Yes (exactly one) | Convention: public `string Id` / `ID`, **or** `[ZVecId]` |
+| Vector properties | **Yes** `[ZVecVector(dim, …)]` | Dimension / metric / index cannot be inferred from `ReadOnlyMemory<float>` alone |
+| Scalar properties | Usually none | Mapped by property name + CLR type; optional `[ZVecField("storageName")]` / `Nullable` |
+| Skip a property | `[ZVecIgnore]` | |
+| Collection name | Optional `[ZVecCollection("name")]` | Defaults to the CLR type name |
+
 ### Typed filters
 
 Expression filters on `IZvecCollection<T>` compile to native filter strings via `ZVecExpressionFilter` (same engine as `DeleteByFilter`). Property names use the mapped storage name (`[ZVecField]` overrides apply).
 
-**Supported**
-
 ```csharp
-// Equality / relational
 products.Query(p => p.Embedding, vec, topK: 10, filter: p => p.Category == "demo");
 products.Query(p => p.Embedding, vec, topK: 10, filter: p => p.Year > 2020);
-products.Query(p => p.Embedding, vec, topK: 10, filter: p => 5 < p.Year); // inverted sides OK
-
-// Compound + not + null
 products.Query(p => p.Embedding, vec, topK: 10,
     filter: p => p.Category == "ai" && p.Year >= 2020);
-products.Query(p => p.Embedding, vec, topK: 10,
-    filter: p => p.Title != null || p.Year >= 2000);
-products.Query(p => p.Embedding, vec, topK: 10,
-    filter: p => !(p.Year < 2000) && (p.Category == "a" || p.Category == "b"));
-
-// Delete by expression
 products.DeleteByFilter(p => p.Category == "expired");
 ```
 
@@ -221,7 +206,7 @@ products.DeleteByFilter(p => p.Category == "expired");
 | Null | `== null` / `!= null` → `IsNull` / `IsNotNull` |
 | Values | string, bool, int/long/float/double (and similar numerics) |
 
-**Unsupported** (throws `ZVecException`): method calls (`StartsWith`, `Contains`, …), indexers, invoking other methods, or anything that is not a comparison / boolean tree. For those, use the escape hatch:
+**Unsupported** (throws `ZVecException`): method calls (`StartsWith`, `Contains`, …), indexers, or anything that is not a comparison / boolean tree. Escape hatch:
 
 ```csharp
 products.Untyped.Query(
@@ -230,9 +215,131 @@ products.Untyped.Query(
     filter: ZVecFilterBuilder.Create().Where("Category", ZVecCompareOp.Eq, "demo"));
 ```
 
-### Advanced / dynamic (`ZVecDoc`)
+---
 
-String field names and `ZVecDoc` remain available for tooling and dynamic schemas:
+## Host patterns
+
+### ASP.NET Core / Blazor Server (typed)
+
+```csharp
+// Program.cs
+using ZVec.NET.DependencyInjection;
+using ZVec.NET.Mapping;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddZVec(options =>
+{
+    options.LogLevel = ZVecLogLevel.Warn;
+    options.QueryThreads = -1;
+    options.MemoryLimitMb = 512;
+});
+
+// Create: true (default) = CreateAndOpen — first run only; see Create vs Open below
+builder.Services.AddZVecCollection<Product>(options =>
+{
+    options.Path = "/data/products";
+    options.EnableMmap = true;
+    options.Create = true; // set false to Open an existing path
+});
+
+var app = builder.Build();
+```
+
+```csharp
+// Inject anywhere
+public class ProductService(IZvecCollection<Product> products)
+{
+    public async Task<IReadOnlyList<ZVecHit<Product>>> SearchAsync(
+        ReadOnlyMemory<float> queryVector,
+        string? category = null)
+    {
+        return await products.QueryAsync(
+            p => p.Embedding,
+            queryVector,
+            topK: 10,
+            filter: category is null ? null : p => p.Category == category);
+    }
+}
+```
+
+### Configuration (`appsettings.json`)
+
+`AddZVec(IConfiguration)` binds the **`ZVec`** section to `ZVecOptions`:
+
+```json
+{
+  "ZVec": {
+    "LogLevel": "Warn",
+    "QueryThreads": -1,
+    "MemoryLimitMb": 512,
+    "MaxConcurrentNativeCalls": 0
+  }
+}
+```
+
+```csharp
+builder.Services.AddZVec(builder.Configuration);
+// or: builder.Services.AddZVec(builder.Configuration.GetSection("ZVec"));
+```
+
+### Create vs Open (restart-safe collections)
+
+Upstream `CreateAndOpen` **throws if the path already exists** (same as Python/Node). There is no native `open_or_create`.
+
+| API | Behavior |
+|-----|----------|
+| `factory.CreateAndOpen(path, schema)` | Create new collection; fails if path exists |
+| `factory.Open(path)` | Open existing; loads schema from on-disk metadata |
+| `AddZVecCollection<T>(… Create = true)` | DI → `CreateAndOpen` (default; **first run only**) |
+| `AddZVecCollection<T>(… Create = false)` | DI → `Open` |
+
+App-level open-or-create (used by samples):
+
+```csharp
+IZvecCollection<Product> OpenOrCreate(IZvecFactory factory, string path)
+{
+    var options = new ZVecCollectionOptions { EnableMmap = true };
+    if (Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any())
+        return new ZVecCollection<Product>(factory.Open(path, options));
+
+    var schema = ZVecCollectionSchemaBuilder.From<Product>().Build();
+    return new ZVecCollection<Product>(factory.CreateAndOpen(path, schema, options));
+}
+```
+
+See [samples `CollectionBootstrap.OpenOrCreate`](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/ZVec.NET.Samples.Shared/CollectionBootstrap.cs).
+
+### Keyed dynamic collection
+
+```csharp
+builder.Services.AddZVecCollection("products", options =>
+{
+    options.Path = "/data/products";
+    options.Create = false; // open existing
+});
+
+// Inject: [FromKeyedServices("products")] IZvecCollection products
+```
+
+### Health checks
+
+`ZVecHealthCheck` reports whether the registered `IZvecFactory` is initialized:
+
+```csharp
+using ZVec.NET.DependencyInjection;
+
+builder.Services.AddHealthChecks()
+    .AddCheck<ZVecHealthCheck>("zvec");
+```
+
+Requires a package that provides `AddHealthChecks()` (e.g. `Microsoft.Extensions.Diagnostics.HealthChecks`).
+
+### MAUI / offline edge
+
+Same DI surface as ASP.NET (`AddZVec` + `AddZVecCollection<T>`). For a full offline/edge RAG host (LM Studio + Gemma), see [samples/ZVec.NET.Samples.Maui](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/samples/ZVec.NET.Samples.Maui) and [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md) (prerequisites, models, datasets). Embeddings and chat are **sample host** concerns — not part of the NuGet DB SDK.
+
+### Advanced / dynamic (`ZVecDoc`)
 
 ```csharp
 using var col = factory.CreateAndOpen("/tmp/docs", new ZVecCollectionSchemaBuilder("docs")
@@ -247,12 +354,20 @@ col.Insert(ZVecDoc.Create("doc1",
 var docs = col.Query(
     new ZVecQuery { FieldName = "vec", Vector = queryVec },
     topk: 10,
-    filter: ZVecFilterBuilder.Create().Where("title", ZVecCompareOp.Eq, "Hello"));
+    filter: ZVecFilterBuilder.Create().Where("title", ZVecCompareOp.Eq, "Hello"),
+    includeVector: false);
 ```
 
 ---
 
 ## Architecture
+
+ZVec.NET is built for thread-safe use against the native engine:
+
+1. **Instance-based factory:** `ZVecFactory` tracks its own state and open collection handles. A process-wide `lock` ensures exactly-once native library initialization (`zvec_initialize`).
+2. **Collection lifecycle:** Open collections own a `SafeZvecHandle`. `Dispose` closes (data preserved); `Destroy` deletes on-disk data then closes. `Destroy` after `Dispose` throws `ObjectDisposedException`. `ZVecFactory.Shutdown` disposes every tracked open collection before native shutdown.
+3. **Optional throttles:** `MaxConcurrentNativeCalls` / `MaxConcurrentReads` use `SemaphoreSlim` when > 0; `0` means unlimited. Native ZVec is already thread-safe.
+4. **Zero-copy pipelines:** Hot paths pin `ReadOnlyMemory<float>` and pass pointers to native code.
 
 ```
 ┌────────────────────────────────────────────────────┐
@@ -264,22 +379,14 @@ var docs = col.Query(
           │   ZVec.NET SDK             │
           │  IZvecFactory / IZvecCollection[T] │
           │  Mapping (attrs, mapper, expr) │
-          │  (+ Lifecycle/Writes/Queries/Ddl) │
           │  Builders / DTOs / DI        │
           ├──────────────────────────────┤
           │  Collection*Ops + CallGate   │
-          │  SafeZvecHandle (collection) │
-          │  SafeHandle helpers (query/doc)│
-          │  [LibraryImport] P/Invoke    │
+          │  SafeZvecHandle + P/Invoke   │
           └─────────────┬──────────────┘
                         │  Flat C ABI
           ┌─────────────▼──────────────┐
-          │  zvec_c_api (C bindings)    │
-          │  Alibaba's official C API   │
-          └─────────────┬──────────────┘
-                        │
-          ┌─────────────▼──────────────┐
-          │  ZVec C++ Core (Proxima)    │
+          │  zvec_c_api → ZVec C++ Core │
           └────────────────────────────┘
 ```
 
@@ -302,13 +409,94 @@ var docs = col.Query(
 
 ### Query Modes
 
-- **Single vector** — `col.Query(new ZVecQuery { FieldName = "vec", Vector = myVec }, topk: 10)`
-- **Multi-vector** — `col.Query(queries, topk: 10, reranker: new ZVecRrfReranker { TopN = 10 })`
-- **Hybrid** (dense + sparse) — multi-query with dense + sparse sub-queries and optional `filter`
-- **Full-text** — `new ZVecQuery { FieldName = "content", Fts = new ZVecFtsQuery { QueryString = "search terms" } }`
-- **Group-by** — `col.QueryGroupBy(new ZVecGroupByQuery { Query = q, GroupByField = "category", GroupSize = 5 })`
-- **Filtered (typed)** — `products.Query(p => p.Embedding, vec, topK: 10, filter: p => p.Year > 2020)` — see [Typed filters](#typed-filters)
-- **Filtered (dynamic)** — `col.Query(query, topk: 10, filter: ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020))`
+Prefer `includeVector: false` when you do not need result embeddings (lower latency and GC alloc). Default remains `true` for backward compatibility.
+
+**Single vector**
+
+```csharp
+var hits = col.Query(
+    new ZVecQuery { FieldName = "vec", Vector = myVec },
+    topk: 10,
+    includeVector: false);
+```
+
+**Full-text (FTS)**
+
+```csharp
+var hits = col.Query(
+    new ZVecQuery
+    {
+        FieldName = "content",
+        Fts = new ZVecFtsQuery { QueryString = "search terms" }
+    },
+    topk: 10,
+    includeVector: false);
+```
+
+**Multi-vector + RRF rerank** (requires ≥ 2 sub-queries)
+
+```csharp
+var hits = col.Query(
+    [
+        new ZVecQuery { FieldName = "title_vec", Vector = titleVec },
+        new ZVecQuery { FieldName = "body_vec", Vector = bodyVec }
+    ],
+    topk: 10,
+    reranker: new ZVecRrfReranker { TopN = 10 },
+    includeVector: false);
+```
+
+**Hybrid (dense + sparse) + filter + RRF**
+
+```csharp
+var denseQ = new ZVecQuery { FieldName = "vector1", Vector = dense };
+var sparseQ = new ZVecQuery
+{
+    FieldName = "sparse1",
+    SparseVector = new Dictionary<int, float> { [0] = 1.0f, [3] = 0.5f }
+};
+var filter = ZVecFilterBuilder.Create()
+    .Where("category", ZVecCompareOp.Eq, "demo");
+var hits = col.Query(
+    [denseQ, sparseQ],
+    topk: 5,
+    reranker: new ZVecRrfReranker { TopN = 5 },
+    filter: filter,
+    includeVector: false);
+```
+
+**Dense + FTS + weighted rerank**
+
+```csharp
+var hits = col.Query(
+    [
+        new ZVecQuery { FieldName = "vec", Vector = dense },
+        new ZVecQuery
+        {
+            FieldName = "content",
+            Fts = new ZVecFtsQuery { QueryString = "zvec maui" }
+        }
+    ],
+    topk: 10,
+    reranker: new ZVecWeightedReranker
+    {
+        TopN = 10,
+        Weights = new Dictionary<string, float>
+        {
+            ["vec"] = 0.7f,
+            ["content"] = 0.3f
+        }
+    },
+    includeVector: false);
+```
+
+**Filtered (typed)** — `products.Query(p => p.Embedding, vec, topK: 10, filter: p => p.Year > 2020)`
+
+**Filtered (dynamic)** — `col.Query(query, topk: 10, filter: ZVecFilterBuilder.Create().Where("year", ZVecCompareOp.Gt, 2020))`
+
+**Query-by-id** — set `ZVecQuery.DocumentId` to load that document’s embedding (extra managed `Fetch`), then search. Result docs already include IDs from native.
+
+**Group-by** — `QueryGroupBy` / `QueryGroupByAsync` are **not supported** in this SDK release (`[Obsolete]`; throw `NotSupportedException`). Use filter + client-side grouping, or track upstream native group-by support.
 
 ### CRUD (typed)
 
@@ -354,44 +542,44 @@ var filter = ZVecFilterBuilder.Create()
 
 ### Sync + Async
 
-Every mutating/querying operation exposes both sync and async variants. Async methods are **cancellation-aware wrappers** around synchronous native P/Invoke (they complete on the caller thread — not a thread-pool offload). When optional throttles are enabled (`MaxConcurrentNativeCalls` / `MaxConcurrentReads` &gt; 0), async paths await the gate with `WaitAsync` (cancelable); after the gate is acquired, P/Invoke still runs synchronously on the continuation thread.
+Every mutating/querying operation exposes both sync and async variants. Async methods are **cancellation-aware wrappers** around synchronous native P/Invoke (they complete on the caller thread — not a thread-pool offload). When optional throttles are enabled (`MaxConcurrentNativeCalls` / `MaxConcurrentReads` > 0), async paths await the gate with `WaitAsync` (cancelable); after the gate is acquired, P/Invoke still runs synchronously on the continuation thread.
 
 ```csharp
-// Sync (lowest latency — P/Invoke on caller thread)
-var results = col.Query(query, topk: 10);
-
-// Async (ValueTask; completes synchronously after the native call unless waiting on an opt-in gate)
-var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
+var results = col.Query(query, topk: 10, includeVector: false);
+var results = await col.QueryAsync(query, topk: 10, includeVector: false, cancellationToken: ct);
 ```
 
-**ASP.NET Core guidance:** For heavy batch insert/optimize workloads, prefer the **sync** APIs on a dedicated worker (`BackgroundService`, channel consumer, or your own bounded queue) rather than unbounded `Task.Run` per request. Use `MaxConcurrentNativeCalls` only when you must **bound** how many threads may block in P/Invoke at once (`0` = unlimited). Do not wrap every SDK call in `Task.Run` inside the library or app — that can worsen thread-pool starvation.
+**ASP.NET Core guidance:** For heavy batch insert/optimize workloads, prefer the **sync** APIs on a dedicated worker (`BackgroundService`, channel consumer, or your own bounded queue) rather than unbounded `Task.Run` per request. Use `MaxConcurrentNativeCalls` only when you must **bound** how many threads may block in P/Invoke at once (`0` = unlimited). Do not wrap every SDK call in `Task.Run`.
 
-Pass `includeVector: false` when you do not need result embeddings (lower latency and GC alloc). Default remains `true` for backward compatibility. Queries that set `ZVecQuery.DocumentId` use a **query-by-id** convenience: an extra managed `Fetch` (with vectors) loads that document’s embedding, then a normal search runs. Search results already include document IDs from native — this is not a missing result-ID gap.
+---
+
+## Samples
+
+Host apps under [`samples/`](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/samples) — **not** in the NuGet package; never gates packaging CI. All sample projects target **.NET 10**.
+
+| Project | Role |
+|---------|------|
+| `ZVec.NET.Samples.Maui` | Flagship — Status + RAG + Search + Recommend (AppData + mmap) |
+| `ZVec.NET.Samples.AspNet` | Minimal API parity (status, hints, models, seed, query) |
+| `ZVec.NET.Samples.Console` | Interactive menu + CLI shortcuts |
+| `ZVec.NET.Samples.Shared` | Shared helpers (not a package) |
+
+```bash
+dotnet build samples/ZVec.NET.Samples.slnx
+dotnet run --project samples/ZVec.NET.Samples.Console
+```
+
+Prerequisites (LM Studio, natives, datasets): [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md).
 
 ---
 
 ## Performance
 
-Workload for primary numbers: **768-dim Flat**, `win-x64`, native ZVec `v0.5.1-35-g1afdea8`, .NET 8.0.29, Intel Core i7-8850H, BenchmarkDotNet **medium** job (2026-07-17, after hot-path recovery). Query/memory benches seed **10_000** docs; insert batch size **1000**.
+Workload for primary numbers: **768-dim Flat**, `win-x64`, native ZVec `v0.5.1-35-g1afdea8`, .NET 8.0.29, Intel Core i7-8850H, BenchmarkDotNet **medium** job (2026-07-17). Query/memory benches seed **10_000** docs; insert batch size **1000**. Primary latency / alloc benches use **`includeVector: false`**.
 
-**Primary latency / alloc benches use `includeVector: false`** (search + id/score/scalars). That matches Python’s `Collection.query(..., include_vector=False)` default. Full materialization (`includeVector: true`) is reported separately — it copies ~10 × 768 floats (~30 KB) and dominates GC alloc.
-
-**Why older smoke numbers looked different:** legacy `ZVecPerformanceBenchmarks` used **128-dim** / tiny corpus. Do not compare those ~ns figures to this suite.
-
-### Upstream engine scale (VectorDBBench — published)
-
-Official ZVec [Benchmarks](https://zvec.org/en/docs/db/benchmarks/) use VectorDBBench on Cohere **1M / 10M** (768-dim). Documented in code as `UpstreamEngineScaleBaseline` / `EngineScaleReferenceBench` (not re-run locally):
-
-| Case | Scale | Published figure | Notes |
-|------|-------|------------------|-------|
-| `Performance768D1M` | Cohere **1M** × 768-d | See VectorDBBench run on docs page | Engine scale |
-| `Performance768D10M` | Cohere **10M** × 768-d | Homepage **8500+ QPS**; index build **~1 hour** | Engine scale |
-
-Not apples-to-apples with the 10k Flat SDK binding suite. Local single-threaded inverse of `Query_Sync` (~2.88 ms → ~350 QPS) is a different metric shape than concurrent VectorDBBench QPS at 10M.
+Official engine scale (VectorDBBench, Cohere 1M/10M): [zvec.org benchmarks](https://zvec.org/en/docs/db/benchmarks/) — not apples-to-apples with the 10k Flat binding suite.
 
 ### Binding suite: .NET vs Python vs Node.js (same machine, 10k Flat)
-
-Same-host parity. **Python `zvec` 0.5.1 re-confirmed this session** (`include_vector=False` for fair compare). Node `@zvec/zvec` column from the earlier same-day run (package not present in this verify session). Scripts are ephemeral (not checked in).
 
 | Metric | .NET (ours) | Python | Node.js |
 |--------|-------------|--------|---------|
@@ -401,33 +589,6 @@ Same-host parity. **Python `zvec` 0.5.1 re-confirmed this session** (`include_ve
 | GC alloc / query (no result vectors) | **6.8 KB** | n/a | n/a |
 | GC alloc / query (with topk vectors) | **40.5 KB** | n/a | n/a |
 
-### Targets vs measured (.NET)
-
-Two tiers — Status is against the **medium** job after hot-path recovery.
-
-**Tier A — binding / search (`includeVector: false`)**
-
-| Metric | Target | Measured | Status |
-|--------|--------|----------|--------|
-| Warm query, 128 docs, topk=10 | &lt; 200 µs | 512 µs mean / 390 µs median (`Query_WarmTinyCorpus`) | Miss — stretch; still competitive with Python warm |
-| Single-vector query, 10k Flat, topk=10 | &lt; 2.0 ms (stretch &lt; 1.5 ms); beat Python | **2.88 ms** (`Query_Sync`) vs Python **4.33 ms** | Miss stretch target; **Pass vs Python** |
-| GC alloc / query (no vectors) | &lt; 4 KB | **6.8 KB** (`Query_768Dim` / `Query_Sync`) | Miss — much improved vs ~44 KB with vectors |
-
-**Tier B — full materialization (`includeVector: true`)**
-
-| Metric | Target | Measured | Status |
-|--------|--------|----------|--------|
-| 10k query with vectors | report / &lt; 4 ms | 2.57–3.16 ms (`Query_Sync_WithVectors` / `Query_768Dim_WithVectors`) | Pass report band |
-| GC alloc / query with vectors | ~40–45 KB expected | **40.5–41.5 KB** | Expected floor (not a &lt;256 B target) |
-
-**Tier C — insert**
-
-| Metric | Target | Measured | Status |
-|--------|--------|----------|--------|
-| Batch insert 1000 docs | &gt; 20k docs/sec (stretch &gt; 30k) | **~16.8k docs/sec** (`Insert_Batch`, 59.4 ms) | Miss; ahead of this-session Python (~7.1k) |
-
-**Allocation split:** query vector still uses `ReadOnlyMemory<float>` + `Memory.Pin()`. With `includeVector: false`, Allocated is mostly result doc/id/scalar unmarshall (~7 KB). With vectors on, ~40 KB is dominated by copying topk embeddings.
-
 ### Measured suite (primary, .NET BDN medium)
 
 | Method | Mean | Allocated |
@@ -436,93 +597,41 @@ Two tiers — Status is against the **medium** job after hot-path recovery.
 | `Query_Sync_WithVectors` (10k) | 2.57 ms | 40.5 KB |
 | `Query_WithFilter` (10k, no vectors) | 1.43 ms | 1.7 KB |
 | `Query_WarmTinyCorpus` (128, no vectors) | 512 µs | 6.7 KB |
-| `Query_768Dim` (no vectors) | 2.82 ms | 6.8 KB |
-| `Query_768Dim_WithVectors` | 3.16 ms | 40.5 KB |
-| `Query_ReadOnlyMemory` (pin, no result vectors) | 4.29 ms | 6.9 KB |
-| `Query_ExplicitCopy` (no result vectors) | 2.61 ms | 9.9 KB |
-| `Fetch_ScalarOnly` | 193 µs | 904 B |
-| `Insert_Single` | 53.1 µs | 1.4 KB |
 | `Insert_Batch` (1000 docs) | 59.4 ms | 446 KB |
-| `Build_SimpleFilter` | 67 ns | 128 B |
-| `Build_CompoundFilter` | 198 ns | 544 B |
-| `Local_10k_Query_ForEngineScaleContext` | 3.52 ms | 6.9 KB |
+| `Fetch_ScalarOnly` | 193 µs | 904 B |
 
-### Typed ODM overhead (vs dynamic `ZVecDoc`)
+**Typed ODM:** wall time ≈ dynamic `ZVecDoc` on insert/query (native dominates); expect **more managed allocations** per op (`TypedOdmOverheadBench`).
 
-Measured with `TypedOdmOverheadBench` (Release, .NET 9, short job: WarmupCount=1, IterationCount=5, 128-doc Flat corpus, 768-dim). **Primary latency suite above stays `ZVecDoc`-only.**
-
-| Method | Mean | Allocated | Notes |
-|--------|------|-----------|--------|
-| `Insert_Dynamic` (baseline) | 66.6 µs | 1.4 KB | |
-| `Insert_Typed` | 55.9 µs | 2.1 KB | Wall time ≈ dynamic (noise); **~1.6× alloc** from mapper |
-| `Query_Dynamic` | 442 µs | 6.5 KB | |
-| `Query_Typed` | 381 µs | 8.8 KB | Wall time ≈ dynamic; **higher alloc** (`ZVecHit<T>` + map) |
-| `QueryFilter_Dynamic` | 569 µs | 6.5 KB | |
-| `QueryFilter_Typed` | 540 µs | 9.5 KB | Expression translate + map; still native-dominated |
-| `Mapper_ToDoc` | 414 ns | 1.0 KB | Managed-only |
-| `Mapper_FromDoc` | 194 ns | 160 B | Managed-only |
-| `ExpressionFilter_Translate` | 372 ns | 592 B | Managed-only |
-
-**Conclusion:** Typed façade does **not** add significant wall-clock cost vs magic-string/`ZVecDoc` on insert/query (native dominates). Expect **more managed allocations** per op. Micro-costs (mapper / expression) are sub-µs.
+### How to reproduce
 
 ```bash
-dotnet run -c Release --project testing/ZVec.NET.Benchmarks --filter *TypedOdmOverheadBench*
-```
-
-### How to reproduce (.NET)
-
-Primary numbers in this README come from a **full-assembly** BenchmarkDotNet run with the **`medium`** job (not `short`). Use `short` only for a quick smoke check.
-
-**Full suite (all classes in the assembly — preferred for README numbers):**
-
-```bash
+# Full suite (README numbers — medium job)
 dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *
-```
 
-**Job options** (BenchmarkDotNet): `short` (smoke), `medium` (README gate), `default` / `long` / `verylong` (more iterations). Invalid names like `MediumRun` / `ShortRun` are rejected; use lowercase `medium` / `short`.
-
-**Filter examples** (run a subset when iterating):
-
-```bash
-# Query latency + with/without vectors
+# Subsets
 dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *QueryThroughputBench*
-
-# Memory / alloc diagnosis
 dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *MemoryDiagnosisBench*
-
-# Insert throughput
 dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *InsertThroughputBench*
-
-# Query-vector pin vs explicit copy
-dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *VectorMarshallingBench*
-
-# Filter AST Build() only (no native)
-dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *FilterParsingBench*
-
-# Local 10k Flat next to upstream VectorDBBench doc context
-dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j medium -f *EngineScaleReferenceBench*
-
-# Typed vs ZVecDoc overhead (managed façade cost)
 dotnet run -c Release --project testing/ZVec.NET.Benchmarks --filter *TypedOdmOverheadBench*
-
-# Legacy 128-dim smoke (not the primary README baseline)
-dotnet run -c Release --project testing/ZVec.NET.Benchmarks -- -j short -f *ZVecPerformanceBenchmarks*
 ```
 
-**Benchmark classes in `testing/ZVec.NET.Benchmarks`:**
+Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `MemoryDiagnosisBench`, `InsertThroughputBench`, `VectorMarshallingBench`, `FilterParsingBench`, `TypedOdmOverheadBench`, `EngineScaleReferenceBench`, plus legacy `ZVecPerformanceBenchmarks` (128-dim smoke — not the primary baseline).
 
-| Class | Role | Notes |
-|-------|------|--------|
-| `QueryThroughputBench` | Primary query latency (10k + warm 128) | `Query_Sync` / `Query_WarmTinyCorpus` use `includeVector: false`; `Query_Sync_WithVectors` is the materialization path |
-| `MemoryDiagnosisBench` | GC alloc per query / fetch | `Query_768Dim` vs `Query_768Dim_WithVectors`; `Fetch_ScalarOnly` |
-| `InsertThroughputBench` | Single + batch insert | Batch size 1000; docs built in `IterationSetup` |
-| `VectorMarshallingBench` | Query-vector pin vs `ToArray()` copy | Result vectors off so alloc delta is marshalling, not topk copies |
-| `FilterParsingBench` | Managed filter `Build()` only | No native collection; `Build_SimpleFilter` / `Build_CompoundFilter` |
-| `TypedOdmOverheadBench` | Typed vs dynamic insert/query + mapper micro | Does **not** replace primary `ZVecDoc` latency suite |
-| `EngineScaleReferenceBench` | Local 10k Flat + prints upstream Cohere 1M/10M context | Does **not** re-run VectorDBBench |
-| `ZVecPerformanceBenchmarks` | Legacy **128-dim** smoke insert/query | Not the primary README baseline; keep for quick local checks only |
+---
 
-Also in the project (not a BDN class): `UpstreamEngineScaleBaseline` / `BenchmarkEnvironment` constants for workload labels and published upstream figures.
+## Troubleshooting
+
+| Symptom | Likely cause / fix |
+|---------|-------------------|
+| `DllNotFoundException` / native load failure | Host RID not in the nupkg, or local `runtimes/{rid}/native/` is empty. Check [supported vs not-yet RIDs](#native-rids-nuget-runtimes). Use a shipped RID, or build/deploy natives (see [CONTRIBUTING.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/CONTRIBUTING.md)). |
+| `ZVecAbiMismatchException` | Native ABI below floor or major mismatch. Use a package whose `+zvec.*` pin matches the shipped `zvec_c_api`. |
+| Create fails: path already exists | Use `factory.Open` / `Create = false`, or the [open-or-create pattern](#create-vs-open-restart-safe-collections). |
+| `PlatformNotSupportedException` (RaBitQ) | HNSW-RaBitQ needs x86_64 + AVX2; not available on Arm/Arm64 ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
+| `PlatformNotSupportedException` (DiskANN) | DiskANN is Linux + libaio only ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
+
+| Expression filter throws | Method calls / unsupported shapes — use `ZVecFilterBuilder` or `products.Untyped`. |
+| Empty scalars after Open | Schema should load from on-disk metadata; if an old broken folder remains, delete the collection path once and recreate. |
+| Samples won’t run | Need .NET 10 SDK + local native for your RID; see [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md). |
 
 ---
 
@@ -534,81 +643,10 @@ Also in the project (not a BDN class): `UpstreamEngineScaleBaseline` / `Benchmar
 | **ZVec native pin** | Build metadata after `+` | `+zvec.0.5.1` |
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
 | **ABI floor** | `ZVecNativeAbi` | Minimum `0.5.1`, same major |
+| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.1` |
+| **Git branch (train)** | `release/1.0` | Long-lived 1.0.x line |
 
-NuGet version example: `1.0.0-beta.1+zvec.0.5.1` — SDK `1.0.0-beta.1` wrapping ZVec C++ `0.5.1`. Do **not** put TFM or branch names into the version string.
-
-### Git vs NuGet (branch ≠ version)
-
-| Concept | Example | Where it lives |
-|---------|---------|----------------|
-| Git branch (train) | `release/1.0` | Git — long-lived for all 1.0.x |
-| Git tag (one ship) | `v1.0.0-beta.1` | Git — **no** `+zvec…` in the tag |
-| NuGet / csproj Version | `1.0.0-beta.1+zvec.0.5.1` | `ZVec.NET.csproj` |
-
-There is **no** branch named `release/1.0.0-beta.1+zvec.0.5.1`. `+zvec.0.5.1` is build metadata only.
-
-### Branch topology
-
-```mermaid
-flowchart LR
-  feat[feature branches]
-  dev[development]
-  main[main]
-  rel["release/1.0"]
-  tag["tag v1.0.0-beta.1"]
-
-  feat --> dev
-  dev -->|"PR merge"| main
-  main -->|"cut release line"| rel
-  rel -->|"tag for nuget.org"| tag
-  rel -->|"hotfix commits"| rel
-  rel -->|"merge backfixes"| main
-  main -->|"merge"| dev
-```
-
-| Branch | Role |
-|--------|------|
-| **`development`** | Daily integration; open `feature/*` / `bugfix/*` PRs here |
-| **`main`** | Stable trunk; parent of every `release/*` cut |
-| **`release/1.0`** | 1.0.x maintenance (betas, RTM, patches via tags) |
-
-**Contributors:** branch off **`development`**. **Hotfixes** for a shipped train: branch off **`release/X.Y`**, PR back into that release line, then merge back to `main` → `development` when the fix still applies.
-
-```mermaid
-flowchart TB
-  subgraph daily [Daily work]
-    feat[feature_or_bugfix_branch]
-    devel[development]
-    feat -->|"PR"| devel
-    devel -->|"PR"| mainBr[main]
-  end
-  subgraph ship [Ship and maintain 1.0]
-    mainBr -->|"cut once"| rel10[release_1.0]
-    rel10 -->|"tag"| t1[v1.0.0-beta.1]
-    hf[hotfix_branch]
-    rel10 -->|"checkout base"| hf
-    hf -->|"PR"| rel10
-    rel10 -->|"tag"| t2[v1.0.0-beta.2]
-    rel10 -->|"merge back"| mainBr
-    mainBr -->|"merge"| devel
-  end
-```
-
-**Examples**
-
-```text
-# Normal feature
-git checkout development && git pull
-git checkout -b feature/fix-filter-null
-# PR → development
-
-# Hotfix published 1.0 train
-git checkout release/1.0 && git pull
-git checkout -b hotfix/1.0-null-filter
-# PR → release/1.0 → bump Version → tag v1.0.0-beta.2 → merge back to main
-```
-
-nuget.org publish is **tag-only** and the tagged commit must be on `release/*` (CI guard). Full policy, CI table, and first-tag steps: [CONTRIBUTING.md](CONTRIBUTING.md) (Branching & releases).
+NuGet version example: `1.0.0-beta.1+zvec.0.5.1`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.1+zvec.0.5.1`.
 
 At startup the ABI gate requires:
 1. `zvec_check_version(MinimumMajor, MinimumMinor, MinimumPatch)` (native ≥ minimum), **and**
@@ -616,49 +654,32 @@ At startup the ABI gate requires:
 
 A mismatch throws `ZVecAbiMismatchException`.
 
+Branching topology, hotfix flow, and tag-only nuget.org publish: [CONTRIBUTING.md — Branching & releases](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/CONTRIBUTING.md#branching--releases).
+
 ---
 
-## Project Structure
+## Project structure
 
 ```
 ZVec.NET/
-├── src/
-│   ├── Native/ZVec.Native/           # CMake -> upstream zvec_c_api
-│   │   └── external/zvec/            # Git submodule (alibaba/zvec)
-│   └── Core/ZVec.NET/                # Published assembly (PackageId: ZVec.NET)
-│       ├── Abstractions/              # IZvecFactory, IZvecCollection, IZvecCollectionOfT (+ role interfaces)
-│       ├── Mapping/                  # ZVec.NET.Mapping — attrs, TypeModel, Mapper, ExpressionFilter
-│       ├── Concurrency/              # CollectionCallGate
-│       ├── DependencyInjection/      # AddZVec, AddZVecCollection / AddZVecCollection<T>, ZVecOptions
-│       ├── Builders/                 # SchemaBuilder (+ From<T>())
-│       ├── Interop/                  # NativeMethods, SafeHandles, NativeLibraryResolver
-│       ├── Internal/                 # Collection*Ops, native builders/unmarshallers
-│       ├── Models/                   # ZVecDoc, ZVecStatus, enums
-│       ├── IndexParams/              # All 8 index param types
-│       ├── Query/                    # ZVecQuery, ZVecFtsQuery, ZVecReranker, FilterBuilder
-│       ├── ZVecFactory.cs
-│       ├── ZVecCollection.cs         # Dynamic façade over Collection*Ops
-│       ├── ZVecCollectionOfT.cs      # Typed ODM façade IZvecCollection<T>
-│       └── ZVecNativeAbi.cs
-├── testing/
-│   ├── ZVec.NET.Tests/               # xUnit + FluentAssertions (real native + Skip)
-│   └── ZVec.NET.Benchmarks/          # BenchmarkDotNet
-├── build/                            # .snk + CI scripts
-├── ZVec.NET.slnx                     # Core + tests + benchmarks (samples: samples/*.slnx)
-├── Directory.Build.props
-└── Directory.Packages.props
+├── src/Core/ZVec.NET/          # Published assembly (PackageId: ZVec.NET)
+├── src/Native/ZVec.Native/     # CMake → upstream zvec_c_api (+ submodule)
+├── testing/                    # xUnit tests + BenchmarkDotNet
+├── samples/                    # Host demos (.NET 10; not in NuGet)
+├── build/                      # .snk + CI scripts
+├── ZVec.NET.slnx               # Core + tests + benchmarks
+└── samples/ZVec.NET.Samples.slnx
 ```
 
 ---
 
 ## Contributing
 
-We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for:
+We welcome contributions! Please read [CONTRIBUTING.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/CONTRIBUTING.md) for:
 
 - Local development setup (C++ submodule init + CMake build)
-- Branching topology (`development` → `main` → `release/1.0` → tag), mermaid diagrams, and examples
-- `feature/*` / `bugfix/*` off **`development`**; `hotfix/*` off **`release/X.Y`**
-- API shape guidelines (DI-first, Builder pattern, full `type.h` enum coverage)
+- Branching (`development` → `main` → `release/1.0` → tag)
+- API shape guidelines (DI-first, typed ODM preferred, full `type.h` enum coverage)
 - Zero-allocation rules on hot paths
 - Testing approach (real native library; tests Skip when the DLL is unavailable)
 
@@ -674,6 +695,8 @@ We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 - **ZVec (upstream):** [github.com/alibaba/zvec](https://github.com/alibaba/zvec)
 - **ZVec docs:** [zvec.org](https://zvec.org)
-- **Project Plan:** [ZVec.NET-Project-Plan.md](ZVec.NET-Project-Plan.md)
-- **Implementation Epics:** [ZVec.NET-Implementation-Plan.md](ZVec.NET-Implementation-Plan.md)
-- **NuGet:** [nuget.org/packages/ZVec.NET](https://www.nuget.org/packages/ZVec.NET/) 
+- **Samples:** [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md)
+- **Contributing:** [CONTRIBUTING.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/CONTRIBUTING.md)
+- **Project Plan:** [ZVec.NET-Project-Plan.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/ZVec.NET-Project-Plan.md)
+- **Implementation Epics:** [ZVec.NET-Implementation-Plan.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/ZVec.NET-Implementation-Plan.md)
+- **NuGet:** [nuget.org/packages/ZVec.NET](https://www.nuget.org/packages/ZVec.NET/)

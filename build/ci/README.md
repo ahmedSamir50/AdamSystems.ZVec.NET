@@ -23,6 +23,35 @@
 
 Samples live under `samples/ZVec.NET.Samples.slnx` and are never built by these workflows.
 
+## RID ship gate
+
+Consumer-facing matrix (supported / not yet / never): [README.md — Native RIDs](../../README.md#native-rids-nuget-runtimes).
+
+Missing RIDs are blocked by **cross-compiling zvec’s bundled third parties** (Arrow, FastPFOR/SIMDe, Lz4, host `protoc`), not by managed P/Invoke. A RID is “shipped” when CI is hard-green for that RID **and** pack always places the binary under `src/Core/ZVec.NET/runtimes/{rid}/native/`.
+
+| RID | Workflow matrix | Gate today |
+|-----|-----------------|------------|
+| `win-x64`, `linux-x64`, `osx-arm64` | `build-native.yml` `optional: false` | Required; pack + managed `require_native` |
+| `win-arm64`, `linux-arm64`, `osx-x64` | `build-native.yml` `optional: true` (`continue-on-error`) | Soft-fail; not pack-required |
+| `android-arm64`, `android-x64` | `build-native-mobile.yml` `continue-on-error: true` | Soft-fail; advertised when artifact present |
+| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `build-native-mobile.yml` `continue-on-error: true` | Soft-fail; not pack-required |
+
+### Patch ↔ RID map (`patches/`)
+
+| Patch / step | RID(s) |
+|--------------|--------|
+| `zvec-version-fallback-0.5.1.patch` | All (shallow submodule / ABI version) |
+| `zvec-arrow-msvc-ninja.patch` | Windows (Arrow + Ninja/MSVC) |
+| `zvec-fastpfor-msvc-arm64-simde.patch` | `win-arm64` |
+| `zvec-arrow-pcg-msvc-arm64.patch` | `win-arm64` (Arrow tree) |
+| Host win64 / linux-x86_64 / osx `protoc` download | `win-arm64`, `linux-arm64`, Android, iOS/Catalyst |
+| `zvec-arrow-linux-aarch64-cross.patch` | `linux-arm64` |
+| `zvec-osx-x64-march.patch` | `osx-x64` |
+| `zvec-ios-static-output-name.patch` | iOS / simulator |
+| `zvec-lz4-maccatalyst.patch`, `zvec-arrow-maccatalyst.patch` | `maccatalyst-arm64` (+ applied from `build-ios.sh`) |
+
+To promote an optional RID: keep the job green, set `optional: false` / drop `continue-on-error`, ensure pack always assembles that artifact, bump `PackageReleaseNotes` + README.
+
 ## Branch / tag cheat sheet
 
 ```text
