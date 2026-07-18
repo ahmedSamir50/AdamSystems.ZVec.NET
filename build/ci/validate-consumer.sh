@@ -7,7 +7,26 @@ FEED_DIR="${2:?path to folder containing .nupkg}"
 # Optional: pre-downloaded native artifact dir (Pack CI downloads to _rid_native).
 NATIVE_SRC="${3:-}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WORK="$(mktemp -d)"
+
+# Convert a bash/MSYS path to a path Windows dotnet/NuGet understand (forward slashes).
+# On Linux/macOS this is identity.
+to_dotnet_path() {
+  local p="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    # -m = Windows path with forward slashes (safe in nuget.config XML).
+    cygpath -m "$p"
+  else
+    printf '%s' "$p"
+  fi
+}
+
+# WORK must live on a real host temp (not bare MSYS /tmp) so nuget.config paths exist for Windows NuGet.
+WORK_BASE="${RUNNER_TEMP:-${TEMP:-${TMP:-/tmp}}}"
+if command -v cygpath >/dev/null 2>&1; then
+  WORK_BASE="$(cygpath -u "$WORK_BASE")"
+fi
+mkdir -p "$WORK_BASE"
+WORK="$(mktemp -d "${WORK_BASE}/zvec-consumer.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 FEED_DIR="$(cd "$FEED_DIR" && pwd)"
@@ -15,8 +34,13 @@ NUPKG=$(ls "$FEED_DIR"/ZVec.NET.*.nupkg | head -n1)
 test -f "$NUPKG"
 VERSION=$(basename "$NUPKG" .nupkg | sed 's/^ZVec\.NET\.//')
 
+FEED_DOTNET="$(to_dotnet_path "$WORK/feed")"
+APP_DOTNET="$(to_dotnet_path "$WORK/app")"
+NUPKG_DOTNET="$(to_dotnet_path "$NUPKG")"
+
 echo "Validating package $NUPKG (version=$VERSION) for RID=$RID"
 echo "ROOT=$ROOT WORK=$WORK"
+echo "FEED_DOTNET=$FEED_DOTNET APP_DOTNET=$APP_DOTNET"
 
 mkdir -p "$WORK/feed"
 cp "$NUPKG" "$WORK/feed/"
@@ -38,18 +62,19 @@ echo "=== extracted runtimes tree ==="
 find "$WORK/nupkg_ex/runtimes" -type f 2>/dev/null | sort || echo "(no runtimes/ in nupkg)"
 
 # Local feed for ZVec.NET + nuget.org for transitive Microsoft.Extensions.* deps.
+# FEED_DOTNET must be a Windows-native path on win-x64 (NU1301 if /tmp is written here).
 cat > "$WORK/nuget.config" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <packageSources>
     <clear />
-    <add key="local" value="$WORK/feed" />
+    <add key="local" value="$FEED_DOTNET" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
   </packageSources>
 </configuration>
 EOF
 
-dotnet new console -n ConsumerSmoke -o "$WORK/app" --framework net8.0 --force
+dotnet new console -n ConsumerSmoke -o "$APP_DOTNET" --framework net8.0 --force
 cp "$WORK/nuget.config" "$WORK/app/nuget.config"
 (
   cd "$WORK/app"
@@ -69,13 +94,14 @@ cp "$WORK/nuget.config" "$WORK/app/nuget.config"
   dotnet add ConsumerSmoke.csproj package ZVec.NET --version "$VERSION"
 )
 
+# CreateAndOpen requires a path that does NOT already exist — do not Directory.CreateDirectory first.
 cat > "$WORK/app/Program.cs" <<'EOF'
 using ZVec.NET;
 
 var path = Path.Combine(Path.GetTempPath(), "zvec-consumer-smoke-" + Guid.NewGuid().ToString("N"));
-Directory.CreateDirectory(path);
 Console.WriteLine("RID=" + System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
 Console.WriteLine("BaseDir=" + AppContext.BaseDirectory);
+Console.WriteLine("CollectionPath=" + path);
 try
 {
     using var factory = new ZVecFactory();
@@ -106,8 +132,9 @@ finally
 }
 EOF
 
-dotnet restore "$WORK/app/ConsumerSmoke.csproj" --runtime "$RID"
-dotnet build "$WORK/app/ConsumerSmoke.csproj" -c Release --no-restore
+PROJ="$(to_dotnet_path "$WORK/app/ConsumerSmoke.csproj")"
+dotnet restore "$PROJ" --runtime "$RID"
+dotnet build "$PROJ" -c Release --no-restore
 
 # Locate build output (with RID folder when RuntimeIdentifier is set).
 OUT_DIR="$(find "$WORK/app/bin/Release" -type d -name "$RID" | head -n1 || true)"
@@ -145,5 +172,5 @@ ls -la "$OUT_DIR" || true
 ls -la "$OUT_NATIVE" || true
 find "$OUT_DIR" -iname '*zvec*' | sort || true
 
-dotnet run --project "$WORK/app/ConsumerSmoke.csproj" -c Release --no-build --runtime "$RID"
+dotnet run --project "$PROJ" -c Release --no-build --runtime "$RID"
 echo "Consumer smoke passed for $RID"
