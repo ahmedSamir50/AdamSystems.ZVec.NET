@@ -117,7 +117,8 @@ jobs:
         shell: pwsh
         run: |
           $zvec = "src/Native/ZVec.Native/external/zvec"
-          $patch = "build/ci/patches/zvec-arrow-msvc-ninja.patch"
+          # Absolute path: git -C resolves relative patch paths inside the submodule.
+          $patch = Join-Path $env:GITHUB_WORKSPACE "build/ci/patches/zvec-arrow-msvc-ninja.patch"
           git -C $zvec apply --check $patch
           git -C $zvec apply $patch
 
