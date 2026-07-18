@@ -12,14 +12,17 @@
 
 | Workflow | Typical triggers | Publishes to nuget.org? |
 |----------|------------------|-------------------------|
-| `build-managed.yml` | `main`, `development`, `release/**`, PRs | No — core + tests only (not samples) |
-| `build-native.yml` / `build-native-mobile.yml` | same (+ path filters) | No |
-| `pack.yml` | `release/**`, tags `v*`, manual | No (pack + smoke only) |
-| `publish-nuget.yml` | tags `v*` only | **Yes** — commit must be on `release/*` |
+| `build-managed.yml` | PRs (+ manual) | No — core + tests only (not samples) |
+| `build-native.yml` / `build-native-mobile.yml` | PRs with path filters (+ manual) | No |
+| `pack.yml` | Manual `workflow_dispatch` only (+ `workflow_call`) | No (pack + smoke only) |
+| `publish-nuget.yml` | tags `v*` + manual | **Yes** — commit must be on `release/*` |
+| `validate-consumer-rerun.yml` | Manual only | No |
+
+**Ship:** PR CI → merge → manually run **Pack NuGet** → tag `v*` (maintainer only) → Publish reuses Pack artifacts.
 
 **Pack order:** desktop natives → managed tests with `require_native` (download `zvec-native-{rid}` into `runtimes/`, assert copy into test `bin/.../runtimes/`, `ZVEC_REQUIRE_NATIVE=1`, then test) → pack nupkg. Pack stays gated on managed success. Mobile / optional desktop RIDs are soft-fail (`continue-on-error`).
 
-**Standalone managed** (push/PR): no native download; integration tests Skip if the RID binary is missing. Unit tests still gate the job.
+**Standalone managed** (PR): no native download; integration tests Skip if the RID binary is missing. Unit tests still gate the job.
 
 Samples live under `samples/ZVec.NET.Samples.slnx` and are never built by these workflows.
 

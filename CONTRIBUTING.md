@@ -124,7 +124,7 @@ flowchart TB
 
 Contributor does **not** create a second “development” from `release/1.0`. Work off **`development`**.
 
-Never commit directly on `main` or `release/*`.
+Never commit directly on `main`, `development`, or `release/*` — open a PR. Only **@ahmedSamir50** may approve merges (Code Owners) and create `v*` release tags.
 
 ### Hotfix for an already-shipped 1.0 train
 
@@ -134,8 +134,8 @@ Bug in a published alpha/RTM on the 1.0 line:
 1. git fetch && git checkout release/1.0 && git pull
 2. git checkout -b hotfix/1.0-null-filter
 3. PR → release/1.0   (not → development)
-4. On release/1.0: bump Version in csproj (e.g. 1.0.0-alpha.2+zvec.0.5.1)
-5. Tag v1.0.0-alpha.2 on release/1.0 → publish CI
+4. On release/1.0: bump Version in csproj (e.g. 1.0.0-beta.3+zvec.0.5.1)
+5. Manually run **Pack NuGet**, then tag v1.0.0-beta.3 on release/1.0 → Publish CI
 6. Merge release/1.0 → main, then main → development (so the fix is not lost)
 ```
 
@@ -161,12 +161,15 @@ There is **no** merge of “different development branches into different `relea
 
 | Workflow | Runs on | Publishes to nuget.org? |
 |----------|---------|-------------------------|
-| `build-managed.yml` | `main`, `development`, `release/**`, all PRs | No — core + tests only (not `samples/`) |
-| `build-native.yml` / `build-native-mobile.yml` | same (+ path filters) | No |
-| `pack.yml` | `release/**`, tags `v*`, manual | No — natives first, then managed with RID artifacts, then pack |
-| `publish-nuget.yml` | tags `v*` only | **Yes** — commit must be on `release/*` |
+| `build-managed.yml` | **PRs** (+ manual dispatch) | No — core + tests only (not `samples/`) |
+| `build-native.yml` / `build-native-mobile.yml` | **PRs** with path filters (+ manual) | No |
+| `pack.yml` | **Manual** `workflow_dispatch` only (also called by Publish if needed) | No — natives → managed with RID artifacts → pack → consumer smoke |
+| `publish-nuget.yml` | tags `v*` + manual | **Yes** — commit must be on `release/*` |
+| `validate-consumer-rerun.yml` | Manual only | No |
 
-**Pack:** desktop natives finish → managed downloads `zvec-native-{rid}` and runs integration tests → pack. Day-to-day managed on `development` / `main` does not wait for natives (integration Skip if missing). Only **nuget.org publish** is release-branch-gated. See [`build/ci/README.md`](build/ci/README.md).
+**Ship flow:** PR (CI) → maintainer merge → **Actions → Pack NuGet** (manual) → maintainer tags `v*` → Publish reuses Pack artifacts. No Pack on every push to `release/**`.
+
+**Pack:** desktop natives finish → managed downloads `zvec-native-{rid}` and runs integration tests → pack. Pack stays gated on managed success. Mobile / optional desktop RIDs are soft-fail. PR managed CI does not wait for natives (integration Skip if missing). See [`build/ci/README.md`](build/ci/README.md).
 
 ### NuGet publish & upstream announce (maintainers)
 

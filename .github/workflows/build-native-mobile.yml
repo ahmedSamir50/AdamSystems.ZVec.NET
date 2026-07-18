@@ -1,12 +1,6 @@
 name: Build Native (mobile)
 
 on:
-  push:
-    branches: ["release/**"]
-    paths:
-      - "src/Native/**"
-      - "build/ci/**"
-      - ".github/workflows/build-native-mobile.yml"
   pull_request:
     paths:
       - "src/Native/**"
