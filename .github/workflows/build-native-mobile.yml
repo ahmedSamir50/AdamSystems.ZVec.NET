@@ -2,7 +2,7 @@ name: Build Native (mobile)
 
 on:
   push:
-    branches: [main, development, "release/**"]
+    branches: ["release/**"]
     paths:
       - "src/Native/**"
       - "build/ci/**"

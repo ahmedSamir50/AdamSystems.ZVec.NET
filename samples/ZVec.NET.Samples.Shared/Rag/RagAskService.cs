@@ -6,11 +6,13 @@ public sealed class RagAskService
 {
     private readonly RagQueryService _query;
     private readonly IChatClient _chat;
+    private readonly LmStudioOptions _options;
 
-    public RagAskService(RagQueryService query, IChatClient chat)
+    public RagAskService(RagQueryService query, IChatClient chat, LmStudioOptions options)
     {
         _query = query ?? throw new ArgumentNullException(nameof(query));
         _chat = chat ?? throw new ArgumentNullException(nameof(chat));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
     public async Task<RagAskResult> AskAsync(
@@ -47,7 +49,7 @@ public sealed class RagAskService
         catch (InvalidOperationException)
         {
             var fallback =
-                $"Chat model unavailable (load '{SampleDefaults.ChatModelId}' in LM Studio alongside embeddings). " +
+                $"Chat model unavailable (load '{_options.ChatModel}' in LM Studio alongside embeddings). " +
                 "Showing retrieved citations only.\n\n" +
                 string.Join("\n", citations.Select((c, i) => $"[{i + 1}] {c.Title}: {c.Snippet}"));
             return new RagAskResult(fallback, citations, UsedChat: false);

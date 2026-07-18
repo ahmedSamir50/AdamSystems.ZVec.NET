@@ -7,11 +7,22 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <span class="brand-top">Offline RAG · Search · Recommend</span>
         </div>
 
         <article class="content px-4">
-            @Body
+            <ErrorBoundary>
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent Context="ex">
+                    <div class="banner error">
+                        <strong>Something failed</strong>
+                        <pre>@ex.Message</pre>
+                        <p class="muted">If this mentions CreateAndOpen / path exists, restart after the open-or-create fix — or delete the collection folder under AppData.</p>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
         </article>
     </main>
 </div>

@@ -53,28 +53,54 @@ public static class FixtureLoader
     public static IReadOnlyList<TextSource> LoadSearchFixtures()
     {
         var path = Path.Combine(SamplePaths.FixturesRoot, "search", "questions.json");
-        if (!File.Exists(path))
-            return [];
+        if (File.Exists(path))
+        {
+            var items = JsonSerializer.Deserialize<List<FixtureQuestion>>(File.ReadAllText(path)) ?? [];
+            if (items.Count > 0)
+                return items.Select(q => new TextSource(q.Id, q.Text, q.Text, "fixture:search", "fixture")).ToArray();
+        }
 
-        var items = JsonSerializer.Deserialize<List<FixtureQuestion>>(File.ReadAllText(path)) ?? [];
-        return items.Select(q => new TextSource(q.Id, q.Text, q.Text, "fixture:search", "fixture")).ToArray();
+        return BuiltInSearchFixtures();
     }
+
+    public static IReadOnlyList<TextSource> BuiltInSearchFixtures() =>
+    [
+        new("q1", "How do I open a ZVec collection in .NET?", "How do I open a ZVec collection in .NET?", "builtin:search", "fixture"),
+        new("q2", "What is the difference between Dispose and Destroy?", "What is the difference between Dispose and Destroy?", "builtin:search", "fixture"),
+        new("q3", "How do typed ODM attributes map to schema?", "How do typed ODM attributes map to schema?", "builtin:search", "fixture"),
+        new("q4", "How can I run semantic search offline on a device?", "How can I run semantic search offline on a device?", "builtin:search", "fixture"),
+        new("q5", "What LM Studio models are used for embeddings and chat?", "What LM Studio models are used for embeddings and chat?", "builtin:search", "fixture")
+    ];
 
     public static IReadOnlyList<RecommendItem> LoadRecommendFixtures()
     {
         var path = Path.Combine(SamplePaths.FixturesRoot, "recommend", "items.json");
-        if (!File.Exists(path))
-            return [];
-
-        var items = JsonSerializer.Deserialize<List<FixtureItem>>(File.ReadAllText(path)) ?? [];
-        return items.Select(i => new RecommendItem
+        if (File.Exists(path))
         {
-            Id = i.Id,
-            Title = i.Title,
-            Category = i.Category,
-            Description = i.Description
-        }).ToArray();
+            var items = JsonSerializer.Deserialize<List<FixtureItem>>(File.ReadAllText(path)) ?? [];
+            if (items.Count > 0)
+            {
+                return items.Select(i => new RecommendItem
+                {
+                    Id = i.Id,
+                    Title = i.Title,
+                    Category = i.Category,
+                    Description = i.Description
+                }).ToArray();
+            }
+        }
+
+        return BuiltInRecommendFixtures();
     }
+
+    public static IReadOnlyList<RecommendItem> BuiltInRecommendFixtures() =>
+    [
+        new() { Id = "m1", Title = "The Matrix", Category = "Sci-Fi, Action", Description = "A computer hacker learns about the true nature of reality." },
+        new() { Id = "m2", Title = "Inception", Category = "Sci-Fi, Thriller", Description = "A thief who steals secrets through dream-sharing technology." },
+        new() { Id = "m3", Title = "Interstellar", Category = "Sci-Fi, Drama", Description = "Explorers travel through a wormhole in space." },
+        new() { Id = "m4", Title = "Spirited Away", Category = "Animation, Fantasy", Description = "A young girl enters a world ruled by gods and spirits." },
+        new() { Id = "m5", Title = "The Godfather", Category = "Crime, Drama", Description = "The aging patriarch of a crime dynasty transfers control to his son." }
+    ];
 
     private sealed class FixtureQuestion
     {

@@ -21,6 +21,9 @@ public static class SampleDefaults
     public const int AmazonBeautyMaxItems = 25_000;
     public const int SimpleWikiMaxArticles = 10_000;
 
+    /// <summary>Cap for interactive T1 seed demos (keep first ingest responsive).</summary>
+    public const int DemoSeedMaxItems = 2_000;
+
     public const int MemoryLimitMb = 512;
     public const bool EnableMmap = true;
 

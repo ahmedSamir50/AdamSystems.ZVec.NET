@@ -2,11 +2,11 @@
 
 User demos for offline/edge RAG, semantic search, and recommendations.
 
-**Not part of the NuGet package.** These projects are `IsPackable=false`, live under `samples/`, and must never gate NuGet pack. MAUI is the cross-platform native proof (Windows / Android / iOS / Mac Catalyst) when RID binaries exist under `src/Core/ZVec.NET/runtimes/`.
+**Not part of the NuGet package.** Epic **E21** (packaging/CI) is deferred — these projects are `IsPackable=false`, live under `samples/`, and must never gate pack or default CI.
 
 ## Target framework
 
-All samples target **.NET 10** only (`net10.0` / `net10.0-*` for MAUI).
+All samples target **.NET 10** only (`net10.0` / `net10.0-windows…` for MAUI).
 
 ## Solution entrypoint
 
@@ -14,50 +14,48 @@ All samples target **.NET 10** only (`net10.0` / `net10.0-*` for MAUI).
 dotnet build samples/ZVec.NET.Samples.slnx
 ```
 
-Use this solution for all sample work. Root `ZVec.NET.slnx` is core + tests + benchmarks only — samples are not listed there so managed CI never builds demos or needs the MAUI workload.
-
 ## Apps
 
 | Project | Role |
 |---------|------|
-| `ZVec.NET.Samples.Maui` | **Flagship** — Blazor Hybrid offline RAG (AppData + mmap) |
-| `ZVec.NET.Samples.AspNet` | Minimal API + DI + health |
-| `ZVec.NET.Samples.Console` | Typed + `ZVecDoc` vignette + CLI |
+| `ZVec.NET.Samples.Maui` | **Flagship** — Status + RAG + Search + Recommend (AppData + mmap) |
+| `ZVec.NET.Samples.AspNet` | Minimal API parity (status, hints, models, seed, query) |
+| `ZVec.NET.Samples.Console` | Interactive menu (no args) + CLI shortcuts |
 | `ZVec.NET.Samples.Shared` | Shared helpers (not a package) |
 
 ## Prerequisites
 
 1. **.NET 10 SDK**
-2. **Native library** for your RID under `src/Core/ZVec.NET/runtimes/{rid}/native/` (see root README Native RIDs). Local win-x64: build via `src/Native/ZVec.Native` deploy scripts. Android: `build/ci/build-android.sh`. iOS/MacCatalyst: `build/ci/build-ios.sh` on macOS / GHA. MAUI embeds them via `ZVec.NET.Samples.Maui/ZVec.Native.targets`.
-3. **LM Studio** at `http://127.0.0.1:1234/v1` with **both** models loaded at once (no switching):
-   - Embeddings: `text-embedding-google_embeddinggemma-300m-qat` (768-d EmbeddingGemma) → `POST /v1/embeddings`
-   - Chat: `google/gemma-4-e2b` → `POST /v1/chat/completions`
-4. **MAUI workload** (for the Maui project only): `dotnet workload install maui`
+2. **Native library** for your RID (win-x64): `zvec_c_api` under `src/Core/ZVec.NET/runtimes/win-x64/native/`
+3. **LM Studio** at `http://127.0.0.1:1234/v1` with both models loaded (concurrent):
+   - Default embed: `text-embedding-google_embeddinggemma-300m-qat` (768-d)
+   - Default chat: `google/gemma-4-e2b`
+   - Change selection via Maui Status, Console `models`, or `GET/PUT /models`
+4. **MAUI workload** (Maui only): `dotnet workload install maui`
 
-## Datasets (MB only, download on startup)
+## Collections (restart-safe)
 
-See [datasets/README.md](datasets/README.md).
+Samples use **app-level open-or-create** (upstream `CreateAndOpen` throws if the path exists — same as Python/Node). Second launch opens existing collections under AppData / temp.
 
-- T0 fixtures are committed under `datasets/fixtures/`
-- T1 packs download **async on sample startup** into gitignored `datasets/cache/`
-- **Second startup skips** packs that are already ready (no re-download)
-- Network failure leaves the T0 path working
-- Hard cap ≈ 100 MB per pack — no GB corpora
+## Datasets
 
-## Quick smoke (manual — samples are not default CI)
+See [datasets/README.md](datasets/README.md). T1 packs download on startup into gitignored `cache/` (skip if present). Seed into ZVec via Maui buttons / Console / AspNet seed endpoints (capped).
 
-- [ ] `dotnet run --project samples/ZVec.NET.Samples.Console -- basics` (win-x64 native present)
-- [ ] LM Studio up with **both** models → `ingest --fixtures` → `ask "What is ZVec.NET?"`
-- [ ] First run downloads T1 into `datasets/cache/`; second run logs `skip …: already present`
-- [ ] `dotnet run --project samples/ZVec.NET.Samples.AspNet` → `GET /health` healthy
-- [ ] `POST /rag/ask` returns answer + hits
-- [ ] MAUI Windows: ingest fixtures → ask → citations; restart app → doc count preserved
-- [ ] MAUI Android (after NDK build): Debug + Release on device/emulator load ZVec (no `DllNotFoundException`)
-- [ ] MAUI iOS simulator / Mac Catalyst (after Xcode/CI native): app loads ZVec
+## Suggested queries
 
-## Packaging isolation
+`DemoPromptCatalog` provides chips / numbered hints so you can try demos without knowing corpus contents. AspNet: `GET /hints`.
 
-- Sample projects are never packed into `ZVec.NET.nupkg`
-- No required GitHub Actions job for sample apps (native/pack CI is separate)
-- After nuget.org publish, samples may document `dotnet add package ZVec.NET` as an alternate to `ProjectReference`
-- **No .NET Aspire** for LM Studio — use HTTP clients + health probes only
+## Quick smoke
+
+- [ ] `dotnet run --project samples/ZVec.NET.Samples.Console` → interactive menu → `status` → `models`
+- [ ] `rag seed-fixtures` → `ask` (pick a suggested #)
+- [ ] `search seed-fixtures` → `search` query
+- [ ] `recommend seed-fixtures` → `recommend` query
+- [ ] AspNet: `GET /status`, `GET /hints`, `GET /models`, seed + query POSTs
+- [ ] Maui: restart twice — no CreateAndOpen crash; Status shows three doc counts
+
+## E21 isolation
+
+- No sample assets under NuGet `runtimes/`
+- No Aspire for LM Studio
+- No GitHub Actions workflow for samples in E25

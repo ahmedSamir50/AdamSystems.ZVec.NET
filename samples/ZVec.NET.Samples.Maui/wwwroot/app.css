@@ -99,3 +99,27 @@ h1:focus {
         padding-left: env(safe-area-inset-left);
     }
 }
+
+/* ZVec sample demos */
+.muted { color: #666; margin-bottom: 1rem; }
+.banner { padding: .75rem 1rem; margin-bottom: 1rem; border-radius: 4px; }
+.banner.error { background: #fdecea; color: #611a15; }
+.banner.info { background: #e8f4fd; color: #0b3d5c; }
+.banner .link { background: none; border: none; text-decoration: underline; cursor: pointer; margin-left: .5rem; }
+.ok { color: #0a7a32; font-weight: 600; }
+.bad { color: #b00020; font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
+.btn { padding: .4rem .8rem; cursor: pointer; border: 1px solid #ccc; background: #f7f7f7; border-radius: 4px; }
+.btn-primary { background: #0b5fff; color: #fff; border-color: #0b5fff; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .75rem; }
+.chip { padding: .25rem .65rem; border-radius: 999px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: .9rem; }
+.chip:disabled { opacity: .5; }
+.answer { white-space: pre-wrap; background: #fafafa; padding: 1rem; }
+.snippet { color: #444; font-size: .9rem; }
+.row { display: flex; flex-wrap: wrap; gap: 1rem; margin: .75rem 0; }
+.row label { display: flex; flex-direction: column; gap: .35rem; min-width: 14rem; flex: 1; }
+.row select { padding: .35rem; }
+.flags { list-style: none; padding: 0; }
+.brand-top { color: #444; font-size: .95rem; }
+section { margin-bottom: 2rem; }

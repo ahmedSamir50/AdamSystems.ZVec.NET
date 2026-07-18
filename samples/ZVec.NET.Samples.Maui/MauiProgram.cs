@@ -2,7 +2,6 @@
 using ZVec.NET.DependencyInjection;
 using ZVec.NET.Samples.Shared;
 using ZVec.NET.Samples.Shared.Data;
-using ZVec.NET.Samples.Shared.Models;
 
 namespace ZVec.NET.Samples.Maui;
 
@@ -22,9 +21,7 @@ public static class MauiProgram
 
         var dataRoot = Path.Combine(FileSystem.AppDataDirectory, "zvec");
         Directory.CreateDirectory(dataRoot);
-        var ragPath = Path.Combine(dataRoot, SampleDefaults.RagCollectionFolder);
 
-        // Offline / edge: mmap collection under AppData. Host lifetime disposes factory on shutdown.
         builder.Services.AddZVec(options =>
         {
             options.LogLevel = ZVecLogLevel.Warn;
@@ -32,13 +29,7 @@ public static class MauiProgram
             options.QueryThreads = -1;
         });
 
-        builder.Services.AddZVecCollection<RagDocument>(options =>
-        {
-            options.Path = ragPath;
-            options.EnableMmap = SampleDefaults.EnableMmap;
-            options.Create = true;
-        });
-
+        builder.Services.AddSampleDemoCollections(dataRoot, SampleDefaults.EnableMmap);
         builder.Services.AddZVecSampleAi();
 
 #if DEBUG
@@ -47,7 +38,6 @@ public static class MauiProgram
 #endif
 
         var app = builder.Build();
-        // Fire-and-forget T1 packs into samples/datasets/cache/ (skip if already present).
         _ = SampleDatasetBootstrap.StartBackgroundEnsureAsync();
         return app;
     }

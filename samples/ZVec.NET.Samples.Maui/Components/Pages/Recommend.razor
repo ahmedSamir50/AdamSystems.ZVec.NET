@@ -1,0 +1,110 @@
+@page "/recommend"
+@using ZVec.NET.Samples.Shared
+@using ZVec.NET.Samples.Shared.Models
+@using ZVec.NET.Samples.Shared.Services
+@inject RecommendService RecommendSvc
+@inject DatasetSeedService Seed
+@inject IZvecCollection<RecommendItem> Collection
+
+<h1>Recommendations</h1>
+<p class="muted">@DemoPromptCatalog.RecommendBlurb</p>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="banner error">@_error <button class="link" @onclick="() => _error = null">dismiss</button></div>
+}
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="banner info">@_message</div>
+}
+
+<section>
+    <h2>Seed</h2>
+    <div class="actions">
+        <button class="btn" disabled="@_busy" @onclick="SeedFixturesAsync">Seed T0 movies</button>
+        <button class="btn" disabled="@_busy" @onclick="SeedMovieLensAsync">Seed MovieLens</button>
+        <button class="btn" disabled="@_busy" @onclick="SeedAmazonAsync">Seed Amazon Beauty (capped)</button>
+    </div>
+    <p>Docs: <strong>@Collection.Stats.DocCount</strong></p>
+</section>
+
+<section>
+    <h2>Similar items</h2>
+    @if (Collection.Stats.DocCount == 0)
+    {
+        <p class="muted">Seed recommend data first.</p>
+    }
+    <div class="chips">
+        @foreach (var p in DemoPromptCatalog.Recommend)
+        {
+            <button class="chip" disabled="@_busy" @onclick="() => UsePrompt(p)">@p.Label</button>
+        }
+    </div>
+    <input @bind="_query" style="width:100%" placeholder="Similar to…" />
+    <div class="actions">
+        <button class="btn btn-primary" disabled="@_busy" @onclick="RunQueryAsync">Recommend</button>
+    </div>
+    @if (_hits.Count > 0)
+    {
+        <ul>
+            @foreach (var h in _hits)
+            {
+                <li>
+                    <strong>@h.Title</strong> [@h.Category] (@h.Score.ToString("F3"))
+                    <div class="snippet">@h.Description</div>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private string _query = "";
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+    private List<RecommendHit> _hits = [];
+
+    private void UsePrompt(DemoPrompt p) => _query = p.Query;
+
+    private async Task SeedFixturesAsync()
+        => await RunAsync(async () =>
+        {
+            var n = await Seed.SeedRecommendFixturesAsync();
+            _message = $"Seeded {n} recommend item(s).";
+        });
+
+    private async Task SeedMovieLensAsync()
+        => await RunAsync(async () =>
+        {
+            var n = await Seed.SeedMovieLensAsync();
+            _message = $"Seeded {n} MovieLens item(s).";
+        });
+
+    private async Task SeedAmazonAsync()
+        => await RunAsync(async () =>
+        {
+            var n = await Seed.SeedAmazonBeautyAsync();
+            _message = $"Seeded {n} Amazon Beauty item(s).";
+        });
+
+    private async Task RunQueryAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_query))
+            return;
+        await RunAsync(async () =>
+        {
+            _hits = (await RecommendSvc.SimilarAsync(_query)).ToList();
+            _message = _hits.Count == 0 ? "No hits." : $"Found {_hits.Count} hit(s).";
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = null;
+        try { await action(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

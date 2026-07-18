@@ -1,0 +1,217 @@
+@page "/"
+@page "/status"
+@using ZVec.NET.Samples.Shared
+@using ZVec.NET.Samples.Shared.Data
+@using ZVec.NET.Samples.Shared.LmStudio
+@using ZVec.NET.Samples.Shared.Models
+@inject LmStudioStatusProbe StatusProbe
+@inject LmStudioModelCatalog ModelCatalog
+@inject LmStudioOptions Options
+@inject IZvecCollection<RagDocument> Rag
+@inject IZvecCollection<SearchDocument> Search
+@inject IZvecCollection<RecommendItem> Recommend
+
+<h1>Status</h1>
+<p class="muted">ZVec.NET Edge — LM Studio models, datasets, collections</p>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="banner error">@_error <button class="link" @onclick="() => _error = null">dismiss</button></div>
+}
+@if (!string.IsNullOrEmpty(_info))
+{
+    <div class="banner info">@_info</div>
+}
+
+<section>
+    <h2>LM Studio</h2>
+    <p>@_statusMessage</p>
+    <p>
+        Embed: <span class="@(_embedOk ? "ok" : "bad")">@(_embedOk ? "OK" : "down")</span>
+        · Chat: <span class="@(_chatOk ? "ok" : "bad")">@(_chatOk ? "OK" : "down")</span>
+    </p>
+
+    <div class="row">
+        <label>
+            Embedding model
+            <select @bind="_selectedEmbed" disabled="@_busy">
+                @if (_modelIds.Count == 0)
+                {
+                    <option value="@Options.EmbeddingModel">@Options.EmbeddingModel</option>
+                }
+                @foreach (var id in _modelIds)
+                {
+                    <option value="@id">@id</option>
+                }
+            </select>
+        </label>
+        <label>
+            Chat model
+            <select @bind="_selectedChat" disabled="@_busy">
+                @if (_modelIds.Count == 0)
+                {
+                    <option value="@Options.ChatModel">@Options.ChatModel</option>
+                }
+                @foreach (var id in _modelIds)
+                {
+                    <option value="@id">@id</option>
+                }
+            </select>
+        </label>
+    </div>
+    <div class="actions">
+        <button class="btn" disabled="@_busy" @onclick="RefreshAllAsync">Refresh</button>
+        <button class="btn" disabled="@_busy" @onclick="RefreshModelsAsync">Refresh models</button>
+        <button class="btn btn-primary" disabled="@_busy" @onclick="ApplyModelsAsync">Apply models</button>
+    </div>
+</section>
+
+<section>
+    <h2>Datasets</h2>
+    <p>@_datasetMessage</p>
+    <ul class="flags">
+        <li>FiQA: @Flag(DatasetDownloader.IsFiqaReady())</li>
+        <li>NFCorpus: @Flag(DatasetDownloader.IsNfCorpusReady())</li>
+        <li>Quora: @Flag(DatasetDownloader.IsQuoraReady())</li>
+        <li>MovieLens: @Flag(DatasetDownloader.IsMovieLensReady())</li>
+        <li>Amazon Beauty: @Flag(DatasetDownloader.IsAmazonBeautyReady())</li>
+    </ul>
+    <button class="btn" disabled="@_busy" @onclick="RetryDatasetsAsync">Retry download</button>
+</section>
+
+<section>
+    <h2>Collections</h2>
+    <ul>
+        <li>RAG: <strong>@_ragCount</strong> · <code>@Rag.Path</code></li>
+        <li>Search: <strong>@_searchCount</strong> · <code>@Search.Path</code></li>
+        <li>Recommend: <strong>@_recCount</strong> · <code>@Recommend.Path</code></li>
+    </ul>
+</section>
+
+@code {
+    private string _statusMessage = "Not probed yet.";
+    private string _datasetMessage = "Checking…";
+    private string? _error;
+    private string? _info;
+    private bool _busy;
+    private bool _embedOk;
+    private bool _chatOk;
+    private long _ragCount, _searchCount, _recCount;
+    private List<string> _modelIds = [];
+    private string _selectedEmbed = SampleDefaults.EmbeddingModelId;
+    private string _selectedChat = SampleDefaults.ChatModelId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _selectedEmbed = Options.EmbeddingModel;
+        _selectedChat = Options.ChatModel;
+        RefreshCounts();
+        _ = TrackDatasetsAsync();
+        await RefreshAllAsync();
+    }
+
+    private void RefreshCounts()
+    {
+        _ragCount = Rag.Stats.DocCount;
+        _searchCount = Search.Stats.DocCount;
+        _recCount = Recommend.Stats.DocCount;
+    }
+
+    private static string Flag(bool ready) => ready ? "ready" : "missing";
+
+    private async Task RefreshAllAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var status = await StatusProbe.ProbeAsync();
+            _statusMessage = status.Message;
+            _embedOk = status.EmbeddingsOk;
+            _chatOk = status.ChatOk;
+            await RefreshModelsAsync();
+            RefreshCounts();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RefreshModelsAsync()
+    {
+        try
+        {
+            var ids = await ModelCatalog.ListModelIdsAsync();
+            _modelIds = ids.ToList();
+            if (_modelIds.Count > 0)
+            {
+                if (!_modelIds.Contains(_selectedEmbed))
+                    _selectedEmbed = _modelIds.FirstOrDefault(LmStudioModelCatalog.LooksLikeEmbeddingModel) ?? _modelIds[0];
+                if (!_modelIds.Contains(_selectedChat))
+                    _selectedChat = _modelIds.FirstOrDefault(id => !LmStudioModelCatalog.LooksLikeEmbeddingModel(id)) ?? _modelIds[0];
+            }
+            _info = _modelIds.Count == 0 ? "No models listed — is LM Studio running?" : $"Loaded {_modelIds.Count} model(s).";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ApplyModelsAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await ModelCatalog.ApplySelectionAsync(_selectedEmbed, _selectedChat);
+            _info = $"Selected embed={result.EmbeddingModel}, chat={result.ChatModel}.";
+            if (!result.EmbeddingOk)
+                _error = result.EmbeddingError ?? "Embedding probe failed.";
+            else if (result.Warning is not null)
+                _info += " " + result.Warning;
+            await RefreshAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task TrackDatasetsAsync()
+    {
+        try
+        {
+            _datasetMessage = "Downloading datasets (skip if present)…";
+            await InvokeAsync(StateHasChanged);
+            var progress = new Progress<string>(msg =>
+            {
+                _datasetMessage = msg;
+                _ = InvokeAsync(StateHasChanged);
+            });
+            await SampleDatasetBootstrap.EnsureAllAsync(progress);
+            _datasetMessage = "Datasets ready (or skipped if already present).";
+        }
+        catch (Exception ex)
+        {
+            _datasetMessage = $"Download issue: {ex.Message}. T0 fixtures still work.";
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RetryDatasetsAsync()
+    {
+        _busy = true;
+        try { await TrackDatasetsAsync(); }
+        finally { _busy = false; }
+    }
+}

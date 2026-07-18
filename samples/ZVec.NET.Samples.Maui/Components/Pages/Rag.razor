@@ -1,0 +1,127 @@
+@page "/rag"
+@using ZVec.NET.Samples.Shared
+@using ZVec.NET.Samples.Shared.Models
+@using ZVec.NET.Samples.Shared.Rag
+@using ZVec.NET.Samples.Shared.Services
+@inject RagIngestService Ingest
+@inject RagAskService Ask
+@inject DatasetSeedService Seed
+@inject IZvecCollection<RagDocument> Collection
+
+<h1>RAG</h1>
+<p class="muted">@DemoPromptCatalog.RagBlurb</p>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="banner error">@_error <button class="link" @onclick="() => _error = null">dismiss</button></div>
+}
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="banner info">@_message</div>
+}
+
+<section>
+    <h2>Ingest</h2>
+    <textarea @bind="_ingestText" rows="5" style="width:100%" placeholder="Paste text to embed…"></textarea>
+    <div class="actions">
+        <button class="btn btn-primary" disabled="@_busy" @onclick="IngestPasteAsync">Ingest text</button>
+        <button class="btn" disabled="@_busy" @onclick="SeedFixturesAsync">Seed T0 fixtures</button>
+        <button class="btn" disabled="@_busy" @onclick="SeedFiqaAsync">Seed FiQA (capped)</button>
+    </div>
+    <p>Docs: <strong>@Collection.Stats.DocCount</strong></p>
+</section>
+
+<section>
+    <h2>Ask</h2>
+    <div class="chips">
+        @foreach (var p in DemoPromptCatalog.Rag)
+        {
+            <button class="chip" disabled="@_busy" @onclick="() => UsePrompt(p)">@p.Label</button>
+        }
+    </div>
+    <input @bind="_question" style="width:100%" placeholder="Ask about ingested content…" />
+    <div class="actions">
+        <button class="btn btn-primary" disabled="@_busy" @onclick="AskAsync">Ask</button>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(_answer))
+    {
+        <h3>Answer</h3>
+        <pre class="answer">@_answer</pre>
+    }
+    @if (_citations.Count > 0)
+    {
+        <h3>Citations</h3>
+        <ul>
+            @foreach (var c in _citations)
+            {
+                <li><strong>@c.Title</strong> (@c.Score.ToString("F3"))<div class="snippet">@c.Snippet</div></li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private string _ingestText = "";
+    private string _question = "";
+    private string _answer = "";
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+    private List<RagCitation> _citations = [];
+
+    private void UsePrompt(DemoPrompt p)
+    {
+        _question = p.Query;
+    }
+
+    private async Task IngestPasteAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_ingestText))
+        {
+            _message = "Paste some text first.";
+            return;
+        }
+
+        await RunAsync(async () =>
+        {
+            var result = await Ingest.IngestTextAsync("maui-paste", "maui", _ingestText, "maui");
+            _message = $"Stored {result.ChunkCount} chunk(s).";
+        });
+    }
+
+    private async Task SeedFixturesAsync()
+        => await RunAsync(async () =>
+        {
+            var n = await Seed.SeedRagFixturesAsync();
+            _message = $"Seeded {n} RAG chunk(s) from fixtures.";
+        });
+
+    private async Task SeedFiqaAsync()
+        => await RunAsync(async () =>
+        {
+            var n = await Seed.SeedFiqaAsync();
+            _message = $"Seeded {n} FiQA chunk(s).";
+        });
+
+    private async Task AskAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_question))
+            return;
+        await RunAsync(async () =>
+        {
+            var result = await Ask.AskAsync(_question);
+            _answer = result.Answer;
+            _citations = result.Citations.ToList();
+            _message = result.UsedChat ? "Answered with chat model." : "Retrieve-only (chat unavailable).";
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = null;
+        try { await action(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

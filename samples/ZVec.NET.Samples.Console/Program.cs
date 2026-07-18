@@ -9,72 +9,186 @@ using ZVec.NET.Samples.Shared.Rag;
 using ZVec.NET.Samples.Shared.Services;
 
 if (args.Length == 0)
+    return await RunInteractiveAsync();
+
+return await DispatchAsync(args);
+
+static async Task<int> RunInteractiveAsync()
 {
+    _ = SampleDatasetBootstrap.StartBackgroundEnsureAsync();
     PrintHelp();
-    return 0;
+    using var host = SampleConsoleHost.Create();
+
+    while (true)
+    {
+        Console.WriteLine();
+        Console.Write("> ");
+        var line = Console.ReadLine();
+        if (line is null)
+            return 0;
+
+        var parts = SplitArgs(line);
+        if (parts.Length == 0)
+            continue;
+
+        var cmd = parts[0].ToLowerInvariant();
+        if (cmd is "quit" or "exit" or "q")
+            return 0;
+
+        try
+        {
+            await DispatchHostAsync(host, parts);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+        }
+    }
 }
 
-var command = args[0].ToLowerInvariant();
-var datasetProgress = new Progress<string>(msg => Console.WriteLine($"[datasets] {msg}"));
-
-if (command is "ingest" or "search" or "recommend")
+static async Task<int> DispatchAsync(string[] args)
 {
+    var command = args[0].ToLowerInvariant();
+    if (command is "help" or "-h" or "--help")
+    {
+        PrintHelp();
+        return 0;
+    }
+
+    if (command is "ingest" or "search" or "recommend" or "rag" or "seed")
+    {
+        try
+        {
+            await SampleDatasetBootstrap.EnsureAllAsync(
+                new Progress<string>(m => Console.WriteLine($"[datasets] {m}")));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[datasets] ensure failed: {ex.Message}. T0 fixtures still work.");
+        }
+    }
+    else if (command is not "basics")
+    {
+        _ = SampleDatasetBootstrap.StartBackgroundEnsureAsync();
+    }
+
+    using var host = SampleConsoleHost.Create();
     try
     {
-        await SampleDatasetBootstrap.EnsureAllAsync(datasetProgress);
+        await DispatchHostAsync(host, args);
+        return 0;
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[datasets] ensure failed: {ex.Message}. T0 fixtures still work.");
+        Console.Error.WriteLine(ex.Message);
+        return 1;
     }
 }
-else if (command is not ("help" or "-h" or "--help"))
+
+static async Task DispatchHostAsync(SampleConsoleHost host, string[] args)
 {
-    _ = SampleDatasetBootstrap.StartBackgroundEnsureAsync();
+    var cmd = args[0].ToLowerInvariant();
+    switch (cmd)
+    {
+        case "help":
+        case "-h":
+        case "--help":
+            PrintHelp();
+            break;
+        case "basics":
+            await RunBasicsAsync();
+            break;
+        case "status":
+            await host.PrintStatusAsync();
+            break;
+        case "models":
+            await host.SelectModelsAsync();
+            break;
+        case "ingest":
+            await host.RunLegacyIngestAsync(args);
+            break;
+        case "ask":
+            await host.AskAsync(JoinRest(args));
+            break;
+        case "search":
+            if (args.Length >= 2 && args[1].StartsWith("seed-", StringComparison.OrdinalIgnoreCase))
+                await host.RunSearchSeedAsync(args[1]);
+            else
+                await host.SearchAsync(JoinRest(args));
+            break;
+        case "recommend":
+            if (args.Length >= 2 && args[1].StartsWith("seed-", StringComparison.OrdinalIgnoreCase))
+                await host.RunRecommendSeedAsync(args[1]);
+            else
+                await host.RecommendAsync(JoinRest(args));
+            break;
+        case "rag":
+            await host.RunRagCommandAsync(args.Skip(1).ToArray());
+            break;
+        default:
+            Console.Error.WriteLine($"Unknown command: {cmd}");
+            PrintHelp();
+            break;
+    }
 }
 
-return command switch
-{
-    "basics" => await RunBasicsAsync(),
-    "ingest" => await RunIngestAsync(args),
-    "ask" => await RunAskAsync(args),
-    "search" => await RunSearchAsync(args),
-    "recommend" => await RunRecommendAsync(args),
-    "help" or "-h" or "--help" => PrintHelp(),
-    _ => Unknown(command)
-};
-
-static int PrintHelp()
+static void PrintHelp()
 {
     Console.WriteLine("""
         ZVec.NET.Samples.Console (.NET 10) — offline RAG / search / recommend
 
-        Commands:
-          basics                         Typed ODM + ZVecDoc vignette (synthetic vectors, no LM Studio)
-          ingest [--fixtures|--file path]  Embed + upsert into RAG collection (needs LM Studio embeddings)
-          ask "question"                 Retrieve + Gemma 4 answer (needs LM Studio)
-          search "query"                 Semantic search over RAG/search collection
-          recommend "query"              Similar items (fixtures or MovieLens cache)
+        Run with no args for an interactive menu. Commands:
+          status                         LM Studio + dataset + doc counts
+          models                         List LM Studio models; select embed + chat
+          basics                         Typed ODM vignette (no LM Studio)
+          rag seed-fixtures|seed-fiqa|ask
+          search seed-fixtures|seed-nfcorpus|seed-quora|query
+          recommend seed-fixtures|seed-movielens|seed-amazon|query
+          ingest [--fixtures|--file path]  (legacy; same as rag seed-fixtures / file)
+          ask / search / recommend <text>  (legacy shortcuts)
+          help | quit
 
-        Prerequisites:
-          - Native zvec_c_api for win-x64 in SDK runtimes (see repo Appendix C)
-          - LM Studio at http://127.0.0.1:1234/v1 with BOTH models loaded concurrently:
-              embed: text-embedding-google_embeddinggemma-300m-qat
-              chat:  google/gemma-4-e2b
-          - T1 datasets download into samples/datasets/cache/ on startup (skip if present)
-          - Target framework: net10.0 only
+        Defaults: EmbeddingGemma + google/gemma-4-e2b (change via models).
+        T1 packs download into samples/datasets/cache/ (skip if present).
         """);
-    return 0;
 }
 
-static int Unknown(string command)
+static string JoinRest(string[] args)
+    => args.Length < 2 ? "" : string.Join(' ', args.Skip(1));
+
+static string[] SplitArgs(string line)
 {
-    Console.Error.WriteLine($"Unknown command: {command}");
-    PrintHelp();
-    return 1;
+    var list = new List<string>();
+    var current = new System.Text.StringBuilder();
+    var inQuotes = false;
+    foreach (var ch in line)
+    {
+        if (ch == '"')
+        {
+            inQuotes = !inQuotes;
+            continue;
+        }
+
+        if (char.IsWhiteSpace(ch) && !inQuotes)
+        {
+            if (current.Length > 0)
+            {
+                list.Add(current.ToString());
+                current.Clear();
+            }
+
+            continue;
+        }
+
+        current.Append(ch);
+    }
+
+    if (current.Length > 0)
+        list.Add(current.ToString());
+    return list.ToArray();
 }
 
-static async Task<int> RunBasicsAsync()
+static async Task RunBasicsAsync()
 {
     var path = SamplePaths.CollectionPath("basics-demo");
     if (Directory.Exists(path))
@@ -101,7 +215,6 @@ static async Task<int> RunBasicsAsync()
     foreach (var hit in hits)
         Console.WriteLine($"  {hit.Record.Id} {hit.Record.Title} score={hit.Score:F4}");
 
-    // Dynamic escape hatch
     untyped.Insert(ZVecDoc.Create(
         "dyn-1",
         denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["Embedding"] = SyntheticVector(2) },
@@ -117,133 +230,6 @@ static async Task<int> RunBasicsAsync()
 
     Console.WriteLine("basics OK (no LM Studio required).");
     await Task.CompletedTask;
-    return 0;
-}
-
-static async Task<int> RunIngestAsync(string[] args)
-{
-    using var factory = CollectionBootstrap.CreateFactory();
-    var ragPath = SamplePaths.CollectionPath(SampleDefaults.RagCollectionFolder);
-    using var collection = CollectionBootstrap.OpenRag(factory, ragPath);
-    using var http = CreateHttp();
-    var opts = new LmStudioOptions();
-    IEmbeddingClient embeddings = new LmStudioEmbeddingClient(http, opts);
-    var ingest = new RagIngestService(collection, embeddings);
-    var progress = new Progress<string>(Console.WriteLine);
-
-    if (args.Any(a => a.Equals("--fixtures", StringComparison.OrdinalIgnoreCase)) || args.Length == 1)
-    {
-        var fixtures = FixtureLoader.LoadRagFixtures();
-        if (fixtures.Count == 0)
-        {
-            Console.Error.WriteLine("No rag fixtures found under samples/datasets/fixtures/rag.");
-            return 1;
-        }
-
-        foreach (var fx in fixtures)
-        {
-            var result = await ingest.IngestTextAsync(fx.Title, fx.Source, fx.Body, fx.Tags, progress);
-            Console.WriteLine($"Ingested {result.ChunkCount} chunk(s) from {result.Source}");
-        }
-
-        return 0;
-    }
-
-    var fileIdx = Array.FindIndex(args, a => a.Equals("--file", StringComparison.OrdinalIgnoreCase));
-    if (fileIdx >= 0 && fileIdx + 1 < args.Length)
-    {
-        var result = await ingest.IngestFileAsync(args[fileIdx + 1], progress: progress);
-        Console.WriteLine($"Ingested {result.ChunkCount} chunk(s) from {result.Source}");
-        return 0;
-    }
-
-    Console.Error.WriteLine("Usage: ingest [--fixtures] | ingest --file path");
-    return 1;
-}
-
-static async Task<int> RunAskAsync(string[] args)
-{
-    if (args.Length < 2)
-    {
-        Console.Error.WriteLine("Usage: ask \"your question\"");
-        return 1;
-    }
-
-    var question = string.Join(' ', args.Skip(1));
-    using var factory = CollectionBootstrap.CreateFactory();
-    using var collection = CollectionBootstrap.OpenRag(factory, SamplePaths.CollectionPath(SampleDefaults.RagCollectionFolder));
-    using var httpEmbed = CreateHttp();
-    using var httpChat = CreateHttp();
-    var opts = new LmStudioOptions();
-    var embeddings = new LmStudioEmbeddingClient(httpEmbed, opts);
-    var chat = new LmStudioChatClient(httpChat, opts);
-    var ask = new RagAskService(new RagQueryService(collection, embeddings), chat);
-
-    var result = await ask.AskAsync(question);
-    Console.WriteLine(result.UsedChat ? "Answer (Gemma):" : "Answer (retrieve-only):");
-    Console.WriteLine(result.Answer);
-    Console.WriteLine();
-    Console.WriteLine("Citations:");
-    foreach (var c in result.Citations)
-        Console.WriteLine($"  [{c.Id}] {c.Title} ({c.Score:F4}) — {c.Snippet}");
-    return 0;
-}
-
-static async Task<int> RunSearchAsync(string[] args)
-{
-    if (args.Length < 2)
-    {
-        Console.Error.WriteLine("Usage: search \"query\"");
-        return 1;
-    }
-
-    var query = string.Join(' ', args.Skip(1));
-    using var factory = CollectionBootstrap.CreateFactory();
-    using var collection = CollectionBootstrap.OpenRag(factory, SamplePaths.CollectionPath(SampleDefaults.RagCollectionFolder));
-    using var http = CreateHttp();
-    var embeddings = new LmStudioEmbeddingClient(http, new LmStudioOptions());
-    var search = new RagQueryService(collection, embeddings);
-    var hits = await search.QueryAsync(query);
-    foreach (var h in hits)
-        Console.WriteLine($"{h.Score:F4}  {h.Title}  {h.Snippet}");
-    return 0;
-}
-
-static async Task<int> RunRecommendAsync(string[] args)
-{
-    if (args.Length < 2)
-    {
-        Console.Error.WriteLine("Usage: recommend \"sci-fi mind-bending\"");
-        return 1;
-    }
-
-    var query = string.Join(' ', args.Skip(1));
-    using var factory = CollectionBootstrap.CreateFactory();
-    using var collection = CollectionBootstrap.OpenRecommend(
-        factory,
-        SamplePaths.CollectionPath(SampleDefaults.RecommendCollectionFolder));
-    using var http = CreateHttp();
-    var embeddings = new LmStudioEmbeddingClient(http, new LmStudioOptions());
-    var recommend = new RecommendService(collection, embeddings);
-
-    if (collection.Stats.DocCount == 0)
-    {
-        var items = FixtureLoader.LoadRecommendFixtures();
-        Console.WriteLine($"Seeding {items.Count} fixture recommend items…");
-        await recommend.UpsertItemsAsync(items, new Progress<string>(Console.WriteLine));
-    }
-
-    var hits = await recommend.SimilarAsync(query);
-    foreach (var h in hits)
-        Console.WriteLine($"{h.Score:F4}  {h.Title} [{h.Category}] — {h.Description}");
-    return 0;
-}
-
-static HttpClient CreateHttp()
-{
-    var http = new HttpClient { BaseAddress = new Uri(SampleDefaults.LmStudioBaseUrl.TrimEnd('/') + "/") };
-    http.Timeout = TimeSpan.FromMinutes(5);
-    return http;
 }
 
 static ReadOnlyMemory<float> SyntheticVector(int seed)
@@ -268,4 +254,328 @@ file sealed class DemoDoc
 
     [ZVecVector(SampleDefaults.VectorDimensions)]
     public ReadOnlyMemory<float> Embedding { get; set; }
+}
+
+file sealed class SampleConsoleHost : IDisposable
+{
+    private readonly IZvecFactory _factory;
+    private readonly IZvecCollection<RagDocument> _rag;
+    private readonly IZvecCollection<SearchDocument> _search;
+    private readonly IZvecCollection<RecommendItem> _recommend;
+    private readonly HttpClient _httpEmbed;
+    private readonly HttpClient _httpChat;
+    private readonly HttpClient _httpModels;
+    private readonly LmStudioOptions _options;
+    private readonly IEmbeddingClient _embeddings;
+    private readonly IChatClient _chat;
+    private readonly RagIngestService _ragIngest;
+    private readonly RagAskService _ask;
+    private readonly RagQueryService _ragQuery;
+    private readonly SearchIngestService _searchIngest;
+    private readonly SearchQueryService _searchQuery;
+    private readonly RecommendService _recommendService;
+    private readonly DatasetSeedService _seed;
+    private readonly LmStudioModelCatalog _models;
+    private readonly LmStudioStatusProbe _probe;
+    private readonly Progress<string> _progress = new(m => Console.WriteLine(m));
+
+    private SampleConsoleHost(
+        IZvecFactory factory,
+        IZvecCollection<RagDocument> rag,
+        IZvecCollection<SearchDocument> search,
+        IZvecCollection<RecommendItem> recommend,
+        HttpClient httpEmbed,
+        HttpClient httpChat,
+        HttpClient httpModels,
+        LmStudioOptions options)
+    {
+        _factory = factory;
+        _rag = rag;
+        _search = search;
+        _recommend = recommend;
+        _httpEmbed = httpEmbed;
+        _httpChat = httpChat;
+        _httpModels = httpModels;
+        _options = options;
+        _embeddings = new LmStudioEmbeddingClient(httpEmbed, options);
+        _chat = new LmStudioChatClient(httpChat, options);
+        var chunker = new TextChunker();
+        _ragIngest = new RagIngestService(rag, _embeddings, chunker);
+        _ragQuery = new RagQueryService(rag, _embeddings);
+        _ask = new RagAskService(_ragQuery, _chat, options);
+        _searchIngest = new SearchIngestService(search, _embeddings, chunker);
+        _searchQuery = new SearchQueryService(search, _embeddings);
+        _recommendService = new RecommendService(recommend, _embeddings);
+        _seed = new DatasetSeedService(_ragIngest, _searchIngest, _recommendService);
+        _models = new LmStudioModelCatalog(httpModels, options, _embeddings);
+        _probe = new LmStudioStatusProbe(_embeddings, _chat, options);
+    }
+
+    public static SampleConsoleHost Create()
+    {
+        var factory = CollectionBootstrap.CreateFactory();
+        var rag = CollectionBootstrap.OpenRag(factory, SamplePaths.CollectionPath(SampleDefaults.RagCollectionFolder));
+        var search = CollectionBootstrap.OpenSearch(factory, SamplePaths.CollectionPath(SampleDefaults.SearchCollectionFolder));
+        var recommend = CollectionBootstrap.OpenRecommend(factory, SamplePaths.CollectionPath(SampleDefaults.RecommendCollectionFolder));
+        var options = new LmStudioOptions();
+        return new SampleConsoleHost(
+            factory, rag, search, recommend,
+            CreateHttp(), CreateHttp(), CreateHttp(), options);
+    }
+
+    private static HttpClient CreateHttp()
+    {
+        var http = new HttpClient { BaseAddress = new Uri(SampleDefaults.LmStudioBaseUrl.TrimEnd('/') + "/") };
+        http.Timeout = TimeSpan.FromMinutes(5);
+        return http;
+    }
+
+    public async Task PrintStatusAsync()
+    {
+        var status = await _probe.ProbeAsync();
+        Console.WriteLine(status.Message);
+        Console.WriteLine($"  embed model: {status.EmbeddingModel}  ok={status.EmbeddingsOk}");
+        Console.WriteLine($"  chat model:  {status.ChatModel}  ok={status.ChatOk}");
+        Console.WriteLine($"  RAG docs: {_rag.Stats.DocCount} @ {_rag.Path}");
+        Console.WriteLine($"  Search docs: {_search.Stats.DocCount} @ {_search.Path}");
+        Console.WriteLine($"  Recommend docs: {_recommend.Stats.DocCount} @ {_recommend.Path}");
+        Console.WriteLine($"  packs: fiqa={DatasetDownloader.IsFiqaReady()} nf={DatasetDownloader.IsNfCorpusReady()} " +
+                          $"quora={DatasetDownloader.IsQuoraReady()} ml={DatasetDownloader.IsMovieLensReady()} " +
+                          $"amazon={DatasetDownloader.IsAmazonBeautyReady()}");
+    }
+
+    public async Task SelectModelsAsync()
+    {
+        var ids = await _models.ListModelIdsAsync();
+        if (ids.Count == 0)
+        {
+            Console.WriteLine("No models returned. Is LM Studio running at " + _options.BaseUrl + "?");
+            return;
+        }
+
+        Console.WriteLine("LM Studio models:");
+        for (var i = 0; i < ids.Count; i++)
+        {
+            var mark = LmStudioModelCatalog.LooksLikeEmbeddingModel(ids[i]) ? " [embed?]" : "";
+            Console.WriteLine($"  {i + 1}. {ids[i]}{mark}");
+        }
+
+        Console.WriteLine($"Current embed: {_options.EmbeddingModel}");
+        Console.WriteLine($"Current chat:  {_options.ChatModel}");
+        Console.Write("Embedding model (# or id, Enter=keep): ");
+        var embedPick = ResolvePick(Console.ReadLine(), ids, _options.EmbeddingModel);
+        Console.Write("Chat model (# or id, Enter=keep): ");
+        var chatPick = ResolvePick(Console.ReadLine(), ids, _options.ChatModel);
+
+        var result = await _models.ApplySelectionAsync(embedPick, chatPick);
+        Console.WriteLine($"Selected embed={result.EmbeddingModel} chat={result.ChatModel} embedOk={result.EmbeddingOk}");
+        if (result.EmbeddingError is not null)
+            Console.WriteLine("  " + result.EmbeddingError);
+        if (result.Warning is not null && !result.EmbeddingOk)
+            Console.WriteLine("  " + result.Warning);
+    }
+
+    private static string ResolvePick(string? input, IReadOnlyList<string> ids, string current)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return current;
+        input = input.Trim();
+        if (int.TryParse(input, out var n) && n >= 1 && n <= ids.Count)
+            return ids[n - 1];
+        return input;
+    }
+
+    public async Task RunRagCommandAsync(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.WriteLine("Usage: rag seed-fixtures | seed-fiqa | ask");
+            return;
+        }
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "seed-fixtures":
+                await _seed.SeedRagFixturesAsync(_progress);
+                break;
+            case "seed-fiqa":
+                await EnsureDatasetsAsync();
+                await _seed.SeedFiqaAsync(progress: _progress);
+                break;
+            case "ask":
+                await AskAsync(string.Join(' ', args.Skip(1)));
+                break;
+            default:
+                Console.WriteLine("Unknown rag subcommand.");
+                break;
+        }
+    }
+
+    public async Task RunSearchSeedAsync(string sub)
+    {
+        await EnsureDatasetsAsync();
+        switch (sub.ToLowerInvariant())
+        {
+            case "seed-fixtures":
+                await _seed.SeedSearchFixturesAsync(_progress);
+                break;
+            case "seed-nfcorpus":
+                await _seed.SeedNfCorpusAsync(progress: _progress);
+                break;
+            case "seed-quora":
+                await _seed.SeedQuoraAsync(progress: _progress);
+                break;
+            default:
+                Console.WriteLine("Unknown search seed.");
+                break;
+        }
+    }
+
+    public async Task RunRecommendSeedAsync(string sub)
+    {
+        await EnsureDatasetsAsync();
+        switch (sub.ToLowerInvariant())
+        {
+            case "seed-fixtures":
+                await _seed.SeedRecommendFixturesAsync(_progress);
+                break;
+            case "seed-movielens":
+                await _seed.SeedMovieLensAsync(_progress);
+                break;
+            case "seed-amazon":
+                await _seed.SeedAmazonBeautyAsync(progress: _progress);
+                break;
+            default:
+                Console.WriteLine("Unknown recommend seed.");
+                break;
+        }
+    }
+
+    public async Task RunLegacyIngestAsync(string[] args)
+    {
+        if (args.Any(a => a.Equals("--file", StringComparison.OrdinalIgnoreCase)))
+        {
+            var idx = Array.FindIndex(args, a => a.Equals("--file", StringComparison.OrdinalIgnoreCase));
+            if (idx < 0 || idx + 1 >= args.Length)
+            {
+                Console.WriteLine("Usage: ingest --file path");
+                return;
+            }
+
+            var result = await _ragIngest.IngestFileAsync(args[idx + 1], progress: _progress);
+            Console.WriteLine($"Ingested {result.ChunkCount} chunk(s) from {result.Source}");
+            return;
+        }
+
+        await _seed.SeedRagFixturesAsync(_progress);
+    }
+
+    public async Task AskAsync(string? question)
+    {
+        question = await PromptWithSuggestionsAsync(question, DemoPromptCatalog.Rag, DemoPromptCatalog.RagBlurb);
+        if (string.IsNullOrWhiteSpace(question))
+            return;
+
+        var result = await _ask.AskAsync(question);
+        Console.WriteLine(result.UsedChat ? "Answer (chat):" : "Answer (retrieve-only):");
+        Console.WriteLine(result.Answer);
+        Console.WriteLine("Citations:");
+        foreach (var c in result.Citations)
+            Console.WriteLine($"  [{c.Id}] {c.Title} ({c.Score:F4}) — {c.Snippet}");
+    }
+
+    public async Task SearchAsync(string? query)
+    {
+        if (argsLooksLikeSeed(query))
+        {
+            await RunSearchSeedAsync(query!);
+            return;
+        }
+
+        query = await PromptWithSuggestionsAsync(query, DemoPromptCatalog.Search, DemoPromptCatalog.SearchBlurb);
+        if (string.IsNullOrWhiteSpace(query))
+            return;
+
+        if (_search.Stats.DocCount == 0)
+        {
+            Console.WriteLine("Search collection empty. Try: search seed-fixtures");
+            return;
+        }
+
+        var hits = await _searchQuery.QueryAsync(query);
+        foreach (var h in hits)
+            Console.WriteLine($"{h.Score:F4}  {h.Title}  {h.Snippet}");
+    }
+
+    public async Task RecommendAsync(string? query)
+    {
+        if (argsLooksLikeSeed(query))
+        {
+            await RunRecommendSeedAsync(query!);
+            return;
+        }
+
+        query = await PromptWithSuggestionsAsync(query, DemoPromptCatalog.Recommend, DemoPromptCatalog.RecommendBlurb);
+        if (string.IsNullOrWhiteSpace(query))
+            return;
+
+        if (_recommend.Stats.DocCount == 0)
+        {
+            Console.WriteLine("Recommend collection empty — seeding T0 fixtures…");
+            await _seed.SeedRecommendFixturesAsync(_progress);
+        }
+
+        var hits = await _recommendService.SimilarAsync(query);
+        foreach (var h in hits)
+            Console.WriteLine($"{h.Score:F4}  {h.Title} [{h.Category}] — {h.Description}");
+    }
+
+    private static bool argsLooksLikeSeed(string? q)
+        => q is not null && q.StartsWith("seed-", StringComparison.OrdinalIgnoreCase);
+
+    private static Task<string?> PromptWithSuggestionsAsync(
+        string? provided,
+        IReadOnlyList<DemoPrompt> prompts,
+        string blurb)
+    {
+        if (!string.IsNullOrWhiteSpace(provided))
+            return Task.FromResult<string?>(provided);
+
+        Console.WriteLine(blurb);
+        Console.WriteLine("Suggested:");
+        for (var i = 0; i < prompts.Count; i++)
+            Console.WriteLine($"  {i + 1}. {prompts[i].Label}  ({prompts[i].CorpusHint})");
+        Console.Write("Query (# or text): ");
+        var input = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(input))
+            return Task.FromResult<string?>(null);
+        input = input.Trim();
+        if (int.TryParse(input, out var n) && n >= 1 && n <= prompts.Count)
+            return Task.FromResult<string?>(prompts[n - 1].Query);
+        return Task.FromResult<string?>(input);
+    }
+
+    private static async Task EnsureDatasetsAsync()
+    {
+        try
+        {
+            await SampleDatasetBootstrap.EnsureAllAsync(
+                new Progress<string>(m => Console.WriteLine($"[datasets] {m}")));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[datasets] {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        _rag.Dispose();
+        _search.Dispose();
+        _recommend.Dispose();
+        _factory.Dispose();
+        _httpEmbed.Dispose();
+        _httpChat.Dispose();
+        _httpModels.Dispose();
+    }
 }

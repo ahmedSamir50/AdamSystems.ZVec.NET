@@ -4,8 +4,14 @@
 dotnet run --project samples/ZVec.NET.Samples.AspNet
 ```
 
-Endpoints: `/health`, `POST /rag/ingest`, `/rag/query`, `/rag/ask`, `/search`, `/recommend`, `/recommend/seed-fixtures`.
+`GET /` lists endpoints. Highlights:
 
-On startup, `DatasetDownloadHostedService` downloads T1 packs into `samples/datasets/cache/` without blocking listen (skips packs already present).
+| Method | Path |
+|--------|------|
+| GET | `/health`, `/status`, `/hints`, `/models` |
+| PUT | `/models` |
+| POST | `/rag/ingest`, `/rag/seed-fixtures`, `/rag/seed-fiqa`, `/rag/query`, `/rag/ask` |
+| POST | `/search/seed-fixtures`, `/search/seed-nfcorpus`, `/search/seed-quora`, `/search/query` |
+| POST | `/recommend/seed-fixtures`, `/recommend/seed-movielens`, `/recommend/seed-amazon`, `/recommend/query` |
 
-Configure LM Studio under `LmStudio` in `appsettings.json` (EmbeddingGemma + `google/gemma-4-e2b`). Host lifetime shuts down the ZVec factory on stop.
+Collections use sample open-or-create (safe on restart). Background T1 download on startup. Configure LM Studio under `LmStudio` in `appsettings.json` (defaults can be overridden at runtime via `PUT /models`).

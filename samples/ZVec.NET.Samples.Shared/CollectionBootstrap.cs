@@ -21,35 +21,52 @@ public static class CollectionBootstrap
         IZvecFactory factory,
         string path,
         bool enableMmap = SampleDefaults.EnableMmap)
-    {
-        Directory.CreateDirectory(path);
-        var options = new ZVecCollectionOptions { EnableMmap = enableMmap };
-        if (Directory.EnumerateFileSystemEntries(path).Any())
-        {
-            var opened = factory.Open(path, options);
-            return new ZVecCollection<RagDocument>(opened);
-        }
+        => OpenOrCreate<RagDocument>(factory, path, enableMmap);
 
-        var schema = ZVecCollectionSchemaBuilder.From<RagDocument>().Build();
-        var created = factory.CreateAndOpen(path, schema, options);
-        return new ZVecCollection<RagDocument>(created);
-    }
+    public static IZvecCollection<SearchDocument> OpenSearch(
+        IZvecFactory factory,
+        string path,
+        bool enableMmap = SampleDefaults.EnableMmap)
+        => OpenOrCreate<SearchDocument>(factory, path, enableMmap);
 
     public static IZvecCollection<RecommendItem> OpenRecommend(
         IZvecFactory factory,
         string path,
         bool enableMmap = SampleDefaults.EnableMmap)
+        => OpenOrCreate<RecommendItem>(factory, path, enableMmap);
+
+    /// <summary>
+    /// App-level open-or-create (upstream has no open_or_create — create throws if path exists).
+    /// Only creates the parent directory; never pre-creates an empty collection path.
+    /// </summary>
+    public static IZvecCollection<T> OpenOrCreate<T>(
+        IZvecFactory factory,
+        string path,
+        bool enableMmap = SampleDefaults.EnableMmap)
+        where T : class
     {
-        Directory.CreateDirectory(path);
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var parent = Path.GetDirectoryName(Path.GetFullPath(path));
+        if (!string.IsNullOrEmpty(parent))
+            Directory.CreateDirectory(parent);
+
         var options = new ZVecCollectionOptions { EnableMmap = enableMmap };
-        if (Directory.EnumerateFileSystemEntries(path).Any())
+        if (Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any())
         {
             var opened = factory.Open(path, options);
-            return new ZVecCollection<RecommendItem>(opened);
+            return new ZVecCollection<T>(opened);
         }
 
-        var schema = ZVecCollectionSchemaBuilder.From<RecommendItem>().Build();
+        // Remove empty dir left by a previous failed create attempt.
+        if (Directory.Exists(path) && !Directory.EnumerateFileSystemEntries(path).Any())
+        {
+            try { Directory.Delete(path); } catch { /* best effort */ }
+        }
+
+        var schema = ZVecCollectionSchemaBuilder.From<T>().Build();
         var created = factory.CreateAndOpen(path, schema, options);
-        return new ZVecCollection<RecommendItem>(created);
+        return new ZVecCollection<T>(created);
     }
 }

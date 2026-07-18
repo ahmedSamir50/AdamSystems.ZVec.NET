@@ -1,0 +1,108 @@
+@page "/search"
+@using ZVec.NET.Samples.Shared
+@using ZVec.NET.Samples.Shared.Models
+@using ZVec.NET.Samples.Shared.Rag
+@using ZVec.NET.Samples.Shared.Services
+@inject SearchQueryService Query
+@inject DatasetSeedService Seed
+@inject IZvecCollection<SearchDocument> Collection
+
+<h1>Semantic search</h1>
+<p class="muted">@DemoPromptCatalog.SearchBlurb</p>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="banner error">@_error <button class="link" @onclick="() => _error = null">dismiss</button></div>
+}
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="banner info">@_message</div>
+}
+
+<section>
+    <h2>Seed</h2>
+    <div class="actions">
+        <button class="btn" disabled="@_busy" @onclick="SeedFixturesAsync">Seed T0 questions</button>
+        <button class="btn" disabled="@_busy" @onclick="SeedNfAsync">Seed NFCorpus (capped)</button>
+        <button class="btn" disabled="@_busy" @onclick="SeedQuoraAsync">Seed Quora (capped)</button>
+    </div>
+    <p>Docs: <strong>@Collection.Stats.DocCount</strong></p>
+</section>
+
+<section>
+    <h2>Query</h2>
+    @if (Collection.Stats.DocCount == 0)
+    {
+        <p class="muted">Seed search data first.</p>
+    }
+    <div class="chips">
+        @foreach (var p in DemoPromptCatalog.Search)
+        {
+            <button class="chip" disabled="@_busy" @onclick="() => UsePrompt(p)">@p.Label</button>
+        }
+    </div>
+    <input @bind="_query" style="width:100%" placeholder="Semantic search query…" />
+    <div class="actions">
+        <button class="btn btn-primary" disabled="@_busy" @onclick="RunQueryAsync">Search</button>
+    </div>
+    @if (_hits.Count > 0)
+    {
+        <ul>
+            @foreach (var h in _hits)
+            {
+                <li><strong>@h.Title</strong> (@h.Score.ToString("F3"))<div class="snippet">@h.Snippet</div></li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private string _query = "";
+    private string? _error;
+    private string? _message;
+    private bool _busy;
+    private List<RagCitation> _hits = [];
+
+    private void UsePrompt(DemoPrompt p) => _query = p.Query;
+
+    private async Task SeedFixturesAsync()
+        => await RunAsync(async () =>
+        {
+            var n = await Seed.SeedSearchFixturesAsync();
+            _message = n == 0 ? "No search fixtures found." : $"Seeded {n} search chunk(s).";
+        });
+
+    private async Task SeedNfAsync()
+        => await RunAsync(async () =>
+        {
+            var n = await Seed.SeedNfCorpusAsync();
+            _message = $"Seeded {n} NFCorpus chunk(s).";
+        });
+
+    private async Task SeedQuoraAsync()
+        => await RunAsync(async () =>
+        {
+            var n = await Seed.SeedQuoraAsync();
+            _message = $"Seeded {n} Quora chunk(s).";
+        });
+
+    private async Task RunQueryAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_query))
+            return;
+        await RunAsync(async () =>
+        {
+            _hits = (await Query.QueryAsync(_query)).ToList();
+            _message = _hits.Count == 0 ? "No hits." : $"Found {_hits.Count} hit(s).";
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = null;
+        try { await action(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}
