@@ -124,6 +124,8 @@ jobs:
 
       # win-x64 and win-arm64 both use Ninja + MSVC from msvc-dev-cmd (not VS generator).
       # Quote 3.5 — unquoted, pwsh splits into "3" and ".5" and CMake fails.
+      # Short build root D:/b/{rid}: GHA path under D:/a/<repo>/<repo>/... exceeds
+      # CMAKE_OBJECT_PATH_MAX (~250) inside Arrow nested ExternalProjects (zlib/re2).
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
         working-directory: src/Native/ZVec.Native
@@ -132,7 +134,8 @@ jobs:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
           CMAKE_GENERATOR: Ninja
         run: |
-          cmake -B "build-${{ matrix.rid }}" -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
+          New-Item -ItemType Directory -Force -Path "D:/b" | Out-Null
+          cmake -B "D:/b/${{ matrix.rid }}" -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
             -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
@@ -148,10 +151,10 @@ jobs:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
           CMAKE_GENERATOR: Ninja
         run: |
-          cmake --build "build-${{ matrix.rid }}" --config Release --target zvec_c_api -- -k 1
+          $root = "D:/b/${{ matrix.rid }}"
+          cmake --build $root --config Release --target zvec_c_api -- -k 1
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            $root = "build-${{ matrix.rid }}"
             Get-ChildItem -Recurse $root -Filter "ARROW.BUILD-*.log" -ErrorAction SilentlyContinue |
               ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName -ErrorAction SilentlyContinue }
             Get-ChildItem -Recurse $root -Filter "Lz4.BUILD-*.log" -ErrorAction SilentlyContinue |
@@ -185,7 +188,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $build = "src/Native/ZVec.Native/build-${{ matrix.rid }}"
+          $build = "D:/b/${{ matrix.rid }}"
           $lib = Get-ChildItem -Recurse $build -Filter "zvec_c_api.dll" | Select-Object -First 1
           if (-not $lib) { throw "zvec_c_api.dll not found under $build" }
           ./build/ci/deploy-native.ps1 -Rid "${{ matrix.rid }}" -SourcePath $lib.FullName
