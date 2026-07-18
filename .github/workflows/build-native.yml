@@ -111,13 +111,15 @@ jobs:
             -S .
 
       # win-x64 and win-arm64 both use Ninja + MSVC from msvc-dev-cmd (not VS generator).
+      # Quote 3.5 — unquoted, pwsh splits into "3" and ".5" and CMake fails.
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
         working-directory: src/Native/ZVec.Native
         shell: pwsh
         run: |
+          $env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
           cmake -B "build-${{ matrix.rid }}" -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 `
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
             -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
 
