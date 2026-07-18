@@ -146,7 +146,7 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: src/Native/ZVec.Native
         shell: pwsh
-        timeout-minutes: 25
+        timeout-minutes: 45
         env:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
           CMAKE_GENERATOR: Ninja
