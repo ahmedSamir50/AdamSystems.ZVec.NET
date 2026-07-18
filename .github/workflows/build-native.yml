@@ -99,6 +99,24 @@ jobs:
         with:
           arch: amd64_arm64
 
+      # Cross-build produces ARM64 protoc.exe which cannot run on the x64 host
+      # ("not compatible with the version of Windows you're running"). Same class
+      # of bug as Android Exec format error — use a host win64 protoc instead.
+      - name: Download host protoc (win-arm64)
+        if: matrix.rid == 'win-arm64'
+        shell: pwsh
+        run: |
+          $dest = "D:/b/host-protoc"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          $zip = Join-Path $dest "protoc-21.12-win64.zip"
+          $url = "https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-win64.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
+          $protoc = Join-Path $dest "bin/protoc.exe"
+          if (-not (Test-Path $protoc)) { throw "Host protoc missing at $protoc" }
+          & $protoc --version
+          Write-Host "HOST_PROTOC=$protoc"
+
       - name: Configure CMake (Unix)
         if: runner.os != 'Windows'
         working-directory: src/Native/ZVec.Native
@@ -150,10 +168,25 @@ jobs:
             Write-Host "ccache not on PATH (expected)"
           }
           New-Item -ItemType Directory -Force -Path "D:/b" | Out-Null
-          cmake -B "D:/b/${{ matrix.rid }}" -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
-            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
-            -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
-            -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
+          $cmakeArgs = @(
+            "-B", "D:/b/${{ matrix.rid }}",
+            "-G", "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+            "-DBUILD_TESTING=OFF",
+            "-DBUILD_TOOLS=OFF",
+            "-DBUILD_EXAMPLES=OFF",
+            "-DBUILD_PYTHON_BINDINGS=OFF",
+            "-DBUILD_C_BINDINGS=ON",
+            "-S", "."
+          )
+          if ("${{ matrix.rid }}" -eq "win-arm64") {
+            $hostProtoc = "D:/b/host-protoc/bin/protoc.exe"
+            if (-not (Test-Path $hostProtoc)) { throw "Host protoc missing: $hostProtoc" }
+            $cmakeArgs += "-DGLOBAL_CC_PROTOBUF_PROTOC=$hostProtoc"
+            Write-Host "Using host protoc for win-arm64: $hostProtoc"
+          }
+          & cmake @cmakeArgs
 
       # Nested ExternalProject cmake (Lz4/Arrow) runs at build time — must inherit policy floor.
       # Fail-fast (no -k 1): one EP failure must not burn the rest of the step timeout.
@@ -173,37 +206,65 @@ jobs:
           ) -join ';'
           $root = "D:/b/${{ matrix.rid }}"
           cmake --build $root --config Release --target zvec_c_api
-          $code = $LASTEXITCODE
-          if ($code -ne 0) {
-            Get-ChildItem -Recurse $root -Filter "ARROW.BUILD-*.log" -ErrorAction SilentlyContinue |
-              ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName -ErrorAction SilentlyContinue }
-            Get-ChildItem -Recurse $root -Filter "Lz4.BUILD-*.log" -ErrorAction SilentlyContinue |
-              ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName -ErrorAction SilentlyContinue }
-            exit $code
-          }
+          exit $LASTEXITCODE
 
-      # Timeout/cancel kills the build step before its dump runs — always dump EP logs after.
+      # Timeout/cancel kills the build step before its dump runs — always dump diagnostics after.
       - name: Dump Windows ExternalProject logs
         if: always() && runner.os == 'Windows'
         shell: pwsh
         run: |
           $root = "D:/b/${{ matrix.rid }}"
+          Write-Host "##[group]Windows build failure markers / host-tool check"
+          Write-Host "Build root: $root  VSCMD_ARG_TGT_ARCH=$env:VSCMD_ARG_TGT_ARCH"
           if (-not (Test-Path $root)) {
             Write-Host "Build root missing: $root"
+            Write-Host "##[endgroup]"
             exit 0
           }
+
+          # Cross-compile footgun: target-arch protoc cannot run on the x64 host.
+          $protocCandidates = @(
+            (Join-Path $root "external/zvec/bin/protoc.exe"),
+            (Join-Path $root "external/zvec/bin/protoc-3.21.12.0.exe"),
+            "D:/b/host-protoc/bin/protoc.exe"
+          ) | Where-Object { Test-Path $_ }
+          foreach ($p in $protocCandidates) {
+            Write-Host "----- protoc: $p -----"
+            try {
+              $bytes = [System.IO.File]::ReadAllBytes($p)
+              # PE machine at COFF header: e_lfanew @0x3C, Machine @ that+4 (uint16)
+              $e_lfanew = [BitConverter]::ToInt32($bytes, 0x3C)
+              $machine = [BitConverter]::ToUInt16($bytes, $e_lfanew + 4)
+              $arch = switch ($machine) {
+                0x8664 { "x64 (AMD64)" }
+                0xAA64 { "ARM64" }
+                0x14c  { "x86" }
+                default { "unknown 0x{0:X4}" -f $machine }
+              }
+              Write-Host "PE Machine=$arch (0x$('{0:X4}' -f $machine))"
+            } catch {
+              Write-Host "Could not read PE headers: $_"
+            }
+          }
+          if (-not $protocCandidates -or $protocCandidates.Count -eq 0) {
+            Write-Host "No protoc.exe found under build tree or D:/b/host-protoc"
+          }
+          Write-Host "##[endgroup]"
+
+          Write-Host "##[group]ARROW/Lz4 ExternalProject logs"
           $logs = @(
             Get-ChildItem -Recurse $root -Filter "ARROW.BUILD-*.log" -ErrorAction SilentlyContinue
             Get-ChildItem -Recurse $root -Filter "Lz4.BUILD-*.log" -ErrorAction SilentlyContinue
           )
           if (-not $logs -or $logs.Count -eq 0) {
-            Write-Host "No ARROW/Lz4 ExternalProject logs under $root"
-            exit 0
+            Write-Host "No ARROW/Lz4 ExternalProject logs under $root (failure may be outside Arrow/Lz4 — see build step FAILED lines)."
+          } else {
+            foreach ($log in $logs) {
+              Write-Host "===== $($log.FullName) ====="
+              Get-Content $log.FullName -ErrorAction SilentlyContinue
+            }
           }
-          foreach ($log in $logs) {
-            Write-Host "===== $($log.FullName) ====="
-            Get-Content $log.FullName -ErrorAction SilentlyContinue
-          }
+          Write-Host "##[endgroup]"
 
       - name: Build zvec_c_api (Unix)
         if: runner.os != 'Windows'
