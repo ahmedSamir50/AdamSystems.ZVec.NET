@@ -12,6 +12,7 @@
 *.nupkg
 *.snupkg
 /artifacts/
+/_ci_artifacts/
 
 # =========================
 # C++ & CMake

@@ -72,6 +72,17 @@ jobs:
         with:
           submodules: recursive
 
+      # Shallow submodule checkouts often lack tags; git_version then becomes g<sha> and
+      # c_api CMake falls back to 0.2.1 — breaking ZVec.NET's 0.5.1 ABI gate.
+      - name: Fetch zvec tags for version header
+        shell: bash
+        run: |
+          set -euo pipefail
+          zvec="src/Native/ZVec.Native/external/zvec"
+          git -C "$zvec" fetch --tags --force origin || true
+          git -C "$zvec" fetch --deepen=200 origin || true
+          git -C "$zvec" describe --tags || true
+
       - name: Install Linux build tools
         if: runner.os == 'Linux'
         run: |
@@ -129,6 +140,15 @@ jobs:
           Write-Host "HOST_PROTOC=$protoc"
 
       # Cannot commit into alibaba/zvec; apply local workaround patches before configure.
+      - name: Patch zvec version fallback (all RIDs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          zvec="src/Native/ZVec.Native/external/zvec"
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.5.1.patch"
+          git -C "$zvec" apply --check "$patch"
+          git -C "$zvec" apply "$patch"
+
       - name: Patch zvec CI workarounds (Windows)
         if: runner.os == 'Windows'
         shell: pwsh

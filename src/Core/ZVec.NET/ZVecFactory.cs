@@ -86,12 +86,16 @@ public sealed class ZVecFactory : IZvecFactory
                 return; // Already initialized or shut down — no-op.
             }
 
+            // True after this factory performed zvec_initialize but before _globalNativeInitCount
+            // is incremented — must roll back on ABI / post-init failure.
+            var nativeInitOwned = false;
             try
             {
                 if (_globalNativeInitCount == 0)
                 {
                     NativeLibraryResolver.EnsureLoaded();
                     ApplyNativeConfig(options);
+                    nativeInitOwned = true;
                 }
                 else
                 {
@@ -107,9 +111,16 @@ public sealed class ZVecFactory : IZvecFactory
 
                 _globalNativeInitCount++;
                 _state = FactoryState.Initialized;
+                nativeInitOwned = false;
             }
             catch
             {
+                if (nativeInitOwned)
+                {
+                    try { NativeMethods.zvec_shutdown(); }
+                    catch { /* best-effort rollback */ }
+                }
+
                 // Throw and leave state as Uninitialized
                 throw;
             }

@@ -37,6 +37,16 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Fetch zvec tags + version fallback patch
+        run: |
+          set -euo pipefail
+          zvec="src/Native/ZVec.Native/external/zvec"
+          git -C "$zvec" fetch --tags --force origin || true
+          git -C "$zvec" fetch --deepen=200 origin || true
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.5.1.patch"
+          git -C "$zvec" apply --check "$patch"
+          git -C "$zvec" apply "$patch"
+
       - name: Install build tools
         run: |
           sudo apt-get update
@@ -79,6 +89,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Fetch zvec tags + version fallback patch
+        run: |
+          set -euo pipefail
+          zvec="src/Native/ZVec.Native/external/zvec"
+          git -C "$zvec" fetch --tags --force origin || true
+          git -C "$zvec" fetch --deepen=200 origin || true
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.5.1.patch"
+          git -C "$zvec" apply --check "$patch"
+          git -C "$zvec" apply "$patch"
 
       - name: Install Ninja
         run: brew install ninja

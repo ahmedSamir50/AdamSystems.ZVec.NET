@@ -1,0 +1,19 @@
+diff --git a/src/binding/c/CMakeLists.txt b/src/binding/c/CMakeLists.txt
+index 13dfdc0..95a97de 100644
+--- a/src/binding/c/CMakeLists.txt
++++ b/src/binding/c/CMakeLists.txt
+@@ -30,11 +30,12 @@ if(ZVEC_VERSION MATCHES "^v([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+     set(ZVEC_VERSION_PATCH "${CMAKE_MATCH_3}")
+     set(ZVEC_VERSION_STRING "${ZVEC_VERSION}")
+ else()
+-    # Default version if parsing fails
++    # Default when git describe has no tags (shallow CI). Must match ZVec.NET ABI floor.
+     set(ZVEC_VERSION_MAJOR 0)
+-    set(ZVEC_VERSION_MINOR 2)
++    set(ZVEC_VERSION_MINOR 5)
+     set(ZVEC_VERSION_PATCH 1)
+     set(ZVEC_VERSION_STRING "${ZVEC_VERSION_MAJOR}.${ZVEC_VERSION_MINOR}.${ZVEC_VERSION_PATCH}")
++    message(WARNING "ZVEC_VERSION '${ZVEC_VERSION}' did not match vX.Y.Z; using fallback ${ZVEC_VERSION_STRING}")
+ endif()
+ 
+ message(STATUS "Parsed version: ${ZVEC_VERSION_MAJOR}.${ZVEC_VERSION_MINOR}.${ZVEC_VERSION_PATCH} (${ZVEC_VERSION_STRING})")
