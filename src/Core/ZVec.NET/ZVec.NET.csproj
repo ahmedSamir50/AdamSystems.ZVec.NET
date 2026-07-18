@@ -5,8 +5,6 @@
     <AssemblyName>ZVec.NET</AssemblyName>
     <RootNamespace>ZVec.NET</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- Version = our SemVer + pinned ZVec native: 1.0.0-alpha.1+zvec.XMajor.XMinor.3Build.0.5.1, where 0.5.1 is the ZVec C++ version we wrap. The
-         .NET target lives in TargetFrameworks + lib/ folder, NOT in the version string -->
     <!-- Version = our SemVer + pinned ZVec native: 1.0.0-beta.1+zvec.0.5.1. TFMs live in TargetFrameworks + lib/, NOT in the version string. -->
     <Version>1.0.0-beta.1+zvec.0.5.1</Version>
     <Authors>Ahmed Samir https://github.com/ahmedSamir50</Authors>
