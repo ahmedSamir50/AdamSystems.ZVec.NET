@@ -26,23 +26,35 @@ public sealed class RecommendService
         if (itemsWithoutVectors.Count == 0)
             return 0;
 
-        var texts = itemsWithoutVectors
-            .Select(i => $"{i.Title}. {i.Category}. {i.Description}")
+        // Skip blank rows — empty embeds trigger LM Studio tokenizer noise / bad vectors.
+        var items = itemsWithoutVectors
+            .Where(i => !string.IsNullOrWhiteSpace(i.Id) && !string.IsNullOrWhiteSpace(i.Title))
+            .ToArray();
+        if (items.Length == 0)
+            return 0;
+
+        var texts = items
+            .Select(i =>
+            {
+                var text = $"{i.Title}. {i.Category}. {i.Description}".Trim();
+                return string.IsNullOrWhiteSpace(text) ? i.Title : text;
+            })
             .ToArray();
 
-        progress?.Report($"Embedding {texts.Length} item(s)…");
+        progress?.Report(
+            $"Embedding {texts.Length} item(s)… (LM Studio may log EmbeddingGemma EOS/SEP warnings — harmless.)");
         var vectors = await _embeddings.EmbedBatchAsync(texts, ct).ConfigureAwait(false);
 
-        var docs = new List<RecommendItem>(itemsWithoutVectors.Count);
-        for (var i = 0; i < itemsWithoutVectors.Count; i++)
+        var docs = new List<RecommendItem>(items.Length);
+        for (var i = 0; i < items.Length; i++)
         {
-            var src = itemsWithoutVectors[i];
+            var src = items[i];
             docs.Add(new RecommendItem
             {
-                Id = src.Id,
-                Title = src.Title,
-                Category = src.Category,
-                Description = src.Description,
+                Id = src.Id.Trim(),
+                Title = src.Title.Trim(),
+                Category = src.Category ?? "",
+                Description = src.Description ?? "",
                 Embedding = vectors[i]
             });
         }

@@ -45,6 +45,12 @@ See [datasets/README.md](datasets/README.md). T1 packs download on startup into 
 
 `DemoPromptCatalog` provides chips / numbered hints so you can try demos without knowing corpus contents. AspNet: `GET /hints`.
 
+## Notes
+
+- RAG Ask prefers **SSE streaming** (Maui UI + `POST /rag/ask/stream`).
+- MovieLens mass-embed may show EmbeddingGemma EOS/SEP warnings in LM Studio — non-fatal.
+- Amazon Beauty downloads from `mcauleylab.ucsd.edu` (not the old `datarepo.eng.ucsd.edu` host).
+
 ## Quick smoke
 
 - [ ] `dotnet run --project samples/ZVec.NET.Samples.Console` → interactive menu → `status` → `models`

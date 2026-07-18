@@ -38,7 +38,7 @@ app.MapGet("/", () => Results.Ok(new
     endpoints = new[]
     {
         "GET /health", "GET /status", "GET /hints", "GET /models", "PUT /models",
-        "POST /rag/ingest", "POST /rag/seed-fixtures", "POST /rag/seed-fiqa", "POST /rag/query", "POST /rag/ask",
+        "POST /rag/ingest", "POST /rag/seed-fixtures", "POST /rag/seed-fiqa", "POST /rag/query", "POST /rag/ask", "POST /rag/ask/stream",
         "POST /search/seed-fixtures", "POST /search/seed-nfcorpus", "POST /search/seed-quora", "POST /search/query",
         "POST /recommend/seed-fixtures", "POST /recommend/seed-movielens", "POST /recommend/seed-amazon", "POST /recommend/query"
     }
@@ -174,6 +174,64 @@ app.MapPost("/rag/ask", async (QueryRequest req, RagAskService ask, Cancellation
     {
         return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
+});
+
+app.MapPost("/rag/ask/stream", async (QueryRequest req, RagAskService ask, HttpResponse http, CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Question))
+        return Results.BadRequest(new { error = "question is required" });
+
+    IReadOnlyList<RagCitation> citations;
+    try
+    {
+        citations = await ask.RetrieveAsync(req.Question, TopK(req.TopK), ct);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    http.ContentType = "text/event-stream";
+    http.Headers.CacheControl = "no-cache";
+    await http.StartAsync(ct);
+
+    static async Task WriteEventAsync(HttpResponse response, string eventName, string data, CancellationToken token)
+    {
+        await response.WriteAsync($"event: {eventName}\n", token);
+        foreach (var line in data.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+            await response.WriteAsync($"data: {line}\n", token);
+        await response.WriteAsync("\n", token);
+        await response.Body.FlushAsync(token);
+    }
+
+    await WriteEventAsync(
+        http,
+        "citations",
+        System.Text.Json.JsonSerializer.Serialize(citations.Select(c => new
+        {
+            c.Id, c.Title, c.Source, c.Snippet, c.Score
+        })),
+        ct);
+
+    if (citations.Count == 0)
+    {
+        await WriteEventAsync(http, "token", "No matching chunks were found. Ingest documents first.", ct);
+        await WriteEventAsync(http, "done", "{}", ct);
+        return Results.Empty;
+    }
+
+    try
+    {
+        await foreach (var token in ask.StreamAnswerAsync(req.Question, citations, ct))
+            await WriteEventAsync(http, "token", token, ct);
+        await WriteEventAsync(http, "done", "{}", ct);
+    }
+    catch (Exception ex)
+    {
+        await WriteEventAsync(http, "error", ex.Message, ct);
+    }
+
+    return Results.Empty;
 });
 
 app.MapPost("/search/seed-fixtures", async (DatasetSeedService seed, CancellationToken ct) =>

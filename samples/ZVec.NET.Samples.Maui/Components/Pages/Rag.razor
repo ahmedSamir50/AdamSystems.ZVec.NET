@@ -41,11 +41,11 @@
     </div>
     <input @bind="_question" style="width:100%" placeholder="Ask about ingested content…" />
     <div class="actions">
-        <button class="btn btn-primary" disabled="@_busy" @onclick="AskAsync">Ask</button>
+        <button class="btn btn-primary" disabled="@_busy" @onclick="AskAsync">Ask (stream)</button>
     </div>
-    @if (!string.IsNullOrWhiteSpace(_answer))
+    @if (!string.IsNullOrWhiteSpace(_answer) || _streaming)
     {
-        <h3>Answer</h3>
+        <h3>Answer @(_streaming ? "(streaming…)" : "")</h3>
         <pre class="answer">@_answer</pre>
     }
     @if (_citations.Count > 0)
@@ -67,12 +67,10 @@
     private string? _error;
     private string? _message;
     private bool _busy;
+    private bool _streaming;
     private List<RagCitation> _citations = [];
 
-    private void UsePrompt(DemoPrompt p)
-    {
-        _question = p.Query;
-    }
+    private void UsePrompt(DemoPrompt p) => _question = p.Query;
 
     private async Task IngestPasteAsync()
     {
@@ -107,13 +105,53 @@
     {
         if (string.IsNullOrWhiteSpace(_question))
             return;
-        await RunAsync(async () =>
+
+        _busy = true;
+        _streaming = true;
+        _error = null;
+        _answer = "";
+        _citations = [];
+        try
         {
-            var result = await Ask.AskAsync(_question);
-            _answer = result.Answer;
-            _citations = result.Citations.ToList();
-            _message = result.UsedChat ? "Answered with chat model." : "Retrieve-only (chat unavailable).";
-        });
+            _citations = (await Ask.RetrieveAsync(_question)).ToList();
+            if (_citations.Count == 0)
+            {
+                _answer = "No matching chunks were found. Ingest documents first.";
+                _message = "Retrieve-only (empty collection).";
+                return;
+            }
+
+            await InvokeAsync(StateHasChanged);
+            try
+            {
+                await foreach (var token in Ask.StreamAnswerAsync(_question, _citations))
+                {
+                    _answer += token;
+                    await InvokeAsync(StateHasChanged);
+                }
+
+                _message = "Answered with streaming chat.";
+            }
+            catch (Exception streamEx)
+            {
+                // Fall back to non-stream ask if SSE fails.
+                var result = await Ask.AskAsync(_question);
+                _answer = result.Answer;
+                _citations = result.Citations.ToList();
+                _message = result.UsedChat
+                    ? $"Stream failed ({streamEx.Message}); used non-stream chat."
+                    : "Retrieve-only (chat unavailable).";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _streaming = false;
+            _busy = false;
+        }
     }
 
     private async Task RunAsync(Func<Task> action)

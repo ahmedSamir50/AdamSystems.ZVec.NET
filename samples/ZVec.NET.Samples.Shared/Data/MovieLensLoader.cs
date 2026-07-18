@@ -41,9 +41,12 @@ public static class MovieLensLoader
             if (parsed.Count < 3)
                 continue;
 
-            var id = parsed[0];
-            var title = parsed[1];
-            var genres = parsed[2];
+            var id = parsed[0]?.Trim() ?? "";
+            var title = parsed[1]?.Trim() ?? "";
+            var genres = parsed[2]?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(title))
+                continue;
+
             items.Add(new RecommendItem
             {
                 Id = id,

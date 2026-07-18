@@ -35,7 +35,10 @@ public sealed class SearchIngestService
         var chunks = _chunker.Chunk(text);
         progress?.Report($"Chunked into {chunks.Count} piece(s). Embedding…");
 
-        var vectors = await _embeddings.EmbedBatchAsync(chunks, ct).ConfigureAwait(false);
+        var embedTexts = chunks
+            .Select(c => string.IsNullOrWhiteSpace(title) ? c : $"{title}\n{c}")
+            .ToArray();
+        var vectors = await _embeddings.EmbedBatchAsync(embedTexts, ct).ConfigureAwait(false);
         var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var docs = new List<SearchDocument>(chunks.Count);
 

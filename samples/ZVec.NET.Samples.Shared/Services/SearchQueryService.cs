@@ -7,6 +7,9 @@ namespace ZVec.NET.Samples.Shared.Services;
 /// <summary>Semantic search against the dedicated search collection.</summary>
 public sealed class SearchQueryService
 {
+    private const int UiSnippetChars = 240;
+    private const int LlmContextChars = 1500;
+
     private readonly IZvecCollection<SearchDocument> _collection;
     private readonly IEmbeddingClient _embeddings;
 
@@ -34,12 +37,17 @@ public sealed class SearchQueryService
             includeVector: false,
             ct).ConfigureAwait(false);
 
-        return hits.Select(h => new RagCitation(
-            h.Record.Id,
-            h.Record.Title,
-            h.Record.Source,
-            Truncate(h.Record.ChunkText, 240),
-            h.Score)).ToArray();
+        return hits.Select(h =>
+        {
+            var full = h.Record.ChunkText ?? "";
+            return new RagCitation(
+                h.Record.Id,
+                h.Record.Title,
+                h.Record.Source,
+                Truncate(full, UiSnippetChars),
+                Truncate(full, LlmContextChars),
+                h.Score);
+        }).ToArray();
     }
 
     private static string Truncate(string text, int max)

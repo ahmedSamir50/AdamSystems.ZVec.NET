@@ -31,7 +31,11 @@ public sealed class RagIngestService
         var chunks = _chunker.Chunk(text);
         progress?.Report($"Chunked into {chunks.Count} piece(s). Embedding…");
 
-        var vectors = await _embeddings.EmbedBatchAsync(chunks, ct).ConfigureAwait(false);
+        // Embed title + chunk so titles participate in retrieval.
+        var embedTexts = chunks
+            .Select(c => string.IsNullOrWhiteSpace(title) ? c : $"{title}\n{c}")
+            .ToArray();
+        var vectors = await _embeddings.EmbedBatchAsync(embedTexts, ct).ConfigureAwait(false);
         var docs = new List<RagDocument>(chunks.Count);
         var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 

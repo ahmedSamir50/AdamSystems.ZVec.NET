@@ -10,7 +10,7 @@ dotnet run --project samples/ZVec.NET.Samples.AspNet
 |--------|------|
 | GET | `/health`, `/status`, `/hints`, `/models` |
 | PUT | `/models` |
-| POST | `/rag/ingest`, `/rag/seed-fixtures`, `/rag/seed-fiqa`, `/rag/query`, `/rag/ask` |
+| POST | `/rag/ingest`, `/rag/seed-fixtures`, `/rag/seed-fiqa`, `/rag/query`, `/rag/ask`, `/rag/ask/stream` (SSE) |
 | POST | `/search/seed-fixtures`, `/search/seed-nfcorpus`, `/search/seed-quora`, `/search/query` |
 | POST | `/recommend/seed-fixtures`, `/recommend/seed-movielens`, `/recommend/seed-amazon`, `/recommend/query` |
 
