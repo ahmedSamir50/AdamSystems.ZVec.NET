@@ -1,0 +1,37 @@
+diff --git a/thirdparty/lz4/CMakeLists.txt b/thirdparty/lz4/CMakeLists.txt
+index 90a57e0..be4a8ff 100644
+--- a/thirdparty/lz4/CMakeLists.txt
++++ b/thirdparty/lz4/CMakeLists.txt
+@@ -77,6 +77,32 @@ elseif(IOS)
+   
+   set(_lz4_cflags "-arch ${_ios_arch} -isysroot ${_ios_sysroot} ${_ios_target_flag} -fPIC")
+   
++  list(APPEND _lz4_env
++    "CC=${CMAKE_C_COMPILER}"
++    "AR=${CMAKE_AR}"
++    "RANLIB=${CMAKE_RANLIB}"
++    "CFLAGS=${_lz4_cflags}"
++  )
++elseif(APPLE AND (CMAKE_C_FLAGS MATCHES "macabi" OR CMAKE_CXX_FLAGS MATCHES "macabi"))
++  # Mac Catalyst: top-level build uses -target *-macabi; Lz4's make EP must match
++  # or the final link fails (liblz4.a built for macOS vs macCatalyst).
++  set(_cat_arch ${CMAKE_OSX_ARCHITECTURES})
++  if(NOT _cat_arch)
++    set(_cat_arch "arm64")
++  endif()
++  set(_cat_min ${CMAKE_OSX_DEPLOYMENT_TARGET})
++  if(NOT _cat_min)
++    set(_cat_min "14.0")
++  endif()
++  set(_cat_sysroot "${CMAKE_OSX_SYSROOT}")
++  if(NOT _cat_sysroot)
++    execute_process(
++      COMMAND xcrun --sdk macosx --show-sdk-path
++      OUTPUT_VARIABLE _cat_sysroot
++      OUTPUT_STRIP_TRAILING_WHITESPACE
++    )
++  endif()
++  set(_lz4_cflags "-arch ${_cat_arch} -isysroot ${_cat_sysroot} -target ${_cat_arch}-apple-ios${_cat_min}-macabi -fPIC")
+   list(APPEND _lz4_env
+     "CC=${CMAKE_C_COMPILER}"
+     "AR=${CMAKE_AR}"

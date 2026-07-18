@@ -1,0 +1,15 @@
+diff --git a/cmake/bazel.cmake b/cmake/bazel.cmake
+index b097340..a4356ea 100644
+--- a/cmake/bazel.cmake
++++ b/cmake/bazel.cmake
+@@ -629,7 +629,9 @@ macro(_add_library _NAME _OPTION)
+       )
+   endif()
+   add_dependencies(${_NAME} ${_NAME}_static)
+-  if(NOT MSVC)
++  # On iOS both ${_NAME} and ${_NAME}_static are STATIC. Giving them the same
++  # OUTPUT_NAME makes Ninja reject duplicate lib${_NAME}.a (e.g. core_knn_diskann).
++  if(NOT MSVC AND NOT IOS)
+     set_property(TARGET ${_NAME}_static PROPERTY OUTPUT_NAME ${_NAME})
+   endif()
+ endmacro()

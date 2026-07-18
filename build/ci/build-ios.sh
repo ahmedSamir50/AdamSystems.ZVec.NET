@@ -33,6 +33,16 @@ esac
 
 BUILD_DIR="$NATIVE/build-$RID"
 SYSROOT="$(xcrun --sdk "$SDK" --show-sdk-path)"
+ZVEC="$NATIVE/external/zvec"
+
+# CI-only patches (not pushed to alibaba/zvec): iOS dual-STATIC OUTPUT_NAME + Catalyst Lz4.
+apply_zvec_patch() {
+  local patch="$ROOT/build/ci/patches/$1"
+  git -C "$ZVEC" apply --check "$patch"
+  git -C "$ZVEC" apply "$patch"
+}
+apply_zvec_patch "zvec-ios-static-output-name.patch"
+apply_zvec_patch "zvec-lz4-maccatalyst.patch"
 
 CMAKE_ARGS=(
   -S "$NATIVE"
