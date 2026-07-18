@@ -175,6 +175,28 @@ There is **no** merge of “different development branches into different `relea
 - **Publish only from tags whose commit is on `release/*`** (CI enforces this). Manual `workflow_dispatch` on publish is for emergencies only — still prefer a tag on `release/*`.
 - After the package is live: Community SDK issue on [alibaba/zvec](https://github.com/alibaba/zvec) (Project Plan §9.4).
 
+#### One-time nuget.org / GitHub setup (required before first publish)
+
+Publish fails with `No matching trust policy owned by user 'AdamSystems'` until this exists.
+
+**Option A — Trusted Publishing (preferred)**
+
+1. Sign in to [nuget.org](https://www.nuget.org/) as the account that will own the policy (usually **AdamSystems**).
+2. Avatar → **Trusted Publishing** → create a policy:
+   - **Repository Owner:** `ahmedSamir50`
+   - **Repository:** `AdamSystems.ZVec.NET`
+   - **Workflow File:** `publish-nuget.yml` (filename only — no `.github/workflows/`)
+   - **Environment:** leave empty (this workflow does not use a GitHub Environment)
+   - **Policy owner:** AdamSystems (or your org) so it can publish that owner’s packages
+3. In [`.github/workflows/publish-nuget.yml`](.github/workflows/publish-nuget.yml), `NuGet/login` `user:` must be the **nuget.org username of the policy creator** (often the same as the owner; if nuget.org says “use the username of the policy creator, not the policy owner”, put the creator’s username there).
+4. Re-run the failed **Publish NuGet** job (or re-dispatch with the Pack `source_run_id`). No need to rebuild natives.
+
+**Option B — API key fallback**
+
+1. nuget.org → API Keys → create a key with **Push** for `ZVec.NET` (or `*`).
+2. GitHub repo → Settings → Secrets → Actions → add `NUGET_API_KEY`.
+3. Re-run Publish. Trusted Publishing is tried first; if it fails, the workflow uses this secret.
+
 ### First publish on `release/1.0`
 
 Confirm Pack CI is green on `release/1.0`, then:

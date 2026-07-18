@@ -161,7 +161,10 @@ jobs:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           if [ -z "${NUGET_API_KEY:-}" ]; then
-            echo "Trusted Publishing login failed and NUGET_API_KEY secret is not set." >&2
+            echo "::error::Trusted Publishing failed and secrets.NUGET_API_KEY is not set."
+            echo "Create a nuget.org Trusted Publishing policy for ahmedSamir50/AdamSystems.ZVec.NET" >&2
+            echo "workflow file publish-nuget.yml (see CONTRIBUTING.md), OR set NUGET_API_KEY." >&2
+            echo "NuGet/login user must be the policy creator username (workflow uses: AdamSystems)." >&2
             exit 1
           fi
           shopt -s nullglob
