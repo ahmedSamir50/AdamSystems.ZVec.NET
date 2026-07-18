@@ -35,7 +35,7 @@ BUILD_DIR="$NATIVE/build-$RID"
 SYSROOT="$(xcrun --sdk "$SDK" --show-sdk-path)"
 ZVEC="$NATIVE/external/zvec"
 
-# CI-only patches (not pushed to alibaba/zvec): iOS dual-STATIC OUTPUT_NAME + Catalyst Lz4.
+# CI-only patches (not pushed to alibaba/zvec).
 apply_zvec_patch() {
   local patch="$ROOT/build/ci/patches/$1"
   git -C "$ZVEC" apply --check "$patch"
@@ -43,6 +43,35 @@ apply_zvec_patch() {
 }
 apply_zvec_patch "zvec-ios-static-output-name.patch"
 apply_zvec_patch "zvec-lz4-maccatalyst.patch"
+apply_zvec_patch "zvec-arrow-maccatalyst.patch"
+
+# Host protoc: iOS-built protoc is killed (SIGKILL) when run on the Mac host.
+# Same pattern as Android GLOBAL_CC_PROTOBUF_PROTOC / win-arm64 host protoc.
+HOST_PROTOC_DIR="$NATIVE/build-host-protoc-bin"
+ensure_host_protoc() {
+  local protoc="$HOST_PROTOC_DIR/bin/protoc"
+  if [[ -x "$protoc" ]]; then
+    echo "$protoc"
+    return 0
+  fi
+  mkdir -p "$HOST_PROTOC_DIR"
+  local zip="$HOST_PROTOC_DIR/protoc.zip"
+  local url="https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-osx-aarch_64.zip"
+  # Intel Mac CI fallback (rare for current runners).
+  if [[ "$(uname -m)" == "x86_64" ]]; then
+    url="https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-osx-x86_64.zip"
+  fi
+  echo "Downloading host protoc from $url ..."
+  curl -fsSL -o "$zip" "$url"
+  unzip -qo "$zip" -d "$HOST_PROTOC_DIR"
+  if [[ ! -x "$protoc" ]]; then
+    echo "Host protoc missing at $protoc" >&2
+    exit 1
+  fi
+  "$protoc" --version
+  echo "$protoc"
+}
+HOST_PROTOC="$(ensure_host_protoc)"
 
 CMAKE_ARGS=(
   -S "$NATIVE"
@@ -58,10 +87,12 @@ CMAKE_ARGS=(
   -DBUILD_EXAMPLES=OFF
   -DBUILD_PYTHON_BINDINGS=OFF
   -DBUILD_C_BINDINGS=ON
+  -DGLOBAL_CC_PROTOBUF_PROTOC="$HOST_PROTOC"
 )
 
 if [[ "$TARGET" == "maccatalyst-arm64" ]]; then
   CMAKE_ARGS+=(-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0)
+  CMAKE_ARGS+=(-DZVEC_MACCATALYST=ON)
   # Catalyst: prefer iOS macabi when available
   CMAKE_ARGS+=(-DCMAKE_CXX_FLAGS="-target arm64-apple-ios14.0-macabi")
   CMAKE_ARGS+=(-DCMAKE_C_FLAGS="-target arm64-apple-ios14.0-macabi")

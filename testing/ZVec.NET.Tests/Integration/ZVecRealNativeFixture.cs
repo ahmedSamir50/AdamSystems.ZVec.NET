@@ -6,15 +6,40 @@ namespace ZVec.NET.Tests.Integration;
 /// Detects whether a real ZVec native library is loadable. Integration/memory tests call
 /// <see cref="SkipIfNotAvailable"/> so CI without a RID binary skips rather than fails.
 /// </summary>
+/// <remarks>
+/// Detection is process-wide and serialized. Parallel <see cref="IClassFixture{T}"/> instances
+/// previously raced Initialize/Shutdown and could call <c>zvec_shutdown</c> while another class
+/// was still constructing — heap corruption (<c>0xC0000374</c>) on Pack CI.
+/// </remarks>
 public class ZVecRealNativeFixture : IDisposable
 {
+    private static readonly object Gate = new();
+    private static int s_liveFixtures;
+    private static bool s_detectDone;
+    private static bool s_available;
+    private static string? s_failReason;
+    private static ZVecFactory? s_sharedFactory;
+
     public bool IsRealNativeAvailable { get; private set; }
-    private readonly string _testPath;
-    private ZVecFactory? _factory;
 
     public ZVecRealNativeFixture()
     {
-        _testPath = Path.Combine(Path.GetTempPath(), $"zvec_real_detect_{Guid.NewGuid():N}");
+        lock (Gate)
+        {
+            s_liveFixtures++;
+            if (!s_detectDone)
+            {
+                s_available = DetectOnce();
+                s_detectDone = true;
+            }
+
+            IsRealNativeAvailable = s_available;
+        }
+    }
+
+    private static bool DetectOnce()
+    {
+        var testPath = Path.Combine(Path.GetTempPath(), $"zvec_real_detect_{Guid.NewGuid():N}");
 
         try
         {
@@ -24,13 +49,14 @@ public class ZVecRealNativeFixture : IDisposable
             var version = NativeMethods.GetVersionString();
             if (string.IsNullOrEmpty(version))
             {
-                IsRealNativeAvailable = false;
-                return;
+                s_failReason = "native GetVersionString returned empty";
+                return false;
             }
 
-            _factory = new ZVecFactory();
-            _factory.Initialize();
+            s_sharedFactory = new ZVecFactory();
+            s_sharedFactory.Initialize();
 
+            // Flat index: fastest/most portable probe (HNSW previously failed detection on CI).
             var schema = new ZVecCollectionSchema
             {
                 Name = "detect_schema",
@@ -41,7 +67,7 @@ public class ZVecRealNativeFixture : IDisposable
                         Name = "embedding",
                         DataType = ZVecDataType.VectorFp32,
                         Dimension = 4,
-                        IndexParam = new ZVecHnswIndexParam()
+                        IndexParam = new ZVecFlatIndexParam()
                     }
                 ],
                 Fields =
@@ -54,13 +80,14 @@ public class ZVecRealNativeFixture : IDisposable
             IZvecCollection? col = null;
             try
             {
-                col = _factory.CreateAndOpen(_testPath, schema);
+                col = s_sharedFactory.CreateAndOpen(testPath, schema);
 
-                bool pathExists = Directory.Exists(_testPath) || File.Exists(_testPath);
+                bool pathExists = Directory.Exists(testPath) || File.Exists(testPath);
                 if (!pathExists)
                 {
-                    IsRealNativeAvailable = false;
-                    return;
+                    s_failReason = $"CreateAndOpen succeeded but path missing: {testPath}";
+                    ShutdownSharedUnlocked();
+                    return false;
                 }
 
                 var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
@@ -68,28 +95,44 @@ public class ZVecRealNativeFixture : IDisposable
                     denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector },
                     fields: new Dictionary<string, object> { ["name"] = "Alice", ["age"] = 30 });
                 col.Insert(doc);
-                IsRealNativeAvailable = true;
+                return true;
             }
             finally
             {
-                col?.Destroy();
+                try { col?.Destroy(); } catch { /* probe cleanup */ }
             }
         }
-        catch (DllNotFoundException)
+        catch (DllNotFoundException ex)
         {
-            IsRealNativeAvailable = false;
+            s_failReason = ex.Message;
+            ShutdownSharedUnlocked();
+            return false;
         }
-        catch (EntryPointNotFoundException)
+        catch (EntryPointNotFoundException ex)
         {
-            IsRealNativeAvailable = false;
+            s_failReason = ex.Message;
+            ShutdownSharedUnlocked();
+            return false;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            IsRealNativeAvailable = false;
+            s_failReason = $"{ex.GetType().Name}: {ex.Message}";
+            ShutdownSharedUnlocked();
+            return false;
         }
         finally
         {
-            Cleanup();
+            try
+            {
+                if (Directory.Exists(testPath))
+                    Directory.Delete(testPath, recursive: true);
+                else if (File.Exists(testPath))
+                    File.Delete(testPath);
+            }
+            catch
+            {
+                // Ignore cleanup failures during detection.
+            }
         }
     }
 
@@ -97,18 +140,23 @@ public class ZVecRealNativeFixture : IDisposable
     {
         if (!IsRealNativeAvailable)
         {
-            Assert.Skip("Real ZVec native library is not available. Skipping integration test.");
+            Assert.Skip(
+                "Real ZVec native library is not available. Skipping integration test."
+                + (string.IsNullOrEmpty(s_failReason) ? "" : $" Reason: {s_failReason}"));
         }
     }
 
     /// <summary>
-    /// Releases the fixture-held native session so a test can re-run <see cref="ZVecFactory.Initialize"/>
+    /// Releases the shared native session so a test can re-run <see cref="ZVecFactory.Initialize"/>
     /// (e.g. ABI version gate). Call <see cref="ResumeNativeSession"/> in <c>finally</c>.
     /// </summary>
     public void SuspendNativeSession()
     {
         SkipIfNotAvailable();
-        _factory?.Shutdown();
+        lock (Gate)
+        {
+            ShutdownSharedUnlocked();
+        }
     }
 
     /// <summary>Re-initializes native after <see cref="SuspendNativeSession"/>.</summary>
@@ -117,39 +165,47 @@ public class ZVecRealNativeFixture : IDisposable
         if (!IsRealNativeAvailable)
             return;
 
-        if (_factory is { IsInitialized: true })
-            return;
-
-        _factory ??= new ZVecFactory();
-        _factory.Initialize();
-    }
-
-    private void Cleanup()
-    {
-        try
+        lock (Gate)
         {
-            if (Directory.Exists(_testPath))
-                Directory.Delete(_testPath, recursive: true);
-            else if (File.Exists(_testPath))
-                File.Delete(_testPath);
-        }
-        catch
-        {
-            // Ignore cleanup failures during detection.
+            if (s_sharedFactory is { IsInitialized: true })
+                return;
+
+            s_sharedFactory ??= new ZVecFactory();
+            s_sharedFactory.Initialize();
         }
     }
 
     public void Dispose()
     {
-        Cleanup();
+        lock (Gate)
+        {
+            s_liveFixtures--;
+            if (s_liveFixtures > 0)
+                return;
 
+            s_liveFixtures = 0;
+            // When unavailable, ensure any half-init factory is torn down.
+            // When available, leave the process-wide native singleton up — parallel unit tests
+            // that call Initialize share _globalNativeInitCount; fixture Dispose must not
+            // zvec_shutdown underneath them.
+            if (!s_available)
+                ShutdownSharedUnlocked();
+        }
+    }
+
+    private static void ShutdownSharedUnlocked()
+    {
         try
         {
-            _factory?.Shutdown();
+            s_sharedFactory?.Shutdown();
         }
         catch
         {
             // Ignore shutdown failures during fixture teardown.
+        }
+        finally
+        {
+            s_sharedFactory = null;
         }
     }
 }

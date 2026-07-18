@@ -1,0 +1,66 @@
+diff --git a/cmake/option.cmake b/cmake/option.cmake
+index fe10857..5ac0cfd 100644
+--- a/cmake/option.cmake
++++ b/cmake/option.cmake
+@@ -280,31 +280,38 @@ if(NOT AUTO_DETECT_ARCH)
+   endif()
+ 
+ else()
+-  # AUTO DETECT
+-  # Heuristic: detect host architecture and probe appropriate flags
+-  string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" SYSTEM_PROC_LOWER)
+-
+-  if(SYSTEM_PROC_LOWER MATCHES "^(x86_64|amd64|x64)$")
+-    set(HOST_ARCH x64)
+-  elseif(SYSTEM_PROC_LOWER MATCHES "^(i[3-6]86|x86)$")
+-    set(HOST_ARCH x86)
+-  elseif(SYSTEM_PROC_LOWER MATCHES "^(aarch64|arm64)$")
+-    set(HOST_ARCH arm64)
+-  elseif(SYSTEM_PROC_LOWER MATCHES "^(arm|armv7|armv7-a|armv7l)$")
+-    set(HOST_ARCH arm)
++  # Prefer CMAKE_OSX_ARCHITECTURES for single-slice Apple builds (e.g. osx-x64 on arm64 host).
++  if(APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES "x86_64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
++    _setup_x86_march()
++  elseif(APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES "arm64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
++    _setup_armv8_march()
+   else()
+-    set(HOST_ARCH unknown)
+-    message(WARNING "unknown host arch: ${CMAKE_SYSTEM_PROCESSOR}")
++    # AUTO DETECT
++    # Heuristic: detect host architecture and probe appropriate flags
++    string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" SYSTEM_PROC_LOWER)
++
++    if(SYSTEM_PROC_LOWER MATCHES "^(x86_64|amd64|x64)$")
++      set(HOST_ARCH x64)
++    elseif(SYSTEM_PROC_LOWER MATCHES "^(i[3-6]86|x86)$")
++      set(HOST_ARCH x86)
++    elseif(SYSTEM_PROC_LOWER MATCHES "^(aarch64|arm64)$")
++      set(HOST_ARCH arm64)
++    elseif(SYSTEM_PROC_LOWER MATCHES "^(arm|armv7|armv7-a|armv7l)$")
++      set(HOST_ARCH arm)
++    else()
++      set(HOST_ARCH unknown)
++      message(WARNING "unknown host arch: ${CMAKE_SYSTEM_PROCESSOR}")
++    endif()
++    #  message(STATUS "host arch: ${HOST_ARCH}")
++
++    if (HOST_ARCH MATCHES "^(arm|arm64)$")
++      _setup_armv8_march()
++    elseif (HOST_ARCH MATCHES "^(x86|x64)$")
++      _setup_x86_march()
++    else ()
++      message(WARNING "unknown host arch - no -march set")
++    endif ()
+   endif()
+-  #  message(STATUS "host arch: ${HOST_ARCH}")
+-
+-  if (HOST_ARCH MATCHES "^(arm|arm64)$")
+-    _setup_armv8_march()
+-  elseif (HOST_ARCH MATCHES "^(x86|x64)$")
+-    _setup_x86_march()
+-  else ()
+-    message(WARNING "unknown host arch - no -march set")
+-  endif ()
+ endif()
+ 
+ # -----------------------------

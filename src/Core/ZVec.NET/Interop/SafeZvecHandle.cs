@@ -5,6 +5,8 @@ namespace ZVec.NET.Interop;
 /// </summary>
 internal sealed class SafeZvecHandle : SafeZvecHandleBase
 {
+    private int _releaseOnce;
+
     public SafeZvecHandle() : base()
     {
     }
@@ -21,6 +23,10 @@ internal sealed class SafeZvecHandle : SafeZvecHandleBase
         {
             return true;
         }
+
+        // Guard against re-entrant / racing finalizer vs explicit Dispose under parallel tests.
+        if (Interlocked.Exchange(ref _releaseOnce, 1) != 0)
+            return true;
 
         // If the factory is not initialized (or already shut down), the native library
         // resources are no longer valid, so calling close would cause an Access Violation.

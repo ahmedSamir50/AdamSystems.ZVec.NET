@@ -37,9 +37,10 @@ jobs:
             rid: win-arm64
             test: false
             optional: true
-            # MSVC cross leaves CMAKE_SYSTEM_PROCESSOR as host AMD64; FastPFOR
-            # wrapper needs ARM64 to FetchContent SIMDe (see thirdparty/FastPFOR/CMakeLists.txt).
-            cmake_extra: "-DCMAKE_SYSTEM_PROCESSOR=ARM64"
+            # Without SYSTEM_NAME, CMake treats this as a native host build and
+            # resets CMAKE_SYSTEM_PROCESSOR to AMD64 (wiping PROCESSOR=ARM64).
+            # FastPFOR also has an MSVC-arch SIMDe CI patch as belt-and-suspenders.
+            cmake_extra: "-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64"
           - os: ubuntu-latest
             rid: linux-x64
             test: true
@@ -78,6 +79,14 @@ jobs:
           sudo apt-get install -y ninja-build cmake build-essential
           if [ "${{ matrix.rid }}" = "linux-arm64" ]; then
             sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user
+            # Host protoc (x86_64): aarch64-built protoc cannot run on the runner
+            # (ld-linux-aarch64.so.1). Same class of bug as win-arm64 / Android.
+            dest="${GITHUB_WORKSPACE}/_host_protoc"
+            mkdir -p "$dest"
+            curl -fsSL -o "$dest/protoc.zip" \
+              "https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip"
+            unzip -qo "$dest/protoc.zip" -d "$dest"
+            "$dest/bin/protoc" --version
           fi
 
       - name: Install macOS build tools
@@ -126,10 +135,16 @@ jobs:
         run: |
           $zvec = "src/Native/ZVec.Native/external/zvec"
           $arrow = Join-Path $zvec "thirdparty/arrow/apache-arrow-21.0.0"
-          $ninja = Join-Path $env:GITHUB_WORKSPACE "build/ci/patches/zvec-arrow-msvc-ninja.patch"
+          $patches = @(
+            "build/ci/patches/zvec-arrow-msvc-ninja.patch",
+            "build/ci/patches/zvec-fastpfor-msvc-arm64-simde.patch"
+          )
+          foreach ($rel in $patches) {
+            $p = Join-Path $env:GITHUB_WORKSPACE $rel
+            git -C $zvec apply --check $p
+            git -C $zvec apply $p
+          }
           $pcg = Join-Path $env:GITHUB_WORKSPACE "build/ci/patches/zvec-arrow-pcg-msvc-arm64.patch"
-          git -C $zvec apply --check $ninja
-          git -C $zvec apply $ninja
           git -C $arrow apply --check $pcg
           git -C $arrow apply $pcg
 
@@ -141,13 +156,29 @@ jobs:
           git -C "$zvec" apply --check "$patch"
           git -C "$zvec" apply "$patch"
 
+      - name: Patch zvec CI workarounds (osx-x64 march)
+        if: matrix.rid == 'osx-x64'
+        run: |
+          zvec="src/Native/ZVec.Native/external/zvec"
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-osx-x64-march.patch"
+          git -C "$zvec" apply --check "$patch"
+          git -C "$zvec" apply "$patch"
+
       - name: Configure CMake (Unix)
         if: runner.os != 'Windows'
         working-directory: src/Native/ZVec.Native
         run: |
+          HOST_PROTOC_ARG=""
+          if [ "${{ matrix.rid }}" = "linux-arm64" ]; then
+            HOST_PROTOC="${GITHUB_WORKSPACE}/_host_protoc/bin/protoc"
+            test -x "$HOST_PROTOC"
+            HOST_PROTOC_ARG="-DGLOBAL_CC_PROTOBUF_PROTOC=$HOST_PROTOC"
+            echo "Using host protoc for linux-arm64: $HOST_PROTOC"
+          fi
           cmake -B "build-${{ matrix.rid }}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             ${{ matrix.cmake_extra }} \
+            $HOST_PROTOC_ARG \
             -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF \
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON \
             -S .
@@ -292,19 +323,21 @@ jobs:
         run: |
           root="build-${{ matrix.rid }}"
           echo "##[group]ARROW/Lz4 ExternalProject logs ($root)"
-          if [[ ! -d "$root" ]]; then
+          if [ ! -d "$root" ]; then
             echo "Build root missing: $root"
             echo "##[endgroup]"
             exit 0
           fi
-          mapfile -t logs < <(find "$root" \( -name 'ARROW.BUILD-*.log' -o -name 'Lz4.BUILD-*.log' \) 2>/dev/null | sort)
-          if [[ ${#logs[@]} -eq 0 ]]; then
+          # POSIX: macOS ships bash 3 without mapfile.
+          found=0
+          find "$root" \( -name 'ARROW.BUILD-*.log' -o -name 'Lz4.BUILD-*.log' \) 2>/dev/null | sort | while IFS= read -r log; do
+            found=1
+            echo "===== $log ====="
+            cat "$log" || true
+          done
+          # Note: found inside pipeline subshell — also probe with find -print -quit
+          if ! find "$root" \( -name 'ARROW.BUILD-*.log' -o -name 'Lz4.BUILD-*.log' \) -print -quit 2>/dev/null | grep -q .; then
             echo "No ARROW/Lz4 ExternalProject logs under $root (see build step FAILED lines)."
-          else
-            for log in "${logs[@]}"; do
-              echo "===== $log ====="
-              cat "$log" || true
-            done
           fi
           echo "##[endgroup]"
 

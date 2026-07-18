@@ -1,8 +1,8 @@
 diff --git a/thirdparty/arrow/CMakeLists.txt b/thirdparty/arrow/CMakeLists.txt
-index d6d926d..ea5e80b 100644
+index d6d926d..3bb81c3 100644
 --- a/thirdparty/arrow/CMakeLists.txt
 +++ b/thirdparty/arrow/CMakeLists.txt
-@@ -144,12 +144,26 @@ elseif (MSVC)
+@@ -144,12 +144,27 @@ elseif (MSVC)
                  LOG_INSTALL ON
          )
  else ()
@@ -17,6 +17,7 @@ index d6d926d..ea5e80b 100644
 +            -DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}
 +            -DARROW_SIMD_LEVEL=NEON
 +            -DARROW_RUNTIME_SIMD_LEVEL=MAX
++            -DARROW_WITH_OPENSSL=OFF
 +        )
 +        message(STATUS "Arrow EP cross args: ${_ARROW_CROSS_ARGS}")
 +    endif()
@@ -30,7 +31,7 @@ index d6d926d..ea5e80b 100644
              BUILD_COMMAND "${CMAKE_COMMAND}" --build . --target all -- -j ${NPROC}
              INSTALL_COMMAND "${CMAKE_COMMAND}" --install "<BINARY_DIR>" --prefix=${EXTERNAL_BINARY_DIR}/usr/local
              BYPRODUCTS ${LIB_PARQUET} ${LIB_ARROW} ${LIB_COMPUTE} ${LIB_ACERO} ${LIB_ARROW_DEPENDS} ${LIB_ARROW_DATASET}
-@@ -157,6 +171,7 @@ else ()
+@@ -157,6 +172,7 @@ else ()
              LOG_CONFIGURE ON
              LOG_BUILD ON
              LOG_INSTALL ON
