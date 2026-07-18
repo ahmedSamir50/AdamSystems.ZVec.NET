@@ -110,22 +110,50 @@ jobs:
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON \
             -S .
 
+      # Arrow MSVC ExternalProject defaults to VS generator → FTK1011 / multi-hour hangs.
+      # Cannot commit into alibaba/zvec; apply the local workaround patch before configure.
+      - name: Patch Arrow MSVC ExternalProject to Ninja
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $zvec = "src/Native/ZVec.Native/external/zvec"
+          $patch = "build/ci/patches/zvec-arrow-msvc-ninja.patch"
+          git -C $zvec apply --check $patch
+          git -C $zvec apply $patch
+
       # win-x64 and win-arm64 both use Ninja + MSVC from msvc-dev-cmd (not VS generator).
       # Quote 3.5 — unquoted, pwsh splits into "3" and ".5" and CMake fails.
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
         working-directory: src/Native/ZVec.Native
         shell: pwsh
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+          CMAKE_GENERATOR: Ninja
         run: |
-          $env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
           cmake -B "build-${{ matrix.rid }}" -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
             -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
 
+      # Nested ExternalProject cmake (Lz4) runs at build time — must inherit policy floor
+      # (matches local _build_ninja.bat). Configure-step env alone is not enough.
       - name: Build zvec_c_api
         working-directory: src/Native/ZVec.Native
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+          CMAKE_GENERATOR: Ninja
         run: cmake --build "build-${{ matrix.rid }}" --config Release --target zvec_c_api
+
+      - name: Dump Windows ExternalProject configure logs on failure
+        if: failure() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $root = "src/Native/ZVec.Native/build-${{ matrix.rid }}"
+          Get-ChildItem -Recurse $root -Filter "Lz4.BUILD-configure*.log" -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName }
+          Get-ChildItem -Recurse $root -Filter "ARROW.BUILD-configure*.log" -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName }
 
       - name: Locate and deploy native (Unix)
         if: runner.os != 'Windows'
