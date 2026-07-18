@@ -145,4 +145,4 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x build/ci/validate-consumer.sh || true
-          bash build/ci/validate-consumer.sh "${{ matrix.rid }}" artifacts/nuget
+          bash build/ci/validate-consumer.sh "${{ matrix.rid }}" artifacts/nuget _rid_native

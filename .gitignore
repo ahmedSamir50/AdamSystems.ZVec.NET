@@ -13,6 +13,7 @@
 *.snupkg
 /artifacts/
 /_ci_artifacts/
+**/BenchmarkDotNet.Artifacts/
 
 # =========================
 # C++ & CMake
@@ -55,3 +56,4 @@ Thumbs.db
 /docs
 /tools
 /githubActions.pipline.log
+githubActions.pipline.log

@@ -19,11 +19,15 @@ namespace ZVec.NET;
 /// </para>
 /// <para>
 /// <b>Async APIs:</b> <c>*Async</c> methods are cancellation-aware wrappers around synchronous native calls
-/// (they complete on the caller thread; they are not thread-pool offloads).
+/// (not thread-pool offloads). When optional gates are enabled
+/// (<c>MaxConcurrentNativeCalls</c> / <c>MaxConcurrentReads</c> &gt; 0), async paths await
+/// <see cref="SemaphoreSlim.WaitAsync(System.Threading.CancellationToken)"/> for the gate only;
+/// after acquire, P/Invoke still runs on the continuation thread. Mid-P/Invoke cancel is best-effort.
 /// </para>
 /// <para>
-/// <b>DocumentId queries:</b> Resolving <see cref="ZVecQuery.DocumentId"/> performs an extra Fetch
-/// (with vectors) before the search — expect an additional native round-trip.
+/// <b>DocumentId queries:</b> <see cref="ZVecQuery.DocumentId"/> is a query-by-id input convenience:
+/// an extra Fetch (with vectors) loads that document’s embedding before search. Query results already
+/// include document IDs from native — this is not a result-ID gap.
 /// </para>
 /// </remarks>
 public sealed class ZVecCollection : IZvecCollection
@@ -96,97 +100,54 @@ public sealed class ZVecCollection : IZvecCollection
     public ZVecStatus Insert(ReadOnlySpan<ZVecDoc> docs) => _writes.Insert(docs);
     public IReadOnlyList<ZVecWriteResult> InsertWithResults(ReadOnlySpan<ZVecDoc> docs) => _writes.InsertWithResults(docs);
 
-    public ValueTask<ZVecStatus> InsertAsync(ZVecDoc doc, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(Insert(doc));
-    }
+    public ValueTask<ZVecStatus> InsertAsync(ZVecDoc doc, CancellationToken ct = default) =>
+        _writes.InsertAsync(doc, ct);
 
-    public ValueTask<IReadOnlyList<ZVecWriteResult>> InsertAsync(IReadOnlyList<ZVecDoc> docs, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        ArgumentNullException.ThrowIfNull(docs);
-        if (docs is ZVecDoc[] arr) return ValueTask.FromResult(InsertWithResults(arr));
-        return ValueTask.FromResult(InsertWithResults(docs.ToArray()));
-    }
+    public ValueTask<IReadOnlyList<ZVecWriteResult>> InsertAsync(IReadOnlyList<ZVecDoc> docs, CancellationToken ct = default) =>
+        _writes.InsertWithResultsAsync(docs, ct);
 
     public ZVecStatus Update(ZVecDoc doc) => _writes.Update(doc);
     public ZVecStatus Update(ReadOnlySpan<ZVecDoc> docs) => _writes.Update(docs);
     public IReadOnlyList<ZVecWriteResult> UpdateWithResults(ReadOnlySpan<ZVecDoc> docs) => _writes.UpdateWithResults(docs);
 
-    public ValueTask<ZVecStatus> UpdateAsync(ZVecDoc doc, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(Update(doc));
-    }
+    public ValueTask<ZVecStatus> UpdateAsync(ZVecDoc doc, CancellationToken ct = default) =>
+        _writes.UpdateAsync(doc, ct);
 
-    public ValueTask<ZVecStatus> UpdateAsync(IReadOnlyList<ZVecDoc> docs, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        ArgumentNullException.ThrowIfNull(docs);
-        if (docs is ZVecDoc[] arr) return ValueTask.FromResult(Update(arr));
-        return ValueTask.FromResult(Update(docs.ToArray()));
-    }
+    public ValueTask<ZVecStatus> UpdateAsync(IReadOnlyList<ZVecDoc> docs, CancellationToken ct = default) =>
+        _writes.UpdateAsync(docs, ct);
 
     public ZVecStatus Upsert(ZVecDoc doc) => _writes.Upsert(doc);
     public ZVecStatus Upsert(ReadOnlySpan<ZVecDoc> docs) => _writes.Upsert(docs);
     public IReadOnlyList<ZVecWriteResult> UpsertWithResults(ReadOnlySpan<ZVecDoc> docs) => _writes.UpsertWithResults(docs);
 
-    public ValueTask<ZVecStatus> UpsertAsync(ZVecDoc doc, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(Upsert(doc));
-    }
+    public ValueTask<ZVecStatus> UpsertAsync(ZVecDoc doc, CancellationToken ct = default) =>
+        _writes.UpsertAsync(doc, ct);
 
-    public ValueTask<ZVecStatus> UpsertAsync(IReadOnlyList<ZVecDoc> docs, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        ArgumentNullException.ThrowIfNull(docs);
-        if (docs is ZVecDoc[] arr) return ValueTask.FromResult(Upsert(arr));
-        return ValueTask.FromResult(Upsert(docs.ToArray()));
-    }
+    public ValueTask<ZVecStatus> UpsertAsync(IReadOnlyList<ZVecDoc> docs, CancellationToken ct = default) =>
+        _writes.UpsertAsync(docs, ct);
 
     public ZVecStatus Delete(string pk) => _writes.Delete(pk);
     public ZVecStatus Delete(ReadOnlySpan<string> pks) => _writes.Delete(pks);
     public IReadOnlyList<ZVecWriteResult> DeleteWithResults(ReadOnlySpan<string> pks) => _writes.DeleteWithResults(pks);
     public ZVecStatus DeleteByFilter(string filter) => _writes.DeleteByFilter(filter);
 
-    public ValueTask<ZVecStatus> DeleteAsync(string pk, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(Delete(pk));
-    }
+    public ValueTask<ZVecStatus> DeleteAsync(string pk, CancellationToken ct = default) =>
+        _writes.DeleteAsync(pk, ct);
 
-    public ValueTask<ZVecStatus> DeleteAsync(IReadOnlyList<string> pks, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        ArgumentNullException.ThrowIfNull(pks);
-        if (pks is string[] arr) return ValueTask.FromResult(Delete(arr));
-        return ValueTask.FromResult(Delete(pks.ToArray()));
-    }
+    public ValueTask<ZVecStatus> DeleteAsync(IReadOnlyList<string> pks, CancellationToken ct = default) =>
+        _writes.DeleteAsync(pks, ct);
 
-    public ValueTask<ZVecStatus> DeleteByFilterAsync(string filter, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(DeleteByFilter(filter));
-    }
+    public ValueTask<ZVecStatus> DeleteByFilterAsync(string filter, CancellationToken ct = default) =>
+        _writes.DeleteByFilterAsync(filter, ct);
 
     public ZVecDoc? Fetch(string pk, bool includeVector = false) => _reads.Fetch(pk, includeVector);
     public IReadOnlyList<ZVecDoc> Fetch(ReadOnlySpan<string> pks, bool includeVector = false) => _reads.Fetch(pks, includeVector);
 
-    public ValueTask<ZVecDoc?> FetchAsync(string pk, bool includeVector = false, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(Fetch(pk, includeVector));
-    }
+    public ValueTask<ZVecDoc?> FetchAsync(string pk, bool includeVector = false, CancellationToken ct = default) =>
+        _reads.FetchAsync(pk, includeVector, ct);
 
-    public ValueTask<IReadOnlyList<ZVecDoc>> FetchAsync(IReadOnlyList<string> pks, bool includeVector = false, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        ArgumentNullException.ThrowIfNull(pks);
-        if (pks is string[] arr) return ValueTask.FromResult(Fetch(arr, includeVector));
-        return ValueTask.FromResult(Fetch(pks.ToArray(), includeVector));
-    }
+    public ValueTask<IReadOnlyList<ZVecDoc>> FetchAsync(IReadOnlyList<string> pks, bool includeVector = false, CancellationToken ct = default) =>
+        _reads.FetchAsync(pks, includeVector, ct);
 
     public IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk = 10, string? filter = null, bool includeVector = true) =>
         _reads.Query(query, topk, filter, includeVector);
@@ -221,18 +182,8 @@ public sealed class ZVecCollection : IZvecCollection
         int topk = 10,
         string? filter = null,
         bool includeVector = true,
-        CancellationToken ct = default)
-    {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled<IReadOnlyList<ZVecDoc>>(ct);
-        try
-        {
-            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(query, topk, filter, includeVector));
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException<IReadOnlyList<ZVecDoc>>(ex);
-        }
-    }
+        CancellationToken ct = default) =>
+        _reads.QueryAsync(query, topk, filter, includeVector, ct);
 
     public ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(
         ZVecQuery query,
@@ -241,15 +192,8 @@ public sealed class ZVecCollection : IZvecCollection
         bool includeVector = true,
         CancellationToken ct = default)
     {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled<IReadOnlyList<ZVecDoc>>(ct);
-        try
-        {
-            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(query, topk, filter, includeVector));
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException<IReadOnlyList<ZVecDoc>>(ex);
-        }
+        ArgumentNullException.ThrowIfNull(filter);
+        return QueryAsync(query, topk, filter.Build(), includeVector, ct);
     }
 
     public ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(
@@ -258,18 +202,8 @@ public sealed class ZVecCollection : IZvecCollection
         ZVecReranker? reranker = null,
         string? filter = null,
         bool includeVector = true,
-        CancellationToken ct = default)
-    {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled<IReadOnlyList<ZVecDoc>>(ct);
-        try
-        {
-            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(queries, topk, reranker, filter, includeVector));
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException<IReadOnlyList<ZVecDoc>>(ex);
-        }
-    }
+        CancellationToken ct = default) =>
+        _reads.QueryAsync(queries, topk, reranker, filter, includeVector, ct);
 
     public ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(
         IReadOnlyList<ZVecQuery> queries,
@@ -279,15 +213,8 @@ public sealed class ZVecCollection : IZvecCollection
         bool includeVector = true,
         CancellationToken ct = default)
     {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled<IReadOnlyList<ZVecDoc>>(ct);
-        try
-        {
-            return new ValueTask<IReadOnlyList<ZVecDoc>>(Query(queries, topk, reranker, filter, includeVector));
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException<IReadOnlyList<ZVecDoc>>(ex);
-        }
+        ArgumentNullException.ThrowIfNull(filter);
+        return QueryAsync(queries, topk, reranker, filter.Build(), includeVector, ct);
     }
 
     /// <inheritdoc/>
@@ -331,87 +258,21 @@ public sealed class ZVecCollection : IZvecCollection
 
     public void Optimize() => _ddl.Optimize();
 
-    public ValueTask AddColumnAsync(ZVecFieldSchema field, string? defaultExpression = null, CancellationToken ct = default)
-    {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
-        try
-        {
-            AddColumn(field, defaultExpression);
-            return ValueTask.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException(ex);
-        }
-    }
+    public ValueTask AddColumnAsync(ZVecFieldSchema field, string? defaultExpression = null, CancellationToken ct = default) =>
+        _ddl.AddColumnAsync(field, defaultExpression, ct);
 
-    public ValueTask DropColumnAsync(string columnName, CancellationToken ct = default)
-    {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
-        try
-        {
-            DropColumn(columnName);
-            return ValueTask.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException(ex);
-        }
-    }
+    public ValueTask DropColumnAsync(string columnName, CancellationToken ct = default) =>
+        _ddl.DropColumnAsync(columnName, ct);
 
-    public ValueTask AlterColumnAsync(string columnName, string? newName = null, ZVecFieldSchema? newSchema = null, CancellationToken ct = default)
-    {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
-        try
-        {
-            AlterColumn(columnName, newName, newSchema);
-            return ValueTask.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException(ex);
-        }
-    }
+    public ValueTask AlterColumnAsync(string columnName, string? newName = null, ZVecFieldSchema? newSchema = null, CancellationToken ct = default) =>
+        _ddl.AlterColumnAsync(columnName, newName, newSchema, ct);
 
-    public ValueTask CreateIndexAsync(string columnName, ZVecIndexParam indexParam, CancellationToken ct = default)
-    {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
-        try
-        {
-            CreateIndex(columnName, indexParam);
-            return ValueTask.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException(ex);
-        }
-    }
+    public ValueTask CreateIndexAsync(string columnName, ZVecIndexParam indexParam, CancellationToken ct = default) =>
+        _ddl.CreateIndexAsync(columnName, indexParam, ct);
 
-    public ValueTask DropIndexAsync(string columnName, CancellationToken ct = default)
-    {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
-        try
-        {
-            DropIndex(columnName);
-            return ValueTask.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException(ex);
-        }
-    }
+    public ValueTask DropIndexAsync(string columnName, CancellationToken ct = default) =>
+        _ddl.DropIndexAsync(columnName, ct);
 
-    public ValueTask OptimizeAsync(CancellationToken ct = default)
-    {
-        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
-        try
-        {
-            Optimize();
-            return ValueTask.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            return ValueTask.FromException(ex);
-        }
-    }
+    public ValueTask OptimizeAsync(CancellationToken ct = default) =>
+        _ddl.OptimizeAsync(ct);
 }

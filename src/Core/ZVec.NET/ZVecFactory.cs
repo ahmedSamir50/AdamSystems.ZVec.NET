@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using ZVec.NET.Exceptions;
+using ZVec.NET.Internal;
 using ZVec.NET.Interop;
 
 namespace ZVec.NET;
@@ -21,6 +21,7 @@ namespace ZVec.NET;
 /// </para>
 /// <para>
 /// Async factory APIs are cancellation-aware wrappers around synchronous native calls.
+/// Process-wide native load/init/shutdown is delegated to <see cref="ZVecNativeLifecycle"/>.
 /// </para>
 /// </remarks>
 public sealed class ZVecFactory : IZvecFactory
@@ -29,8 +30,6 @@ public sealed class ZVecFactory : IZvecFactory
     // State machine — transitions only go forward: Uninitialized → Initialized → ShutDown.
     // =========================================================================
     private int _state = FactoryState.Uninitialized;
-    private static int _globalNativeInitCount = 0;
-    private static readonly object _globalInitLock = new();
 
     private static class FactoryState
     {
@@ -40,22 +39,11 @@ public sealed class ZVecFactory : IZvecFactory
     }
 
     /// <summary>Returns <c>true</c> if the factory has been successfully initialized.</summary>
-    public bool IsInitialized
-    {
-        get
-        {
-            lock (_globalInitLock) return _state == FactoryState.Initialized;
-        }
-    }
+    public bool IsInitialized =>
+        ZVecNativeLifecycle.WithGlobalLock(() => _state == FactoryState.Initialized);
 
     /// <summary>Returns <c>true</c> if the native library is currently loaded and initialized globally.</summary>
-    internal static bool IsNativeLibraryInitialized
-    {
-        get
-        {
-            lock (_globalInitLock) return _globalNativeInitCount > 0;
-        }
-    }
+    internal static bool IsNativeLibraryInitialized => ZVecNativeLifecycle.IsNativeLibraryInitialized;
 
     // =========================================================================
     // Open collection tracking — strong references so Shutdown can close them
@@ -79,52 +67,34 @@ public sealed class ZVecFactory : IZvecFactory
     /// <inheritdoc/>
     public void Initialize(ZVecOptions? options = null)
     {
-        lock (_globalInitLock)
+        ZVecNativeLifecycle.WithGlobalLock(() =>
         {
             if (_state != FactoryState.Uninitialized)
             {
                 return; // Already initialized or shut down — no-op.
             }
 
-            // True after this factory performed zvec_initialize but before _globalNativeInitCount
-            // is incremented — must roll back on ABI / post-init failure.
-            var nativeInitOwned = false;
+            var acquired = false;
             try
             {
-                if (_globalNativeInitCount == 0)
-                {
-                    NativeLibraryResolver.EnsureLoaded();
-                    ApplyNativeConfig(options);
-                    nativeInitOwned = true;
-                }
-                else
-                {
-                    NativeLibraryResolver.EnsureLoaded();
-                }
-
-                CheckAbiVersion();
+                ZVecNativeLifecycle.Acquire(options);
+                acquired = true;
 
                 int maxNative = options?.MaxConcurrentNativeCalls
                     ?? ZVecDefaults.GlobalOptions.MaxConcurrentNativeCalls;
                 if (maxNative > 0)
                     _nativeCallGate = new SemaphoreSlim(maxNative, maxNative);
 
-                _globalNativeInitCount++;
                 _state = FactoryState.Initialized;
-                nativeInitOwned = false;
+                acquired = false;
             }
             catch
             {
-                if (nativeInitOwned)
-                {
-                    try { NativeMethods.zvec_shutdown(); }
-                    catch { /* best-effort rollback */ }
-                }
-
-                // Throw and leave state as Uninitialized
+                if (acquired)
+                    ZVecNativeLifecycle.Release();
                 throw;
             }
-        }
+        });
     }
 
     /// <inheritdoc/>
@@ -147,8 +117,9 @@ public sealed class ZVecFactory : IZvecFactory
     /// </remarks>
     public void Shutdown()
     {
-        ZVecCollection[] toClose;
-        lock (_globalInitLock)
+        ZVecCollection[]? toClose = null;
+
+        ZVecNativeLifecycle.WithGlobalLock(() =>
         {
             if (_state != FactoryState.Initialized)
             {
@@ -161,7 +132,10 @@ public sealed class ZVecFactory : IZvecFactory
             _shutdownCts.Cancel();
             toClose = OpenCollections.Values.ToArray();
             OpenCollections.Clear();
-        }
+        });
+
+        if (toClose is null)
+            return;
 
         // Dispose outside the init lock to avoid deadlocking with IsInitialized / SafeHandle guards.
         foreach (var col in toClose)
@@ -176,26 +150,14 @@ public sealed class ZVecFactory : IZvecFactory
             }
         }
 
-        lock (_globalInitLock)
+        ZVecNativeLifecycle.WithGlobalLock(() =>
         {
             if (_state != FactoryState.ShutDown)
             {
                 return;
             }
 
-            // Only shutdown the native library when the last factory is shut down.
-            _globalNativeInitCount--;
-            if (_globalNativeInitCount == 0)
-            {
-                try
-                {
-                    NativeMethods.zvec_shutdown();
-                }
-                catch (DllNotFoundException)
-                {
-                    // Native library already unloaded or resolver poisoned.
-                }
-            }
+            ZVecNativeLifecycle.Release();
 
             _nativeCallGate?.Dispose();
             _nativeCallGate = null;
@@ -203,7 +165,7 @@ public sealed class ZVecFactory : IZvecFactory
             // State goes back to Uninitialized so it can be re-initialized if needed (especially for tests)
             _shutdownCts = new CancellationTokenSource();
             _state = FactoryState.Uninitialized;
-        }
+        });
     }
 
     /// <inheritdoc/>
@@ -225,8 +187,8 @@ public sealed class ZVecFactory : IZvecFactory
         ArgumentException.ThrowIfNullOrEmpty(path);
         ArgumentNullException.ThrowIfNull(schema);
 
-        using var nativeSchema = new Internal.NativeCollectionSchemaBuilder(schema);
-        using var nativeOptions = options != null ? new Internal.NativeCollectionOptionsBuilder(options) : null;
+        using var nativeSchema = new NativeCollectionSchemaBuilder(schema);
+        using var nativeOptions = options != null ? new NativeCollectionOptionsBuilder(options) : null;
 
         var rc = NativeMethods.zvec_collection_create_and_open(
             path, nativeSchema.Handle, nativeOptions?.Handle ?? IntPtr.Zero, out IntPtr handle);
@@ -254,7 +216,7 @@ public sealed class ZVecFactory : IZvecFactory
         ThrowIfNotInitialized();
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        using var nativeOptions = options != null ? new Internal.NativeCollectionOptionsBuilder(options) : null;
+        using var nativeOptions = options != null ? new NativeCollectionOptionsBuilder(options) : null;
 
         var rc = NativeMethods.zvec_collection_open(path, nativeOptions?.Handle ?? IntPtr.Zero, out IntPtr handle);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Open));
@@ -263,7 +225,7 @@ public sealed class ZVecFactory : IZvecFactory
         ZVecCollectionSchema schema;
         try
         {
-            schema = Internal.NativeSchemaMarshaller.FromOpenCollection(handle);
+            schema = NativeSchemaMarshaller.FromOpenCollection(handle);
         }
         catch
         {
@@ -300,7 +262,7 @@ public sealed class ZVecFactory : IZvecFactory
         string requiredMinimum =
             $"{requiredMajor}.{ZVecDefaults.Version.ExpectedMinor}.{ZVecDefaults.Version.ExpectedPatch}";
 
-        if (!Interop.NativeLibraryResolver.IsLoaded)
+        if (!NativeLibraryResolver.IsLoaded)
         {
             return new ZVecNativeAbiInfo(
                 requiredMinimum,
@@ -344,25 +306,8 @@ public sealed class ZVecFactory : IZvecFactory
     // Private helpers
     // =========================================================================
 
-    private static void CheckAbiVersion()
-    {
-        if (ZVecDefaults.Version.BypassAbiCheck)
-            return;
-
-        int requiredMajor = ZVecDefaults.Version.ExpectedMajor;
-        int requiredMinor = ZVecDefaults.Version.ExpectedMinor;
-        int requiredPatch = ZVecDefaults.Version.ExpectedPatch;
-
-        bool meetsMinimum = NativeMethods.zvec_check_version(requiredMajor, requiredMinor, requiredPatch);
-        int foundMajor = NativeMethods.zvec_get_version_major();
-
-        if (!ZVecNativeAbi.IsCompatible(meetsMinimum, foundMajor, requiredMajor))
-        {
-            string found = NativeMethods.GetVersionString();
-            string minimum = $"{requiredMajor}.{requiredMinor}.{requiredPatch}";
-            throw new ZVecAbiMismatchException(minimum, requiredMajor, found);
-        }
-    }
+    /// <summary>True when <see cref="ZVecOptions.MaxConcurrentNativeCalls"/> created a throttle semaphore.</summary>
+    internal bool HasNativeCallGate => _nativeCallGate is not null;
 
     /// <summary>Acquires the optional native-call throttle (no-op when unlimited).</summary>
     internal void EnterNativeCall(CancellationToken cancellationToken = default)
@@ -370,55 +315,22 @@ public sealed class ZVecFactory : IZvecFactory
         _nativeCallGate?.Wait(cancellationToken);
     }
 
+    /// <summary>
+    /// Asynchronously acquires the optional native-call throttle (no-op when unlimited).
+    /// Honors <paramref name="cancellationToken"/> while waiting; mid-P/Invoke cancel is unaffected.
+    /// </summary>
+    internal ValueTask EnterNativeCallAsync(CancellationToken cancellationToken = default)
+    {
+        if (_nativeCallGate is null)
+            return ValueTask.CompletedTask;
+
+        return new ValueTask(_nativeCallGate.WaitAsync(cancellationToken));
+    }
+
     /// <summary>Releases the optional native-call throttle (no-op when unlimited).</summary>
     internal void ExitNativeCall()
     {
         _nativeCallGate?.Release();
-    }
-
-    private static void ApplyNativeConfig(ZVecOptions? options)
-    {
-        if (options is null)
-        {
-            // Use default native config (NULL → native uses its own defaults).
-            ZVecError.ThrowIfFailed((ZVecErrorCode)NativeMethods.zvec_initialize(IntPtr.Zero), nameof(Initialize));
-            return;
-        }
-
-        IntPtr cfg = NativeMethods.zvec_config_data_create();
-        try
-        {
-            if (options.QueryThreads > 0)
-                NativeMethods.zvec_config_data_set_query_thread_count(cfg, (uint)options.QueryThreads);
-
-            if (options.MemoryLimitMb.HasValue)
-                NativeMethods.zvec_config_data_set_memory_limit(cfg, (ulong)options.MemoryLimitMb.Value * 1024 * 1024);
-
-            IntPtr logCfg = options.LogType == ZVecLogType.File
-                ? NativeMethods.zvec_config_log_create_file(
-                    (int)options.LogLevel,
-                    options.LogDir ?? "./logs",
-                    options.LogBasename ?? "zvec.log",
-                    options.LogFileSizeMb,
-                    options.LogOverdueDays)
-                : NativeMethods.zvec_config_log_create_console((int)options.LogLevel);
-
-            try
-            {
-                NativeMethods.zvec_config_data_set_log_config(cfg, logCfg);
-                ZVecError.ThrowIfFailed(
-                    (ZVecErrorCode)NativeMethods.zvec_initialize(cfg),
-                    nameof(Initialize));
-            }
-            finally
-            {
-                NativeMethods.zvec_config_log_destroy(logCfg);
-            }
-        }
-        finally
-        {
-            NativeMethods.zvec_config_data_destroy(cfg);
-        }
     }
 
     private void TrackCollection(ZVecCollection col, nint handle)

@@ -291,6 +291,42 @@ public class ConcurrencyGateTests : IClassFixture<ZVecRealNativeFixture>, IDispo
         }, TimeSpan.FromSeconds(30), testCt);
     }
 
+    [Fact]
+    public async Task InsertAsync_CancelWhileWaitingOnSaturatedGate_ThrowsPromptly()
+    {
+        Setup(options: new ZVecOptions { MaxConcurrentNativeCalls = 1 });
+        _collection.Should().NotBeNull();
+        var factory = (ZVecFactory)_factory!;
+
+        var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+        var doc = ZVecDoc.Create("cancel_wait",
+            denseVectors: new Dictionary<string, ReadOnlyMemory<float>> { ["embedding"] = vector });
+
+        // Hold the single native-call slot so InsertAsync must WaitAsync.
+        factory.EnterNativeCall();
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            var insertTask = _collection!.InsertAsync(doc, cts.Token).AsTask();
+
+            // Allow the async path to reach WaitAsync on the saturated gate.
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+            insertTask.IsCompleted.Should().BeFalse("InsertAsync should be waiting on the saturated gate");
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            cts.Cancel();
+
+            var act = async () => await insertTask.WaitAsync(TestContext.Current.CancellationToken);
+            await act.Should().ThrowAsync<OperationCanceledException>();
+            sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2),
+                "cancel while waiting on WaitAsync should complete promptly");
+        }
+        finally
+        {
+            factory.ExitNativeCall();
+        }
+    }
+
     public void Dispose()
     {
         _collection?.Dispose();

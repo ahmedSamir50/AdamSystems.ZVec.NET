@@ -354,17 +354,19 @@ var filter = ZVecFilterBuilder.Create()
 
 ### Sync + Async
 
-Every mutating/querying operation exposes both sync and async variants. Async methods are **cancellation-aware wrappers** around synchronous native P/Invoke (they complete on the caller thread — not a thread-pool offload).
+Every mutating/querying operation exposes both sync and async variants. Async methods are **cancellation-aware wrappers** around synchronous native P/Invoke (they complete on the caller thread — not a thread-pool offload). When optional throttles are enabled (`MaxConcurrentNativeCalls` / `MaxConcurrentReads` &gt; 0), async paths await the gate with `WaitAsync` (cancelable); after the gate is acquired, P/Invoke still runs synchronously on the continuation thread.
 
 ```csharp
 // Sync (lowest latency — P/Invoke on caller thread)
 var results = col.Query(query, topk: 10);
 
-// Async (ValueTask; completes synchronously after the native call)
+// Async (ValueTask; completes synchronously after the native call unless waiting on an opt-in gate)
 var results = await col.QueryAsync(query, topk: 10, cancellationToken: ct);
 ```
 
-Pass `includeVector: false` when you do not need result embeddings (lower latency and GC alloc). Default remains `true` for backward compatibility. Queries that set `ZVecQuery.DocumentId` perform an extra `Fetch` (with vectors) before search.
+**ASP.NET Core guidance:** For heavy batch insert/optimize workloads, prefer the **sync** APIs on a dedicated worker (`BackgroundService`, channel consumer, or your own bounded queue) rather than unbounded `Task.Run` per request. Use `MaxConcurrentNativeCalls` only when you must **bound** how many threads may block in P/Invoke at once (`0` = unlimited). Do not wrap every SDK call in `Task.Run` inside the library or app — that can worsen thread-pool starvation.
+
+Pass `includeVector: false` when you do not need result embeddings (lower latency and GC alloc). Default remains `true` for backward compatibility. Queries that set `ZVecQuery.DocumentId` use a **query-by-id** convenience: an extra managed `Fetch` (with vectors) loads that document’s embedding, then a normal search runs. Search results already include document IDs from native — this is not a missing result-ID gap.
 
 ---
 

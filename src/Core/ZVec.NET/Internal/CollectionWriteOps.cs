@@ -34,11 +34,39 @@ internal sealed class CollectionWriteOps
         return ExecuteDocWrite(docs, DocWriteKind.Insert);
     }
 
+    public ValueTask<ZVecStatus> InsertAsync(ZVecDoc doc, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(doc);
+        ct.ThrowIfCancellationRequested();
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+            return new ValueTask<ZVecStatus>(Insert(doc));
+        return ExecuteDocWriteAsync([doc], DocWriteKind.Insert, ct);
+    }
+
     public IReadOnlyList<ZVecWriteResult> InsertWithResults(ReadOnlySpan<ZVecDoc> docs)
     {
         _ctx.ThrowIfDisposed();
         if (docs.IsEmpty) return [];
         return ExecuteDocWriteWithResults(docs, DocWriteKind.InsertWithResults);
+    }
+
+    public ValueTask<IReadOnlyList<ZVecWriteResult>> InsertWithResultsAsync(
+        IReadOnlyList<ZVecDoc> docs,
+        CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(docs);
+        ct.ThrowIfCancellationRequested();
+        if (docs.Count == 0) return new ValueTask<IReadOnlyList<ZVecWriteResult>>([]);
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            if (docs is ZVecDoc[] arr) return new ValueTask<IReadOnlyList<ZVecWriteResult>>(InsertWithResults(arr));
+            return new ValueTask<IReadOnlyList<ZVecWriteResult>>(InsertWithResults(docs.ToArray()));
+        }
+
+        var copy = docs is ZVecDoc[] a ? a : docs.ToArray();
+        return ExecuteDocWriteWithResultsAsync(copy, DocWriteKind.InsertWithResults, ct);
     }
 
     public ZVecStatus Update(ZVecDoc doc)
@@ -53,6 +81,32 @@ internal sealed class CollectionWriteOps
         _ctx.ThrowIfDisposed();
         if (docs.IsEmpty) return new ZVecStatus { Code = ZVecErrorCode.Ok };
         return ExecuteDocWrite(docs, DocWriteKind.Update);
+    }
+
+    public ValueTask<ZVecStatus> UpdateAsync(ZVecDoc doc, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(doc);
+        ct.ThrowIfCancellationRequested();
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+            return new ValueTask<ZVecStatus>(Update(doc));
+        return ExecuteDocWriteAsync([doc], DocWriteKind.Update, ct);
+    }
+
+    public ValueTask<ZVecStatus> UpdateAsync(IReadOnlyList<ZVecDoc> docs, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(docs);
+        ct.ThrowIfCancellationRequested();
+        if (docs.Count == 0) return new ValueTask<ZVecStatus>(new ZVecStatus { Code = ZVecErrorCode.Ok });
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            if (docs is ZVecDoc[] arr) return new ValueTask<ZVecStatus>(Update(arr));
+            return new ValueTask<ZVecStatus>(Update(docs.ToArray()));
+        }
+
+        var copy = docs is ZVecDoc[] a ? a : docs.ToArray();
+        return ExecuteDocWriteAsync(copy, DocWriteKind.Update, ct);
     }
 
     public IReadOnlyList<ZVecWriteResult> UpdateWithResults(ReadOnlySpan<ZVecDoc> docs)
@@ -74,6 +128,32 @@ internal sealed class CollectionWriteOps
         _ctx.ThrowIfDisposed();
         if (docs.IsEmpty) return new ZVecStatus { Code = ZVecErrorCode.Ok };
         return ExecuteDocWrite(docs, DocWriteKind.Upsert);
+    }
+
+    public ValueTask<ZVecStatus> UpsertAsync(ZVecDoc doc, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(doc);
+        ct.ThrowIfCancellationRequested();
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+            return new ValueTask<ZVecStatus>(Upsert(doc));
+        return ExecuteDocWriteAsync([doc], DocWriteKind.Upsert, ct);
+    }
+
+    public ValueTask<ZVecStatus> UpsertAsync(IReadOnlyList<ZVecDoc> docs, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(docs);
+        ct.ThrowIfCancellationRequested();
+        if (docs.Count == 0) return new ValueTask<ZVecStatus>(new ZVecStatus { Code = ZVecErrorCode.Ok });
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            if (docs is ZVecDoc[] arr) return new ValueTask<ZVecStatus>(Upsert(arr));
+            return new ValueTask<ZVecStatus>(Upsert(docs.ToArray()));
+        }
+
+        var copy = docs is ZVecDoc[] a ? a : docs.ToArray();
+        return ExecuteDocWriteAsync(copy, DocWriteKind.Upsert, ct);
     }
 
     public IReadOnlyList<ZVecWriteResult> UpsertWithResults(ReadOnlySpan<ZVecDoc> docs)
@@ -104,6 +184,32 @@ internal sealed class CollectionWriteOps
         {
             _ctx.Gate.ExitNativeCall();
         }
+    }
+
+    public ValueTask<ZVecStatus> DeleteAsync(string pk, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(pk);
+        ct.ThrowIfCancellationRequested();
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+            return new ValueTask<ZVecStatus>(Delete(pk));
+        return DeleteAsyncCore([pk], ct);
+    }
+
+    public ValueTask<ZVecStatus> DeleteAsync(IReadOnlyList<string> pks, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(pks);
+        ct.ThrowIfCancellationRequested();
+        if (pks.Count == 0) return new ValueTask<ZVecStatus>(new ZVecStatus { Code = ZVecErrorCode.Ok });
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            if (pks is string[] arr) return new ValueTask<ZVecStatus>(Delete(arr));
+            return new ValueTask<ZVecStatus>(Delete(pks.ToArray()));
+        }
+
+        var copy = pks is string[] a ? a : pks.ToArray();
+        return DeleteAsyncCore(copy, ct);
     }
 
     public IReadOnlyList<ZVecWriteResult> DeleteWithResults(ReadOnlySpan<string> pks)
@@ -140,11 +246,74 @@ internal sealed class CollectionWriteOps
         }
     }
 
+    public ValueTask<ZVecStatus> DeleteByFilterAsync(string filter, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(filter);
+        ct.ThrowIfCancellationRequested();
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+            return new ValueTask<ZVecStatus>(DeleteByFilter(filter));
+        return DeleteByFilterAsyncCore(filter, ct);
+    }
+
+    private async ValueTask<ZVecStatus> DeleteByFilterAsyncCore(string filter, CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var rc = NativeMethods.zvec_collection_delete_by_filter(_ctx.Handle, filter);
+            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(DeleteByFilter));
+            return new ZVecStatus { Code = (ZVecErrorCode)rc };
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+    }
+
+    private async ValueTask<ZVecStatus> DeleteAsyncCore(string[] pks, CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return DeleteCore(pks);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+    }
+
     private ZVecStatus ExecuteDocWrite(ReadOnlySpan<ZVecDoc> docs, DocWriteKind kind)
+    {
+        _ctx.Gate.EnterNativeCall();
+        try
+        {
+            return ExecuteDocWriteCore(docs, kind);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+    }
+
+    private async ValueTask<ZVecStatus> ExecuteDocWriteAsync(ZVecDoc[] docs, DocWriteKind kind, CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return ExecuteDocWriteCore(docs, kind);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+    }
+
+    private ZVecStatus ExecuteDocWriteCore(ReadOnlySpan<ZVecDoc> docs, DocWriteKind kind)
     {
         var builders = new NativeDocBuilder[docs.Length];
         nint[] ptrs = System.Buffers.ArrayPool<nint>.Shared.Rent(docs.Length);
-        _ctx.Gate.EnterNativeCall();
         try
         {
             for (int i = 0; i < docs.Length; i++)
@@ -173,15 +342,42 @@ internal sealed class CollectionWriteOps
         {
             foreach (var b in builders) b?.Dispose();
             System.Buffers.ArrayPool<nint>.Shared.Return(ptrs, clearArray: true);
-            _ctx.Gate.ExitNativeCall();
         }
     }
 
     private IReadOnlyList<ZVecWriteResult> ExecuteDocWriteWithResults(ReadOnlySpan<ZVecDoc> docs, DocWriteKind kind)
     {
+        _ctx.Gate.EnterNativeCall();
+        try
+        {
+            return ExecuteDocWriteWithResultsCore(docs, kind);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+    }
+
+    private async ValueTask<IReadOnlyList<ZVecWriteResult>> ExecuteDocWriteWithResultsAsync(
+        ZVecDoc[] docs,
+        DocWriteKind kind,
+        CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return ExecuteDocWriteWithResultsCore(docs, kind);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+    }
+
+    private IReadOnlyList<ZVecWriteResult> ExecuteDocWriteWithResultsCore(ReadOnlySpan<ZVecDoc> docs, DocWriteKind kind)
+    {
         var builders = new NativeDocBuilder[docs.Length];
         nint[] ptrs = System.Buffers.ArrayPool<nint>.Shared.Rent(docs.Length);
-        _ctx.Gate.EnterNativeCall();
         try
         {
             for (int i = 0; i < docs.Length; i++)
@@ -210,7 +406,6 @@ internal sealed class CollectionWriteOps
         {
             foreach (var b in builders) b?.Dispose();
             System.Buffers.ArrayPool<nint>.Shared.Return(ptrs, clearArray: true);
-            _ctx.Gate.ExitNativeCall();
         }
     }
 

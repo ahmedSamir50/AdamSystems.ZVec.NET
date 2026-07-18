@@ -40,7 +40,7 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 |---|------|---------------|
 | G1 | **Idiomatic C# API** | Sync + async entry points; .NET naming guidelines; `ValueTask` for async; `IAsyncEnumerable` for streaming where useful |
 | G2 | **Zero-allocation vector pipeline** | `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` on vector hot paths; no `float[]` copies. Scalar `Fields` may box (documented) |
-| G3 | **Sub-millisecond overhead** | Sync P/Invoke marshalling overhead < 50 µs on a 768-dim vector query (verified by BenchmarkDotNet); async path uses bounded offload |
+| G3 | **Sub-millisecond overhead** | Sync P/Invoke marshalling overhead < 50 µs on a 768-dim vector query (verified by BenchmarkDotNet); async APIs are cancellation-aware sync wrappers (no thread-pool offload) |
 | G4 | **Cross-platform single NuGet** | One `.nupkg` (`ZVec.NET`) with native binaries for win/linux/osx × x64/arm64 **plus** Android / iOS / Mac Catalyst when CI builds succeed |
 | G5 | **Edge-ready / MAUI-compatible** | Memory-mapped I/O exposed; resource governance knobs exposed; no server dependency; MAUI sample wires natives for Windows/Android/iOS/MacCatalyst |
 | G6 | **Full in-process DB / C++ wrap** | 100% of the **Vector Database** API that `zvec_c_api` / C++ exposes, with managed shapes aligned to Python/Node **DB** docs in [llms-full](https://zvec.org/llms-full.txt) (collections, schema, CRUD, query modes, indexes, schema evolution, config). **Not** 100% of AI Integration packages (embeddings, MCP, skills, model rerankers) |
@@ -80,7 +80,7 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 | Docs audit source | Fresh snapshot [`docs/llms-full.txt`](docs/llms-full.txt) | Re-audit when upstream docs change |
 | LINQ | On results only; typed expression filters → native filter strings | No custom `IQueryable` provider; `ZVecFilterBuilder` remains for dynamic filters |
 | Typed ODM (E23) | `ZVec.NET.Mapping` + `IZvecCollection<T>` + `AddZVecCollection<T>` | One mapper/expression engine; E24 = future separate `ZVec.NET.VectorData` package |
-| Public API shape | **Sync + async** entry points | Sync = lowest latency after RW lock; async = bounded offload for ASP.NET |
+| Public API shape | **Sync + async** entry points | Sync = lowest-latency P/Invoke on caller thread; async = cancellation-aware `ValueTask` wrappers (same thread; no offload). Bounded offload is a future optional epic only if ASP.NET hosting benchmarks prove need |
 | Concurrency gates | Interlocked for lifecycle state; native C++ owns operation-level thread safety | No managed-side RW lock — `Interlocked.CompareExchange`/`Exchange` for factory/collection state transitions; native `std::atomic` for its own global config. The planned `AsyncReaderWriterLock` was canceled (redundant with native guarantees, correctness concerns) |
 | Native version gate | Prefer `zvec_check_version` / int major/minor/patch; string version is diagnostics only | Fail fast on ABI mismatch; never free static version string |
 | Close vs Destroy | `Dispose`/`ReleaseHandle` → `close` only; `Destroy` → `destroy` then `close` | Close releases handle (data on disk); Destroy permanently deletes collection |
@@ -659,7 +659,7 @@ internal static class VectorMarshaller
 
 > **Primary surface is DI + interfaces** under namespace **`ZVec.NET`**. All consumer imports use this root (plus `.DependencyInjection` / `.Query`). A thin static façade (scripting/console) may be added later; it must not be the only entry point.
 >
-> **Sync + async:** Every mutating/querying operation exposes both. Sync calls acquire the RW lock and invoke P/Invoke on the caller thread. Async acquires the same lock, then runs P/Invoke via **bounded** offload (never unbounded `Task.Run`).
+> **Sync + async:** Every mutating/querying operation exposes both. Sync invokes P/Invoke on the caller thread (lowest latency). Async APIs are **cancellation-aware sync wrappers** (`ValueTask`) — they complete on the caller thread after the native call; they are **not** thread-pool offloads. Never add unbounded `Task.Run` around native calls (worsens ASP.NET thread-pool starvation). When optional gates are enabled (`MaxConcurrentNativeCalls` / `MaxConcurrentReads` &gt; 0), async paths await `SemaphoreSlim.WaitAsync` (gate wait only); mid-P/Invoke cancel remains best-effort. Bounded offload is a **future optional epic**, not the shipped model.
 
 ### 7.1 Factory — `IZvecFactory`
 
@@ -720,7 +720,7 @@ services.AddZVec(options =>
     options.LogType = ZVecLogType.Console;
     options.LogLevel = ZVecLogLevel.Warn;
     options.QueryThreads = -1;
-    options.MaxConcurrentNativeCalls = 0;      // 0 = auto (e.g. ProcessorCount * 2)
+    options.MaxConcurrentNativeCalls = 0;      // 0 = unlimited (no SemaphoreSlim)
     options.MemoryLimitMb = 512;               // global — maps to zvec_config_data_set_memory_limit
 });
 
@@ -729,7 +729,7 @@ services.AddZVecCollection<Product>(options =>
 {
     options.Path = path;
     options.EnableMmap = true;
-    options.MaxConcurrentReads = Environment.ProcessorCount;
+    options.MaxConcurrentReads = 0;            // 0 = unlimited; set > 0 only to throttle reads
 });
 
 // Advanced — dynamic / string-keyed (explicit schema)
@@ -738,7 +738,7 @@ services.AddZVecCollection("products", options =>
     options.Path = path;
     options.Schema = schema;
     options.EnableMmap = true;
-    options.MaxConcurrentReads = Environment.ProcessorCount;
+    options.MaxConcurrentReads = 0;            // 0 = unlimited
 });
 ```
 
@@ -1174,14 +1174,15 @@ model — **no custom managed-side RW lock** — because:
        └──────────┬──────────┘
                   ▼
 ┌──────────────────────────────────────┐
-│  Process-wide MaxConcurrentNative    │  ← caps threads blocked in P/Invoke
+│  Optional MaxConcurrentNativeCalls   │  ← per-factory SemaphoreSlim when > 0
+│  + optional MaxConcurrentReads       │  ← per-collection; 0 = unlimited
 └──────────────┬───────────────────────┘
                │
                ▼
 ┌──────────────────────────────────────┐
 │  Sync: P/Invoke on caller thread     │
-│  Async: bounded offload after call   │  ← ConfigureAwait(false) in library
-│  → zvec_c_api                        │
+│  Async: same P/Invoke after gate     │  ← WaitAsync when gates enabled;
+│  → zvec_c_api                        │     else sync-completing ValueTask
 └──────────────┬───────────────────────┘
                │
                ▼
@@ -1196,13 +1197,13 @@ model — **no custom managed-side RW lock** — because:
 
 1. **No managed-side RW lock** — The native C++ engine handles concurrent reads and exclusive writes internally. Managed code uses `Interlocked` for lifecycle state transitions only.
 2. **Sync path** — P/Invoke on caller thread. Lowest latency (console, batch jobs, MAUI background).
-3. **Async path** — Bounded offload for blocking P/Invoke. Never unbounded `Task.Run` per request.
-4. **Global throttle** — `MaxConcurrentNativeCalls` protects ASP.NET thread pools (`0` = auto).
+3. **Async path** — Cancellation-aware sync wrappers (`ValueTask`). When optional gates are enabled, await `WaitAsync` for the gate only; then P/Invoke still runs on the continuation thread. Never unbounded `Task.Run` per request (worsens ASP.NET thread-pool starvation for sync native I/O). Bounded offload is deferred as a future optional epic.
+4. **Optional throttle** — `MaxConcurrentNativeCalls` (per factory) and `MaxConcurrentReads` (per collection) use `SemaphoreSlim` when &gt; 0; **`0` = unlimited**.
 5. **Native query threads** — `ZVecOptions.QueryThreads` is orthogonal (intra-query parallelism).
 6. **Dispose/Destroy safety** — `Interlocked.Exchange` on `_disposed`/`_destroyed` flags ensures lifecycle operations run exactly once, even under concurrent calls.
 8. **Batch over chatty P/Invoke** — Prefer list overloads.
 9. **Zero-copy vectors** — Pin only for the native call duration.
-10. **Cancellation** — Honored while waiting on the lock and before entering native. Mid-P/Invoke cancel is best-effort — document that limitation.
+10. **Cancellation** — Honored while waiting on optional gates (`WaitAsync` + linked operation/shutdown tokens) and before entering native. Mid-P/Invoke cancel is best-effort — document that limitation.
 
 ### 8.5 Memory Governance for Edge
 
@@ -1227,7 +1228,7 @@ public sealed class ZVecCollectionOptions
 {
     public bool ReadOnly { get; init; } = false;
     public bool EnableMmap { get; init; } = true;
-    public int MaxConcurrentReads { get; init; } = 0;        // 0 = ProcessorCount
+    public int MaxConcurrentReads { get; init; } = 0;        // 0 = unlimited
 }
 ```
 

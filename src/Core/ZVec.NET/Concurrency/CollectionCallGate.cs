@@ -20,6 +20,17 @@ internal sealed class CollectionCallGate
         _readGate = readGate;
     }
 
+    /// <summary>
+    /// True when an async path must <see cref="EnterNativeCallAsync"/> (factory throttle enabled).
+    /// When false, sync enter is a no-op and async wrappers may call sync ops without allocation.
+    /// </summary>
+    public bool NeedsAsyncWaitForNative => _factory.HasNativeCallGate;
+
+    /// <summary>
+    /// True when an async read path must <see cref="EnterReadAsync"/> (factory and/or read throttle).
+    /// </summary>
+    public bool NeedsAsyncWaitForRead => _factory.HasNativeCallGate || _readGate is not null;
+
     public void EnterNativeCall()
     {
         _factory.EnterNativeCall(_factoryShutdownToken);
@@ -28,6 +39,26 @@ internal sealed class CollectionCallGate
     public void ExitNativeCall()
     {
         _factory.ExitNativeCall();
+    }
+
+    public ValueTask EnterNativeCallAsync(CancellationToken operationToken = default)
+    {
+        if (!_factory.HasNativeCallGate)
+            return ValueTask.CompletedTask;
+
+        return EnterNativeCallAsyncCore(operationToken);
+    }
+
+    private async ValueTask EnterNativeCallAsyncCore(CancellationToken operationToken)
+    {
+        if (!operationToken.CanBeCanceled)
+        {
+            await _factory.EnterNativeCallAsync(_factoryShutdownToken).ConfigureAwait(false);
+            return;
+        }
+
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(operationToken, _factoryShutdownToken);
+        await _factory.EnterNativeCallAsync(linked.Token).ConfigureAwait(false);
     }
 
     public void EnterRead()
@@ -53,6 +84,39 @@ internal sealed class CollectionCallGate
         finally
         {
             ExitNativeCall();
+        }
+    }
+
+    public ValueTask EnterReadAsync(CancellationToken operationToken = default)
+    {
+        if (!NeedsAsyncWaitForRead)
+            return ValueTask.CompletedTask;
+
+        return EnterReadAsyncCore(operationToken);
+    }
+
+    private async ValueTask EnterReadAsyncCore(CancellationToken operationToken)
+    {
+        await EnterNativeCallAsync(operationToken).ConfigureAwait(false);
+        if (_readGate is null)
+            return;
+
+        try
+        {
+            if (!operationToken.CanBeCanceled)
+            {
+                await _readGate.WaitAsync(_factoryShutdownToken).ConfigureAwait(false);
+            }
+            else
+            {
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(operationToken, _factoryShutdownToken);
+                await _readGate.WaitAsync(linked.Token).ConfigureAwait(false);
+            }
+        }
+        catch
+        {
+            ExitNativeCall();
+            throw;
         }
     }
 

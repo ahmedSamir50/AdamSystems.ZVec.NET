@@ -17,15 +17,67 @@ internal sealed class CollectionDdlOps
         _ctx.Gate.EnterNativeCall();
         try
         {
-            using var builder = new NativeFieldSchemaBuilder(field);
-            int rc = NativeMethods.zvec_collection_add_column(_ctx.Handle, builder.Handle, defaultExpression ?? string.Empty);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddColumn));
+            AddColumnCore(field, defaultExpression);
         }
         finally
         {
             _ctx.Gate.ExitNativeCall();
         }
 
+        RefreshSchemaAfterAdd(field);
+    }
+
+    public ValueTask AddColumnAsync(
+        ZVecFieldSchema field,
+        string? defaultExpression = null,
+        CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(field);
+        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            try
+            {
+                AddColumn(field, defaultExpression);
+                return ValueTask.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                return ValueTask.FromException(ex);
+            }
+        }
+
+        return AddColumnAsyncCore(field, defaultExpression, ct);
+    }
+
+    private async ValueTask AddColumnAsyncCore(
+        ZVecFieldSchema field,
+        string? defaultExpression,
+        CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            AddColumnCore(field, defaultExpression);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+
+        RefreshSchemaAfterAdd(field);
+    }
+
+    private void AddColumnCore(ZVecFieldSchema field, string? defaultExpression)
+    {
+        using var builder = new NativeFieldSchemaBuilder(field);
+        int rc = NativeMethods.zvec_collection_add_column(_ctx.Handle, builder.Handle, defaultExpression ?? string.Empty);
+        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AddColumn));
+    }
+
+    private void RefreshSchemaAfterAdd(ZVecFieldSchema field)
+    {
         if (_ctx.Schema != null)
         {
             var fields = _ctx.Schema.Fields.ToList();
@@ -47,14 +99,60 @@ internal sealed class CollectionDdlOps
         _ctx.Gate.EnterNativeCall();
         try
         {
-            int rc = NativeMethods.zvec_collection_drop_column(_ctx.Handle, columnName);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(DropColumn));
+            DropColumnCore(columnName);
         }
         finally
         {
             _ctx.Gate.ExitNativeCall();
         }
 
+        RefreshSchemaAfterDrop(columnName);
+    }
+
+    public ValueTask DropColumnAsync(string columnName, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(columnName);
+        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            try
+            {
+                DropColumn(columnName);
+                return ValueTask.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                return ValueTask.FromException(ex);
+            }
+        }
+
+        return DropColumnAsyncCore(columnName, ct);
+    }
+
+    private async ValueTask DropColumnAsyncCore(string columnName, CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            DropColumnCore(columnName);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+
+        RefreshSchemaAfterDrop(columnName);
+    }
+
+    private void DropColumnCore(string columnName)
+    {
+        int rc = NativeMethods.zvec_collection_drop_column(_ctx.Handle, columnName);
+        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(DropColumn));
+    }
+
+    private void RefreshSchemaAfterDrop(string columnName)
+    {
         if (_ctx.Schema != null)
         {
             var fields = _ctx.Schema.Fields.Where(f => f.Name != columnName).ToList();
@@ -76,19 +174,73 @@ internal sealed class CollectionDdlOps
         _ctx.Gate.EnterNativeCall();
         try
         {
-            using var builder = newSchema != null ? new NativeFieldSchemaBuilder(newSchema) : null;
-            int rc = NativeMethods.zvec_collection_alter_column(
-                _ctx.Handle,
-                columnName,
-                newName,
-                builder?.Handle ?? IntPtr.Zero);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AlterColumn));
+            AlterColumnCore(columnName, newName, newSchema);
         }
         finally
         {
             _ctx.Gate.ExitNativeCall();
         }
 
+        RefreshSchemaAfterAlter(columnName, newName, newSchema);
+    }
+
+    public ValueTask AlterColumnAsync(
+        string columnName,
+        string? newName = null,
+        ZVecFieldSchema? newSchema = null,
+        CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(columnName);
+        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            try
+            {
+                AlterColumn(columnName, newName, newSchema);
+                return ValueTask.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                return ValueTask.FromException(ex);
+            }
+        }
+
+        return AlterColumnAsyncCore(columnName, newName, newSchema, ct);
+    }
+
+    private async ValueTask AlterColumnAsyncCore(
+        string columnName,
+        string? newName,
+        ZVecFieldSchema? newSchema,
+        CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            AlterColumnCore(columnName, newName, newSchema);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+
+        RefreshSchemaAfterAlter(columnName, newName, newSchema);
+    }
+
+    private void AlterColumnCore(string columnName, string? newName, ZVecFieldSchema? newSchema)
+    {
+        using var builder = newSchema != null ? new NativeFieldSchemaBuilder(newSchema) : null;
+        int rc = NativeMethods.zvec_collection_alter_column(
+            _ctx.Handle,
+            columnName,
+            newName,
+            builder?.Handle ?? IntPtr.Zero);
+        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(AlterColumn));
+    }
+
+    private void RefreshSchemaAfterAlter(string columnName, string? newName, ZVecFieldSchema? newSchema)
+    {
         if (_ctx.Schema != null)
         {
             var fields = _ctx.Schema.Fields.ToList();
@@ -122,14 +274,54 @@ internal sealed class CollectionDdlOps
         _ctx.Gate.EnterNativeCall();
         try
         {
-            using var builder = new NativeIndexParamBuilder(indexParam);
-            int rc = NativeMethods.zvec_collection_create_index(_ctx.Handle, columnName, builder.Handle);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(CreateIndex));
+            CreateIndexCore(columnName, indexParam);
         }
         finally
         {
             _ctx.Gate.ExitNativeCall();
         }
+    }
+
+    public ValueTask CreateIndexAsync(string columnName, ZVecIndexParam indexParam, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(columnName);
+        ArgumentNullException.ThrowIfNull(indexParam);
+        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            try
+            {
+                CreateIndex(columnName, indexParam);
+                return ValueTask.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                return ValueTask.FromException(ex);
+            }
+        }
+
+        return CreateIndexAsyncCore(columnName, indexParam, ct);
+    }
+
+    private async ValueTask CreateIndexAsyncCore(string columnName, ZVecIndexParam indexParam, CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            CreateIndexCore(columnName, indexParam);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+    }
+
+    private void CreateIndexCore(string columnName, ZVecIndexParam indexParam)
+    {
+        using var builder = new NativeIndexParamBuilder(indexParam);
+        int rc = NativeMethods.zvec_collection_create_index(_ctx.Handle, columnName, builder.Handle);
+        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(CreateIndex));
     }
 
     public void DropIndex(string columnName)
@@ -140,13 +332,52 @@ internal sealed class CollectionDdlOps
         _ctx.Gate.EnterNativeCall();
         try
         {
-            int rc = NativeMethods.zvec_collection_drop_index(_ctx.Handle, columnName);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(DropIndex));
+            DropIndexCore(columnName);
         }
         finally
         {
             _ctx.Gate.ExitNativeCall();
         }
+    }
+
+    public ValueTask DropIndexAsync(string columnName, CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(columnName);
+        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            try
+            {
+                DropIndex(columnName);
+                return ValueTask.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                return ValueTask.FromException(ex);
+            }
+        }
+
+        return DropIndexAsyncCore(columnName, ct);
+    }
+
+    private async ValueTask DropIndexAsyncCore(string columnName, CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            DropIndexCore(columnName);
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+    }
+
+    private void DropIndexCore(string columnName)
+    {
+        int rc = NativeMethods.zvec_collection_drop_index(_ctx.Handle, columnName);
+        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(DropIndex));
     }
 
     public void Optimize()
@@ -156,12 +387,50 @@ internal sealed class CollectionDdlOps
         _ctx.Gate.EnterNativeCall();
         try
         {
-            int rc = NativeMethods.zvec_collection_optimize(_ctx.Handle);
-            ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Optimize));
+            OptimizeCore();
         }
         finally
         {
             _ctx.Gate.ExitNativeCall();
         }
+    }
+
+    public ValueTask OptimizeAsync(CancellationToken ct = default)
+    {
+        _ctx.ThrowIfDisposed();
+        if (ct.IsCancellationRequested) return ValueTask.FromCanceled(ct);
+        if (!_ctx.Gate.NeedsAsyncWaitForNative)
+        {
+            try
+            {
+                Optimize();
+                return ValueTask.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                return ValueTask.FromException(ex);
+            }
+        }
+
+        return OptimizeAsyncCore(ct);
+    }
+
+    private async ValueTask OptimizeAsyncCore(CancellationToken ct)
+    {
+        await _ctx.Gate.EnterNativeCallAsync(ct).ConfigureAwait(false);
+        try
+        {
+            OptimizeCore();
+        }
+        finally
+        {
+            _ctx.Gate.ExitNativeCall();
+        }
+    }
+
+    private void OptimizeCore()
+    {
+        int rc = NativeMethods.zvec_collection_optimize(_ctx.Handle);
+        ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Optimize));
     }
 }
