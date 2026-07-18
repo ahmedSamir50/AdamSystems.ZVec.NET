@@ -402,12 +402,20 @@ public class NativeCallerCoverageIntegrationTests : IClassFixture<ZVecRealNative
             ]
         };
 
-        using var col = _factory.CreateAndOpen(path, schema);
-        col.Insert(ZVecDoc.Create("d1",
-            denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
-            {
-                ["embedding"] = new float[] { 0.1f, 0.2f, 0.3f, 0.4f }
-            })).IsSuccess.Should().BeTrue();
+        try
+        {
+            using var col = _factory.CreateAndOpen(path, schema);
+            col.Insert(ZVecDoc.Create("d1",
+                denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
+                {
+                    ["embedding"] = new float[] { 0.1f, 0.2f, 0.3f, 0.4f }
+                })).IsSuccess.Should().BeTrue();
+        }
+        catch (ZVecNativeException ex) when (ex.ErrorCode == ZVecErrorCode.NotSupported)
+        {
+            // Upstream DiskANN may refuse some hosts even on Linux (e.g. missing libaio / runtime init).
+            Assert.Skip($"DiskANN not usable on this host: {ex.NativeErrorMessage}");
+        }
     }
 
     [Fact]
