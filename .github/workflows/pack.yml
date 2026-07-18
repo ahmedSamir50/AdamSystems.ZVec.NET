@@ -80,6 +80,9 @@ jobs:
         run: |
           dotnet pack src/Core/ZVec.NET/ZVec.NET.csproj -c Release -o artifacts/nuget
           ls -la artifacts/nuget
+          NUPKG=$(ls artifacts/nuget/ZVec.NET.*.nupkg | head -n1)
+          echo "=== nupkg runtimes ==="
+          python -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); print('\n'.join(n for n in z.namelist() if '/native/' in n))" "$NUPKG"
 
       - name: Assert snupkg + size note
         shell: bash
@@ -135,7 +138,6 @@ jobs:
 
       - name: Download native for smoke RID
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: zvec-native-${{ matrix.rid }}
           path: _rid_native
@@ -144,5 +146,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Normalize CRLF if a checkout ever reintroduces it (Windows runners).
+          sed -i 's/\r$//' build/ci/validate-consumer.sh 2>/dev/null || \
+            sed -i.bak 's/\r$//' build/ci/validate-consumer.sh
           chmod +x build/ci/validate-consumer.sh || true
+          ls -la _rid_native || true
           bash build/ci/validate-consumer.sh "${{ matrix.rid }}" artifacts/nuget _rid_native

@@ -30,7 +30,7 @@
 
   <ItemGroup>
     <None Include="..\..\..\README.md" Pack="true" PackagePath="\" />
-    <None Include="runtimes\**\*" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes" />
+    <None Include="runtimes\**\*" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\" />
   </ItemGroup>
 
   <ItemGroup>
