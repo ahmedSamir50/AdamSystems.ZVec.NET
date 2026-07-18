@@ -6,6 +6,11 @@ namespace ZVec.NET.Samples.Shared.Data;
 /// <summary>Loads committed T0 fixtures (no download).</summary>
 public static class FixtureLoader
 {
+    private static readonly JsonSerializerOptions FixtureJson = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public static IReadOnlyList<TextSource> LoadRagFixtures()
     {
         var dir = Path.Combine(SamplePaths.FixturesRoot, "rag");
@@ -55,9 +60,13 @@ public static class FixtureLoader
         var path = Path.Combine(SamplePaths.FixturesRoot, "search", "questions.json");
         if (File.Exists(path))
         {
-            var items = JsonSerializer.Deserialize<List<FixtureQuestion>>(File.ReadAllText(path)) ?? [];
-            if (items.Count > 0)
-                return items.Select(q => new TextSource(q.Id, q.Text, q.Text, "fixture:search", "fixture")).ToArray();
+            var items = JsonSerializer.Deserialize<List<FixtureQuestion>>(File.ReadAllText(path), FixtureJson) ?? [];
+            var valid = items
+                .Where(q => !string.IsNullOrWhiteSpace(q.Id) && !string.IsNullOrWhiteSpace(q.Text))
+                .Select(q => new TextSource(q.Id.Trim(), q.Text.Trim(), q.Text.Trim(), "fixture:search", "fixture"))
+                .ToArray();
+            if (valid.Length > 0)
+                return valid;
         }
 
         return BuiltInSearchFixtures();
@@ -77,17 +86,19 @@ public static class FixtureLoader
         var path = Path.Combine(SamplePaths.FixturesRoot, "recommend", "items.json");
         if (File.Exists(path))
         {
-            var items = JsonSerializer.Deserialize<List<FixtureItem>>(File.ReadAllText(path)) ?? [];
-            if (items.Count > 0)
-            {
-                return items.Select(i => new RecommendItem
+            var items = JsonSerializer.Deserialize<List<FixtureItem>>(File.ReadAllText(path), FixtureJson) ?? [];
+            var valid = items
+                .Where(i => !string.IsNullOrWhiteSpace(i.Id) && !string.IsNullOrWhiteSpace(i.Title))
+                .Select(i => new RecommendItem
                 {
-                    Id = i.Id,
-                    Title = i.Title,
-                    Category = i.Category,
-                    Description = i.Description
-                }).ToArray();
-            }
+                    Id = i.Id.Trim(),
+                    Title = i.Title.Trim(),
+                    Category = i.Category?.Trim() ?? "",
+                    Description = i.Description?.Trim() ?? ""
+                })
+                .ToArray();
+            if (valid.Length > 0)
+                return valid;
         }
 
         return BuiltInRecommendFixtures();

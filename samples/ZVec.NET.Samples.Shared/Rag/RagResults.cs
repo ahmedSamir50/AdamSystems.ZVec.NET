@@ -1,8 +1,14 @@
-using ZVec.NET.Samples.Shared.Models;
-
 namespace ZVec.NET.Samples.Shared.Rag;
 
-public sealed record RagCitation(string Id, string Title, string Source, string Snippet, float Score);
+/// <param name="Snippet">Short preview for UI (~240 chars).</param>
+/// <param name="ContextText">Full chunk text for LLM context (may be capped).</param>
+public sealed record RagCitation(
+    string Id,
+    string Title,
+    string Source,
+    string Snippet,
+    string ContextText,
+    float Score);
 
 public sealed record RagAskResult(string Answer, IReadOnlyList<RagCitation> Citations, bool UsedChat);
 

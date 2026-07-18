@@ -5,6 +5,9 @@ namespace ZVec.NET.Samples.Shared.Rag;
 
 public sealed class RagQueryService
 {
+    private const int UiSnippetChars = 240;
+    private const int LlmContextChars = 1500;
+
     private readonly IZvecCollection<RagDocument> _collection;
     private readonly IEmbeddingClient _embeddings;
 
@@ -29,12 +32,17 @@ public sealed class RagQueryService
             includeVector: false,
             ct).ConfigureAwait(false);
 
-        return hits.Select(h => new RagCitation(
-            h.Record.Id,
-            h.Record.Title,
-            h.Record.Source,
-            Truncate(h.Record.ChunkText, 240),
-            h.Score)).ToArray();
+        return hits.Select(h =>
+        {
+            var full = h.Record.ChunkText ?? "";
+            return new RagCitation(
+                h.Record.Id,
+                h.Record.Title,
+                h.Record.Source,
+                Truncate(full, UiSnippetChars),
+                Truncate(full, LlmContextChars),
+                h.Score);
+        }).ToArray();
     }
 
     private static string Truncate(string text, int max)

@@ -20,5 +20,5 @@ public static class DatasetDownloadUrls
     /// never keep a GB-scale extract.
     /// </summary>
     public const string AmazonBeautyMetaJsonlGz =
-        "https://datarepo.eng.ucsd.edu/mcauley_group/data/amazon_2023/raw/meta_categories/meta_All_Beauty.jsonl.gz";
+        "https://mcauleylab.ucsd.edu/public_datasets/data/amazon_2023/raw/meta_categories/meta_All_Beauty.jsonl.gz";
 }

@@ -34,7 +34,7 @@ T1 packs are **not committed**. Console / AspNet / Maui call `SampleDatasetBoots
 | NFCorpus | `https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/nfcorpus.zip` | ~2.4 MB |
 | MovieLens small | `https://files.grouplens.org/datasets/movielens/ml-latest-small.zip` | ~1 MB |
 | Quora QQP | Hugging Face `aisuko/quora_duplicate_questions` TSV | ~58 MB |
-| Amazon Beauty | UCSD Amazon Reviews 2023 All_Beauty meta (stream → capped JSONL ≤25k / ≤100 MB) | capped |
+| Amazon Beauty | `https://mcauleylab.ucsd.edu/public_datasets/data/amazon_2023/raw/meta_categories/meta_All_Beauty.jsonl.gz` (stream → capped JSONL ≤25k / ≤100 MB) | capped |
 
 Unpacked under `cache/fiqa/`, `cache/nfcorpus/`, `cache/movielens-small/`, `cache/quora/`, `cache/amazon-beauty/`.
 

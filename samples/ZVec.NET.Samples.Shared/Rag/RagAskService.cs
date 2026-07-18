@@ -15,6 +15,12 @@ public sealed class RagAskService
         _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
+    public Task<IReadOnlyList<RagCitation>> RetrieveAsync(
+        string question,
+        int topK = SampleDefaults.DefaultTopK,
+        CancellationToken ct = default)
+        => _query.QueryAsync(question, topK, ct);
+
     public async Task<RagAskResult> AskAsync(
         string question,
         int topK = SampleDefaults.DefaultTopK,
@@ -29,17 +35,7 @@ public sealed class RagAskService
                 UsedChat: false);
         }
 
-        var context = string.Join(
-            "\n\n",
-            citations.Select((c, i) => $"[{i + 1}] ({c.Title} / {c.Source})\n{c.Snippet}"));
-
-        var system = """
-            You are a helpful assistant for an offline edge RAG demo using ZVec.NET.
-            Answer using only the provided context. If the context is insufficient, say so.
-            Cite sources like [1], [2] when you use them.
-            """;
-
-        var user = $"Context:\n{context}\n\nQuestion: {question}";
+        var (system, user) = BuildPrompts(question, citations);
 
         try
         {
@@ -54,5 +50,49 @@ public sealed class RagAskService
                 string.Join("\n", citations.Select((c, i) => $"[{i + 1}] {c.Title}: {c.Snippet}"));
             return new RagAskResult(fallback, citations, UsedChat: false);
         }
+    }
+
+    /// <summary>Stream answer tokens after retrieve (caller should call <see cref="RetrieveAsync"/> first for citations).</summary>
+    public IAsyncEnumerable<string> StreamAnswerAsync(
+        string question,
+        IReadOnlyList<RagCitation> citations,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(citations);
+        var (system, user) = BuildPrompts(question, citations);
+        return _chat.StreamAsync(system, user, ct);
+    }
+
+    /// <summary>Retrieve then stream (re-queries; prefer Retrieve + StreamAnswer for UI).</summary>
+    public async IAsyncEnumerable<string> AskStreamAsync(
+        string question,
+        int topK = SampleDefaults.DefaultTopK,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var citations = await _query.QueryAsync(question, topK, ct).ConfigureAwait(false);
+        if (citations.Count == 0)
+        {
+            yield return "No matching chunks were found. Ingest documents first.";
+            yield break;
+        }
+
+        await foreach (var token in StreamAnswerAsync(question, citations, ct).ConfigureAwait(false))
+            yield return token;
+    }
+
+    internal static (string System, string User) BuildPrompts(string question, IReadOnlyList<RagCitation> citations)
+    {
+        var context = string.Join(
+            "\n\n",
+            citations.Select((c, i) => $"[{i + 1}] ({c.Title} / {c.Source})\n{c.ContextText}"));
+
+        var system = """
+            You are a helpful assistant for an offline edge RAG demo using ZVec.NET.
+            Answer using the provided context. Prefer a concise answer and cite sources like [1], [2] when you use them.
+            Only say the context is insufficient if it truly does not contain relevant information for the question.
+            """;
+
+        var user = $"Context:\n{context}\n\nQuestion: {question}";
+        return (system, user);
     }
 }

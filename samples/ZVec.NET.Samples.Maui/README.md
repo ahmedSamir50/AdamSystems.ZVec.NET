@@ -16,4 +16,8 @@ dotnet build samples/ZVec.NET.Samples.Maui -t:Run -f net10.0-windows10.0.19041.0
 
 Collections live under `FileSystem.AppDataDirectory` with mmap and **open-or-create** (restart-safe). Errors show in-page banners / `ErrorBoundary` (not a blank WebView).
 
+RAG Ask uses **SSE streaming** from LM Studio (`chat/completions` with `stream: true`).
+
+**Note:** Seeding MovieLens may log EmbeddingGemma `tokenizer.ggml.add_eos_token` / SEP warnings in LM Studio — harmless; seed still completes. Optional silence via LM Studio/GGUF settings, not ZVec.NET.
+
 Requires .NET 10 MAUI workload and win-x64 `zvec_c_api`.
