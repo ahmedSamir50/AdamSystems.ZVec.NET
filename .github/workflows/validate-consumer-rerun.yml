@@ -1,0 +1,65 @@
+# Re-run only the Pack consumer smoke (win-x64 + linux-x64) using nupkg/native
+# artifacts from an existing Pack run. Avoids a full natives rebuild (~1h).
+name: Validate consumer (rerun)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Pack workflow run ID that uploaded nuget-packages + zvec-native-*
+        required: true
+        type: string
+        default: "29666630278"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  validate-consumer:
+    name: validate clean consumer
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Download nupkg from Pack run
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/nuget
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Download native for smoke RID
+        uses: actions/download-artifact@v4
+        with:
+          name: zvec-native-${{ matrix.rid }}
+          path: _rid_native
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Consumer smoke (restore from local feed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's/\r$//' build/ci/validate-consumer.sh 2>/dev/null || \
+            sed -i.bak 's/\r$//' build/ci/validate-consumer.sh
+          chmod +x build/ci/validate-consumer.sh || true
+          ls -la artifacts/nuget || true
+          ls -la _rid_native || true
+          bash build/ci/validate-consumer.sh "${{ matrix.rid }}" artifacts/nuget _rid_native
