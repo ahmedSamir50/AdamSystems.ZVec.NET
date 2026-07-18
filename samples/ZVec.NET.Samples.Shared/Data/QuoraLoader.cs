@@ -35,10 +35,11 @@ public static class QuoraLoader
         var header = await reader.ReadLineAsync(ct).ConfigureAwait(false);
         var sep = tsv.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) ? ',' : '\t';
 
-        while (!reader.EndOfStream && results.Count < maxUnique)
+        string? line;
+        while (results.Count < maxUnique &&
+               (line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) is not null)
         {
             ct.ThrowIfCancellationRequested();
-            var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 

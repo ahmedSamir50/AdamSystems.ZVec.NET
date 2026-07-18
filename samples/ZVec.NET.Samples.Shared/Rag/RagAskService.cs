@@ -89,6 +89,7 @@ public sealed class RagAskService
         var system = """
             You are a helpful assistant for an offline edge RAG demo using ZVec.NET.
             Answer using the provided context. Prefer a concise answer and cite sources like [1], [2] when you use them.
+            Cite each distinct source at most once in the answer; do not repeat the same citation index on every bullet.
             Only say the context is insufficient if it truly does not contain relevant information for the question.
             """;
 

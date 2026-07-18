@@ -43,18 +43,22 @@ See [datasets/README.md](datasets/README.md). T1 packs download on startup into 
 
 ## Suggested queries
 
-`DemoPromptCatalog` provides chips / numbered hints so you can try demos without knowing corpus contents. AspNet: `GET /hints`.
+`DemoPromptCatalog` provides chips / numbered hints (EN + Arabic product + Egyptian CS FAQ). AspNet: `GET /hints`.
 
 ## Notes
 
 - RAG Ask prefers **SSE streaming** (Maui UI + `POST /rag/ask/stream`).
+- Citations are **score-descending** (best first); near-duplicate chunks are deduped before chat.
+- T0 RAG: EN+AR markdown fixtures + `fixtures/rag/eg_faq_dataset.csv` (seed with `rag seed-eg-faq` / Maui button / `POST /rag/seed-eg-faq`).
+- If an old RAG collection has cloned docs from timestamp ids, delete `zvec-samples-rag` under AppData or `%TEMP%\ZVec.NET.Samples` once, then re-seed.
 - MovieLens mass-embed may show EmbeddingGemma EOS/SEP warnings in LM Studio — non-fatal.
 - Amazon Beauty downloads from `mcauleylab.ucsd.edu` (not the old `datarepo.eng.ucsd.edu` host).
 
 ## Quick smoke
 
 - [ ] `dotnet run --project samples/ZVec.NET.Samples.Console` → interactive menu → `status` → `models`
-- [ ] `rag seed-fixtures` → `ask` (pick a suggested #)
+- [ ] `rag seed-fixtures` → `ask` (EN or Arabic product chip)
+- [ ] `rag seed-eg-faq` → `ask` (Egyptian CS chip)
 - [ ] `search seed-fixtures` → `search` query
 - [ ] `recommend seed-fixtures` → `recommend` query
 - [ ] AspNet: `GET /status`, `GET /hints`, `GET /models`, seed + query POSTs

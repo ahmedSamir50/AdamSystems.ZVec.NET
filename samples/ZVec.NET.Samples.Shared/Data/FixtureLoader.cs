@@ -52,6 +52,18 @@ public static class FixtureLoader
             "Edge and offline devices",
             "ZVec is designed for local and edge deployments. MAUI Blazor Hybrid stores collections under AppData with EnableMmap. Native binaries are RID-specific until NuGet multi-RID packaging in Epic E21.",
             "builtin:edge-devices",
+            "fixture"),
+        new TextSource(
+            "zvec-overview-ar",
+            "نظرة عامة على ZVec.NET",
+            "ZVec.NET هو حزمة SDK لـ .NET مبنية فوق Alibaba ZVec، قاعدة بيانات متجهات مضمّنة. تدعم HNSW والـ ODM المكتوب بأنواع وDI عبر AddZVec. Dispose يغلق؛ Destroy يحذف من القرص. تطبيقات الحافة يمكنها استخدام AppData مع mmap لـ RAG دون اتصال.",
+            "builtin:zvec-overview-ar",
+            "fixture"),
+        new TextSource(
+            "rag-edge-ar",
+            "RAG دون اتصال على الأجهزة الطرفية",
+            "يعمل RAG بتقسيم المستندات وتضمين كل مقطع وتخزين المتجهات في ZVec ثم استرجاع أعلى النتائج. العينات تستخدم LM Studio للتضمين والمحادثة. على MAUI تُحفظ المجموعات تحت AppData مع EnableMmap.",
+            "builtin:rag-edge-ar",
             "fixture")
     ];
 

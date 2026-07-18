@@ -25,7 +25,8 @@ public sealed class RagIngestService
         string text,
         string tags = "",
         IProgress<string>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? stableId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         var chunks = _chunker.Chunk(text);
@@ -38,12 +39,17 @@ public sealed class RagIngestService
         var vectors = await _embeddings.EmbedBatchAsync(embedTexts, ct).ConfigureAwait(false);
         var docs = new List<RagDocument>(chunks.Count);
         var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var idBase = string.IsNullOrWhiteSpace(stableId) ? null : Sanitize(stableId);
 
         for (var i = 0; i < chunks.Count; i++)
         {
             docs.Add(new RagDocument
             {
-                Id = $"{Sanitize(source)}-{stamp}-{i}",
+                Id = idBase is null
+                    ? $"{Sanitize(source)}-{stamp}-{i}"
+                    : chunks.Count == 1
+                        ? idBase
+                        : $"{idBase}-{i}",
                 Title = title,
                 Source = source,
                 ChunkText = chunks[i],
@@ -63,7 +69,8 @@ public sealed class RagIngestService
         string? title = null,
         string tags = "",
         IProgress<string>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? stableId = null)
     {
         var text = await File.ReadAllTextAsync(filePath, ct).ConfigureAwait(false);
         return await IngestTextAsync(
@@ -72,12 +79,13 @@ public sealed class RagIngestService
             text,
             tags,
             progress,
-            ct).ConfigureAwait(false);
+            ct,
+            stableId ?? Path.GetFileNameWithoutExtension(filePath)).ConfigureAwait(false);
     }
 
     private static string Sanitize(string value)
     {
-        var chars = value.Select(c => char.IsLetterOrDigit(c) ? c : '_').Take(40).ToArray();
+        var chars = value.Select(c => char.IsLetterOrDigit(c) ? c : '_').Take(80).ToArray();
         return new string(chars);
     }
 }

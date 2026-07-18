@@ -33,10 +33,11 @@ public static class AmazonMetaLoader
 
         var items = new List<RecommendItem>();
         using var reader = new StreamReader(file);
-        while (!reader.EndOfStream && items.Count < maxItems)
+        string? line;
+        while (items.Count < maxItems &&
+               (line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) is not null)
         {
             ct.ThrowIfCancellationRequested();
-            var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 

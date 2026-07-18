@@ -29,10 +29,10 @@ public static class MovieLensLoader
         using var reader = new StreamReader(moviesCsv);
         _ = await reader.ReadLineAsync(ct).ConfigureAwait(false); // header
 
-        while (!reader.EndOfStream)
+        string? line;
+        while ((line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) is not null)
         {
             ct.ThrowIfCancellationRequested();
-            var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 

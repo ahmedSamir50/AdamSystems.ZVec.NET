@@ -29,7 +29,8 @@ public sealed class SearchIngestService
         string text,
         string tags = "",
         IProgress<string>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? stableId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         var chunks = _chunker.Chunk(text);
@@ -41,12 +42,17 @@ public sealed class SearchIngestService
         var vectors = await _embeddings.EmbedBatchAsync(embedTexts, ct).ConfigureAwait(false);
         var stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var docs = new List<SearchDocument>(chunks.Count);
+        var idBase = string.IsNullOrWhiteSpace(stableId) ? null : Sanitize(stableId);
 
         for (var i = 0; i < chunks.Count; i++)
         {
             docs.Add(new SearchDocument
             {
-                Id = $"{Sanitize(source)}-{stamp}-{i}",
+                Id = idBase is null
+                    ? $"{Sanitize(source)}-{stamp}-{i}"
+                    : chunks.Count == 1
+                        ? idBase
+                        : $"{idBase}-{i}",
                 Title = title,
                 Source = source,
                 ChunkText = chunks[i],
@@ -63,7 +69,7 @@ public sealed class SearchIngestService
 
     private static string Sanitize(string value)
     {
-        var chars = value.Select(c => char.IsLetterOrDigit(c) ? c : '_').Take(40).ToArray();
+        var chars = value.Select(c => char.IsLetterOrDigit(c) ? c : '_').Take(80).ToArray();
         return new string(chars);
     }
 }

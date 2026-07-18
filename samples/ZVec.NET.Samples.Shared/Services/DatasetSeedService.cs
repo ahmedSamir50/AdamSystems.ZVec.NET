@@ -27,12 +27,56 @@ public sealed class DatasetSeedService
         foreach (var fx in fixtures)
         {
             ct.ThrowIfCancellationRequested();
-            var result = await _ragIngest.IngestTextAsync(fx.Title, fx.Source, fx.Body, fx.Tags, progress, ct)
+            var result = await _ragIngest.IngestTextAsync(
+                    fx.Title,
+                    fx.Source,
+                    fx.Body,
+                    fx.Tags,
+                    progress,
+                    ct,
+                    stableId: fx.Id)
                 .ConfigureAwait(false);
             total += result.ChunkCount;
         }
 
         progress?.Report($"Seeded {total} RAG chunk(s) from {fixtures.Count} fixture(s).");
+        return total;
+    }
+
+    /// <summary>Seeds committed Egyptian Arabic FAQ CSV (2k Q&amp;A rows) with stable ids.</summary>
+    public async Task<int> SeedArabicEgFaqAsync(IProgress<string>? progress = null, CancellationToken ct = default)
+    {
+        var rows = EgFaqLoader.Load();
+        if (rows.Count == 0)
+        {
+            progress?.Report(
+                $"No Egyptian FAQ CSV found at fixtures/rag/{EgFaqLoader.FileName}. " +
+                "Run from the repo samples tree or restore the committed fixture.");
+            return 0;
+        }
+
+        var total = 0;
+        var i = 0;
+        foreach (var row in rows)
+        {
+            ct.ThrowIfCancellationRequested();
+            i++;
+            if (i % 100 == 0 || i == 1)
+                progress?.Report($"Ingesting Egyptian FAQ {i}/{rows.Count}…");
+
+            var result = await _ragIngest.IngestTextAsync(
+                    row.Title,
+                    row.Source,
+                    row.Body,
+                    row.Tags,
+                    progress: null,
+                    ct,
+                    stableId: $"eg-cs-{row.Id}")
+                .ConfigureAwait(false);
+            total += result.ChunkCount;
+        }
+
+        progress?.Report($"Seeded {total} Egyptian FAQ chunk(s) from {rows.Count} row(s).");
         return total;
     }
 
@@ -115,7 +159,14 @@ public sealed class DatasetSeedService
             if (i % 50 == 0)
                 progress?.Report($"Ingesting {tag} {i}/{sources.Count}…");
 
-            var result = await ingest.IngestTextAsync(src.Title, src.Source, src.Body, tag, progress: null, ct)
+            var result = await ingest.IngestTextAsync(
+                    src.Title,
+                    src.Source,
+                    src.Body,
+                    tag,
+                    progress: null,
+                    ct,
+                    stableId: src.Id)
                 .ConfigureAwait(false);
             total += result.ChunkCount;
         }
@@ -140,7 +191,14 @@ public sealed class DatasetSeedService
             if (i % 50 == 0)
                 progress?.Report($"Ingesting {tag} {i}/{sources.Count}…");
 
-            var result = await ingest.IngestTextAsync(src.Title, src.Source, src.Body, tag, progress: null, ct)
+            var result = await ingest.IngestTextAsync(
+                    src.Title,
+                    src.Source,
+                    src.Body,
+                    tag,
+                    progress: null,
+                    ct,
+                    stableId: src.Id)
                 .ConfigureAwait(false);
             total += result.ChunkCount;
         }

@@ -141,7 +141,7 @@ static void PrintHelp()
           status                         LM Studio + dataset + doc counts
           models                         List LM Studio models; select embed + chat
           basics                         Typed ODM vignette (no LM Studio)
-          rag seed-fixtures|seed-fiqa|ask
+          rag seed-fixtures|seed-eg-faq|seed-fiqa|ask
           search seed-fixtures|seed-nfcorpus|seed-quora|query
           recommend seed-fixtures|seed-movielens|seed-amazon|query
           ingest [--fixtures|--file path]  (legacy; same as rag seed-fixtures / file)
@@ -389,7 +389,7 @@ file sealed class SampleConsoleHost : IDisposable
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: rag seed-fixtures | seed-fiqa | ask");
+            Console.WriteLine("Usage: rag seed-fixtures | seed-eg-faq | seed-fiqa | ask");
             return;
         }
 
@@ -397,6 +397,9 @@ file sealed class SampleConsoleHost : IDisposable
         {
             case "seed-fixtures":
                 await _seed.SeedRagFixturesAsync(_progress);
+                break;
+            case "seed-eg-faq":
+                await _seed.SeedArabicEgFaqAsync(_progress);
                 break;
             case "seed-fiqa":
                 await EnsureDatasetsAsync();

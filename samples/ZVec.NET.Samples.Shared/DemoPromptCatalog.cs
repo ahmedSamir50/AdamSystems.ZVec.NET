@@ -6,7 +6,8 @@ public sealed record DemoPrompt(string Id, string Label, string Query, string Co
 public static class DemoPromptCatalog
 {
     public const string RagBlurb =
-        "T0 fixtures: ZVec.NET overview, RAG basics, edge/mmap. T1 FiQA: finance Q&A posts.";
+        "T0: EN+AR product fixtures + Egyptian CS FAQ (eg_faq_dataset.csv). T1 FiQA: finance Q&A. " +
+        "Citations are score-desc (best first) and near-duplicates are dropped before chat.";
 
     public const string SearchBlurb =
         "T0: sample ZVec/.NET questions. T1 NFCorpus: nutrition/medical abstracts. T1 Quora: question pairs.";
@@ -18,7 +19,11 @@ public static class DemoPromptCatalog
     [
         new("rag-zvec", "What is ZVec.NET?", "What is ZVec.NET?", "fixtures"),
         new("rag-offline", "Offline RAG", "How does offline RAG work on edge devices?", "fixtures"),
-        new("rag-mmap", "mmap", "What is mmap used for in ZVec samples?", "fixtures"),
+        new("rag-ar-zvec", "ما هو ZVec.NET؟", "ما هو ZVec.NET؟", "fixtures-ar"),
+        new("rag-ar-rag", "RAG دون اتصال", "كيف يعمل RAG دون اتصال على الأجهزة الطرفية؟", "fixtures-ar"),
+        new("rag-eg-order", "اوردر متأخر", "انا عملت اوردر من كام يوم ومش واصل، اعمل ايه؟", "eg-faq"),
+        new("rag-eg-fiber", "نت فاصل", "النت الفايبر عندي فاصل، ممكن تساعدوني؟", "eg-faq"),
+        new("rag-eg-warranty", "ضمان جهاز", "الثلاجة لسه في الضمان وبتعمل صوت غريب، أعمل إيه؟", "eg-faq"),
         new("rag-fiqa", "Investors / company", "How do investors evaluate a company?", "fiqa")
     ];
 

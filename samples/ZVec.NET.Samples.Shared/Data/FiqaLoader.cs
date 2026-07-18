@@ -77,12 +77,11 @@ public static class FiqaLoader
         using (stream)
         using (var reader = new StreamReader(stream))
         {
-            while (!reader.EndOfStream)
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) is not null)
             {
                 ct.ThrowIfCancellationRequested();
-                var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
-                if (line is not null)
-                    yield return line;
+                yield return line;
             }
         }
     }

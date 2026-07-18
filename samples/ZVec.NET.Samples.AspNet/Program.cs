@@ -132,6 +132,19 @@ app.MapPost("/rag/seed-fixtures", async (DatasetSeedService seed, CancellationTo
     }
 });
 
+app.MapPost("/rag/seed-eg-faq", async (DatasetSeedService seed, CancellationToken ct) =>
+{
+    try
+    {
+        var n = await seed.SeedArabicEgFaqAsync(ct: ct);
+        return Results.Ok(new { upserted = n });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
 app.MapPost("/rag/seed-fiqa", async (SeedRequest? req, DatasetSeedService seed, CancellationToken ct) =>
 {
     try

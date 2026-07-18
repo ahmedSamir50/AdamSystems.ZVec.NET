@@ -25,9 +25,11 @@
     <textarea @bind="_ingestText" rows="5" style="width:100%" placeholder="Paste text to embed…"></textarea>
     <div class="actions">
         <button class="btn btn-primary" disabled="@_busy" @onclick="IngestPasteAsync">Ingest text</button>
-        <button class="btn" disabled="@_busy" @onclick="SeedFixturesAsync">Seed T0 fixtures</button>
+        <button class="btn" disabled="@_busy" @onclick="SeedFixturesAsync">Seed T0 (EN+AR)</button>
+        <button class="btn" disabled="@_busy" @onclick="SeedEgFaqAsync">Seed Arabic EG FAQ</button>
         <button class="btn" disabled="@_busy" @onclick="SeedFiqaAsync">Seed FiQA (capped)</button>
     </div>
+    <p class="muted">If citations look duplicated from older seeds, delete the AppData <code>zvec-samples-rag</code> folder once, then re-seed.</p>
     <p>Docs: <strong>@Collection.Stats.DocCount</strong></p>
 </section>
 
@@ -91,7 +93,16 @@
         => await RunAsync(async () =>
         {
             var n = await Seed.SeedRagFixturesAsync();
-            _message = $"Seeded {n} RAG chunk(s) from fixtures.";
+            _message = $"Seeded {n} RAG chunk(s) from T0 fixtures (EN+AR).";
+        });
+
+    private async Task SeedEgFaqAsync()
+        => await RunAsync(async () =>
+        {
+            var n = await Seed.SeedArabicEgFaqAsync();
+            _message = n == 0
+                ? "Egyptian FAQ CSV not found (need samples/datasets/fixtures/rag/eg_faq_dataset.csv)."
+                : $"Seeded {n} Egyptian FAQ chunk(s).";
         });
 
     private async Task SeedFiqaAsync()
