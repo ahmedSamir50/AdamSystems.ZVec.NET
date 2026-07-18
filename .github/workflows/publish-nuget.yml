@@ -3,16 +3,22 @@ name: Publish NuGet
 # nuget.org publish is release-line only:
 # - Tags: v* whose commit is on a release/* branch (guard below).
 # - workflow_dispatch: emergency only; prefer tagging on release/* so the same guard applies.
-#   When dispatching from the UI, run it from a release/* branch ref when possible.
+#   Prefer source_run_id = a green Pack run so Publish does NOT rebuild natives (~1h).
 
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Green Pack run ID whose nuget-packages artifact to publish (skips rebuild)
+        required: false
+        type: string
 
 permissions:
   contents: read
+  actions: read
   id-token: write   # NuGet Trusted Publishing (OIDC)
 
 jobs:
@@ -43,17 +49,77 @@ jobs:
           echo "event=$EVENT_NAME ref=$REF"
           exit 1
 
-  pack:
+  resolve-pack-run:
+    name: resolve Pack artifacts
     needs: guard-release-line
+    runs-on: ubuntu-latest
+    outputs:
+      pack_run_id: ${{ steps.resolve.outputs.pack_run_id }}
+      need_pack: ${{ steps.resolve.outputs.need_pack }}
+    steps:
+      - name: Resolve source Pack run
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_RUN: ${{ inputs.source_run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_RUN:-}" ]; then
+            echo "Using workflow_dispatch source_run_id=${INPUT_RUN}"
+            echo "pack_run_id=${INPUT_RUN}" >> "$GITHUB_OUTPUT"
+            echo "need_pack=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Prefer a successful Pack NuGet run for this exact SHA (no rebuild).
+          RUN_ID="$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/pack.yml/runs?per_page=30" \
+            --jq ".workflow_runs[] | select(.head_sha==\"${SHA}\" and .conclusion==\"success\") | .id" \
+            | head -n1 || true)"
+
+          if [ -n "${RUN_ID:-}" ]; then
+            echo "Found green Pack run ${RUN_ID} for ${SHA}"
+            echo "pack_run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+            echo "need_pack=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "No green Pack run for ${SHA}; will rebuild via pack.yml"
+          echo "pack_run_id=" >> "$GITHUB_OUTPUT"
+          echo "need_pack=true" >> "$GITHUB_OUTPUT"
+
+  pack:
+    needs: resolve-pack-run
+    if: needs.resolve-pack-run.outputs.need_pack == 'true'
     uses: ./.github/workflows/pack.yml
 
   publish:
     name: push to nuget.org
-    needs: pack
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [resolve-pack-run, pack]
+    if: |
+      always() &&
+      needs.resolve-pack-run.result == 'success' &&
+      (
+        needs.resolve-pack-run.outputs.need_pack != 'true' ||
+        needs.pack.result == 'success'
+      ) &&
+      (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
-      - name: Download packages
+      - name: Download packages from Pack run
+        if: needs.resolve-pack-run.outputs.need_pack != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/nuget
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve-pack-run.outputs.pack_run_id }}
+
+      - name: Download packages from this workflow pack
+        if: needs.resolve-pack-run.outputs.need_pack == 'true'
         uses: actions/download-artifact@v4
         with:
           name: nuget-packages
@@ -63,6 +129,13 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Assert nupkg present
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la artifacts/nuget
+          test -n "$(ls artifacts/nuget/ZVec.NET.*.nupkg 2>/dev/null | head -n1)"
 
       - name: NuGet login (OIDC Trusted Publishing)
         id: login

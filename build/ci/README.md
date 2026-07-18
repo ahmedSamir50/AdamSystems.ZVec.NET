@@ -58,7 +58,7 @@ To promote an optional RID: keep the job green, set `optional: false` / drop `co
 development  → daily PRs
 main         → stable trunk (cut releases from here)
 release/1.0  → 1.0.x maintenance (hotfixes + tags)
-tag v1.0.0-beta.1  → nuget.org beta ship (Version 1.0.0-beta.1+zvec.0.5.1 in csproj)
+tag v1.0.0-beta.2  → nuget.org beta ship (Version 1.0.0-beta.2+zvec.0.5.1 in csproj; Publish reuses green Pack artifacts)
 ```
 
 
