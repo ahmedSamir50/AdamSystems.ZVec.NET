@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using ZVec.NET.Exceptions;
 using ZVec.NET.Interop;
 using FluentAssertions;
@@ -7,6 +8,18 @@ namespace ZVec.NET.Tests.Unit.Exceptions;
 [Collection("ResolverStateTests")]
 public class ZVecExceptionTests
 {
+    [Fact]
+    public void NativeErrorDetails_UnmanagedSize_IncludesPointerPadding()
+    {
+        // x64 C ABI: int + pad4 + ptr + ptr + int + pad4 + ptr = 40 (not the naive 32 field sum).
+        int size = ZVecError.NativeErrorDetailsSize;
+        size.Should().Be(Marshal.SizeOf<ZVecError.NativeErrorDetails>());
+        if (IntPtr.Size == 8)
+            size.Should().Be(40);
+        else
+            size.Should().BeGreaterThanOrEqualTo(20);
+    }
+
     [Fact]
     public void ZVecAbiMismatchException_ContainsVersionInfo()
     {

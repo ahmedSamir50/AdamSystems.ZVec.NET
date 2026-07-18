@@ -35,7 +35,7 @@ dotnet build samples/ZVec.NET.Samples.slnx
 
 ## Collections (restart-safe)
 
-Samples use **app-level open-or-create** (upstream `CreateAndOpen` throws if the path exists — same as Python/Node). Second launch opens existing collections under AppData / temp.
+Samples use **app-level open-or-create** (upstream `CreateAndOpen` throws if the path exists — same as Python/Node). Second launch opens existing collections under AppData / temp via `factory.Open`; the SDK loads managed schema from on-disk metadata so Query/Fetch return Title/ChunkText/etc., not scores alone. If an old collection still looks empty, delete the three `zvec-samples-*` folders once and re-seed.
 
 ## Datasets
 

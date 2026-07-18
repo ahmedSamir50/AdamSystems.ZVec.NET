@@ -44,11 +44,20 @@ public interface IZvecFactory : IAsyncDisposable, IDisposable
     /// <summary>
     /// Opens an existing collection.
     /// </summary>
+    /// <remarks>
+    /// The opened collection’s <see cref="IZvecCollection.Schema"/> is loaded from on-disk
+    /// metadata (<c>zvec_collection_get_schema</c>). That binding is required for scalar field
+    /// unmarshalling on Fetch/Query; callers do not re-supply the create-time schema.
+    /// </remarks>
     IZvecCollection Open(string path, ZVecCollectionOptions? options = null);
 
     /// <summary>
     /// Asynchronously opens an existing collection.
     /// </summary>
+    /// <remarks>
+    /// Same schema binding as <see cref="Open"/>: managed <see cref="IZvecCollection.Schema"/>
+    /// is loaded from on-disk metadata for FieldTypeMap / unmarshalling.
+    /// </remarks>
     ValueTask<IZvecCollection> OpenAsync(string path, ZVecCollectionOptions? options = null, CancellationToken ct = default);
 
     /// <summary>

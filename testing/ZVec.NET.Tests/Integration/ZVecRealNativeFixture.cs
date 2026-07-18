@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using ZVec.NET.Interop;
 
 namespace ZVec.NET.Tests.Integration;
@@ -5,6 +6,7 @@ namespace ZVec.NET.Tests.Integration;
 /// <summary>
 /// Detects whether a real ZVec native library is loadable. Integration/memory tests call
 /// <see cref="SkipIfNotAvailable"/> so CI without a RID binary skips rather than fails.
+/// Pack CI sets <c>ZVEC_REQUIRE_NATIVE=1</c> so detection failure fails the job instead of Skip.
 /// </summary>
 /// <remarks>
 /// Detection is process-wide and serialized. Parallel <see cref="IClassFixture{T}"/> instances
@@ -22,6 +24,9 @@ public class ZVecRealNativeFixture : IDisposable
 
     public bool IsRealNativeAvailable { get; private set; }
 
+    /// <summary>Last detection failure message (null when native is available).</summary>
+    public static string? UnavailableReason => s_failReason;
+
     public ZVecRealNativeFixture()
     {
         lock (Gate)
@@ -31,10 +36,36 @@ public class ZVecRealNativeFixture : IDisposable
             {
                 s_available = DetectOnce();
                 s_detectDone = true;
+
+                if (!s_available)
+                {
+                    var reason = string.IsNullOrEmpty(s_failReason) ? "(no reason recorded)" : s_failReason;
+                    Console.Error.WriteLine(
+                        $"[ZVecRealNativeFixture] Real native unavailable. Reason: {reason}");
+                    Console.Error.WriteLine(
+                        $"[ZVecRealNativeFixture] BaseDirectory={AppContext.BaseDirectory} RID={RuntimeInformation.RuntimeIdentifier}");
+
+                    if (IsNativeRequired())
+                    {
+                        throw new InvalidOperationException(
+                            "ZVEC_REQUIRE_NATIVE is set but real native detection failed: " + reason);
+                    }
+                }
+                else
+                {
+                    Console.Error.WriteLine(
+                        $"[ZVecRealNativeFixture] Real native available. BaseDirectory={AppContext.BaseDirectory}");
+                }
             }
 
             IsRealNativeAvailable = s_available;
         }
+    }
+
+    private static bool IsNativeRequired()
+    {
+        var value = Environment.GetEnvironmentVariable("ZVEC_REQUIRE_NATIVE");
+        return value is "1" or "true" or "TRUE" or "yes" or "YES";
     }
 
     private static bool DetectOnce()

@@ -362,6 +362,7 @@ public static class ZVecDefaults
 
         /// <summary>Message shown when trying to register a collection via DI without a path.</summary>
         public const string CollectionPathRequired = "Collection path must be provided.";
+        public const string CollectionSchemaRequired = "Collection schema must be provided when Create is true.";
 
         /// <summary>Message shown when the native library fails to allocate a multi-query.</summary>
         public const string NativeMultiQueryCreateFailed = "Failed to create native multi-query.";

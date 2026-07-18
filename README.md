@@ -1,11 +1,9 @@
-# 🚧 ZVec.NET
+# ZVec.NET
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0%2B-512bd4.svg)](https://dotnet.microsoft.com/)
 
-> **⚠️ UNDER CONSTRUCTION — PRE-ALPHA**  
-> This project is in early active development. APIs are unstable. Not yet available on NuGet.  
-> See [Project Status](ZVec.NET-Implementation-Plan.md) for what's implemented.
+> **Beta** — `1.0.0-beta.1+zvec.0.5.1`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org after the first publish (tag `v1.0.0-beta.1`).
 
 **The definitive .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)**
 
@@ -20,7 +18,7 @@
 | **DI-first design** | `AddZVec()` / `AddZVecCollection<T>()` — works with ASP.NET Core, MAUI, Blazor Server out of the box |
 | **Typed ODM** | Map POCOs with `ZVec.NET.Mapping` attributes — schema `From<T>()`, expression filters, typed CRUD/DDL without magic field strings |
 | **Safe native lifecycle** | Collection handles owned by `SafeZvecHandle` (close-only); `Dispose` closes, `Destroy` deletes then closes; `Shutdown` disposes all tracked open collections before `zvec_shutdown` |
-| **Cross-platform natives** | Single NuGet `ZVec.NET` with `runtimes/{rid}/native/` for Windows, Linux, macOS, **Android**, **iOS / Mac Catalyst** (CI-built; MAUI sample is the proof) |
+| **Cross-platform natives** | Single NuGet `ZVec.NET` with `runtimes/{rid}/native/` for **win-x64**, **linux-x64**, **osx-arm64**, **android-arm64/x64** in beta (more RIDs when CI is green) |
 | **Full ZVec DB coverage** | HNSW, Flat, IVF, HNSW-RaBitQ, DiskANN, Vamana, Invert, FTS indexes; hybrid search; schema evolution; in-DB RRF/Weighted rerankers |
 | **Idiomatic C#** | .NET naming guidelines, `ValueTask`, `CancellationToken`, fluent builders |
 
@@ -42,20 +40,32 @@ ZVec.NET is built for thread-safe use against the native engine:
 ### Install
 
 ```bash
-dotnet add package ZVec.NET
+dotnet add package ZVec.NET --version 1.0.0-beta.1
 ```
 
-> **Requires .NET 8.0+ (LTS).** Version scheme: `1.0.0-alpha.1+zvec.0.5.1` (SDK SemVer + pinned native). Supported TFMs are `lib/net8.0`, `lib/net9.0`, `lib/net10.0` — **not** encoded in the version string. Pre-alpha: CI packs whatever RID natives are built; local tests Skip if the native for your RID is missing.
+> **Requires .NET 8.0+ (LTS).** Version scheme: `1.0.0-beta.1+zvec.0.5.1` (SDK SemVer + pinned native). Supported TFMs are `lib/net8.0`, `lib/net9.0`, `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires desktop natives.
 
 ### Native RIDs (NuGet `runtimes/`)
 
+#### Supported in `1.0.0-beta.1`
+
 | RID | Native file | Built by |
 |-----|-------------|----------|
-| `win-x64`, `win-arm64` | `zvec_c_api.dll` | GitHub Actions (Windows) |
-| `linux-x64`, `linux-arm64` | `libzvec_c_api.so` | GitHub Actions (Ubuntu; arm64 cross + QEMU) |
-| `osx-x64`, `osx-arm64` | `libzvec_c_api.dylib` | GitHub Actions (macOS) |
-| `android-arm64`, `android-x64` | `libzvec_c_api.so` | Android NDK + CMake (CI / local) |
-| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | macOS + Xcode (CI) |
+| `win-x64` | `zvec_c_api.dll` | GitHub Actions (Windows) |
+| `linux-x64` | `libzvec_c_api.so` | GitHub Actions (Ubuntu) |
+| `osx-arm64` | `libzvec_c_api.dylib` | GitHub Actions (macOS) |
+| `android-arm64`, `android-x64` | `libzvec_c_api.so` | Android NDK + CMake (CI) |
+
+#### Not yet shipped
+
+Blocked by upstream zvec / cross-compile issues on CI; will be added when those builds are green:
+
+| RID | Native file | Notes |
+|-----|-------------|-------|
+| `win-arm64` | `zvec_c_api.dll` | Optional CI; SIMDe / MSVC arch issues |
+| `linux-arm64` | `libzvec_c_api.so` | Optional CI; Arrow/OpenSSL cross |
+| `osx-x64` | `libzvec_c_api.dylib` | Optional CI; arch/march cross |
+| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | Optional mobile CI |
 
 Package size grows with each RID (desktop natives are already large). There is **no** fixed 50 MB gate — see pack workflow / release notes for measured size. Blazor WebAssembly is out of scope (no native RID).
 
@@ -156,8 +166,9 @@ using ZVec.NET.Mapping;
 using var factory = new ZVecFactory();
 factory.Initialize(new ZVecOptions { LogLevel = ZVecLogLevel.Warn });
 
+var path = "/tmp/products";
 var schema = ZVecCollectionSchemaBuilder.From<Product>().Build();
-using var untyped = factory.CreateAndOpen("/tmp/products", schema);
+using var untyped = factory.CreateAndOpen(path, schema);
 using IZvecCollection<Product> products = new ZVecCollection<Product>(untyped);
 
 products.Insert(new Product
@@ -171,6 +182,12 @@ products.Insert(new Product
 var hits = products.Query(p => p.Embedding, queryVec, topK: 10, filter: p => p.Category == "demo");
 foreach (var hit in hits)
     Console.WriteLine($"{hit.Record.Id} (score: {hit.Score:F4})");
+
+// Later / after restart: Open loads Schema from on-disk metadata (no schema argument).
+using var reopened = factory.Open(path);
+using IZvecCollection<Product> again = new ZVecCollection<Product>(reopened);
+var doc = again.Fetch("p1"); // Title / Category present — not Id+Score only
+_ = reopened.Schema;         // non-null; bound for unmarshalling
 ```
 
 ### Typed filters
@@ -511,22 +528,22 @@ Also in the project (not a BDN class): `UpstreamEngineScaleBaseline` / `Benchmar
 
 | What | Format | Example |
 |------|--------|---------|
-| **SDK version** | SemVer | `1.0.0-alpha.1` |
+| **SDK version** | SemVer | `1.0.0-beta.1` |
 | **ZVec native pin** | Build metadata after `+` | `+zvec.0.5.1` |
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
 | **ABI floor** | `ZVecNativeAbi` | Minimum `0.5.1`, same major |
 
-NuGet version example: `1.0.0-alpha.1+zvec.0.5.1` — SDK `1.0.0-alpha.1` wrapping ZVec C++ `0.5.1`. Do **not** put TFM or branch names into the version string.
+NuGet version example: `1.0.0-beta.1+zvec.0.5.1` — SDK `1.0.0-beta.1` wrapping ZVec C++ `0.5.1`. Do **not** put TFM or branch names into the version string.
 
 ### Git vs NuGet (branch ≠ version)
 
 | Concept | Example | Where it lives |
 |---------|---------|----------------|
 | Git branch (train) | `release/1.0` | Git — long-lived for all 1.0.x |
-| Git tag (one ship) | `v1.0.0-alpha.1` | Git — **no** `+zvec…` in the tag |
-| NuGet / csproj Version | `1.0.0-alpha.1+zvec.0.5.1` | `ZVec.NET.csproj` |
+| Git tag (one ship) | `v1.0.0-beta.1` | Git — **no** `+zvec…` in the tag |
+| NuGet / csproj Version | `1.0.0-beta.1+zvec.0.5.1` | `ZVec.NET.csproj` |
 
-There is **no** branch named `release/1.0.0-alpha.1+zvec.0.5.1`. `+zvec.0.5.1` is build metadata only.
+There is **no** branch named `release/1.0.0-beta.1+zvec.0.5.1`. `+zvec.0.5.1` is build metadata only.
 
 ### Branch topology
 
@@ -536,7 +553,7 @@ flowchart LR
   dev[development]
   main[main]
   rel["release/1.0"]
-  tag["tag v1.0.0-alpha.1"]
+  tag["tag v1.0.0-beta.1"]
 
   feat --> dev
   dev -->|"PR merge"| main
@@ -551,7 +568,7 @@ flowchart LR
 |--------|------|
 | **`development`** | Daily integration; open `feature/*` / `bugfix/*` PRs here |
 | **`main`** | Stable trunk; parent of every `release/*` cut |
-| **`release/1.0`** | 1.0.x maintenance (alphas, RTM, patches via tags) |
+| **`release/1.0`** | 1.0.x maintenance (betas, RTM, patches via tags) |
 
 **Contributors:** branch off **`development`**. **Hotfixes** for a shipped train: branch off **`release/X.Y`**, PR back into that release line, then merge back to `main` → `development` when the fix still applies.
 
@@ -565,11 +582,11 @@ flowchart TB
   end
   subgraph ship [Ship and maintain 1.0]
     mainBr -->|"cut once"| rel10[release_1.0]
-    rel10 -->|"tag"| t1[v1.0.0-alpha.1]
+    rel10 -->|"tag"| t1[v1.0.0-beta.1]
     hf[hotfix_branch]
     rel10 -->|"checkout base"| hf
     hf -->|"PR"| rel10
-    rel10 -->|"tag"| t2[v1.0.0-alpha.2]
+    rel10 -->|"tag"| t2[v1.0.0-beta.2]
     rel10 -->|"merge back"| mainBr
     mainBr -->|"merge"| devel
   end
@@ -586,7 +603,7 @@ git checkout -b feature/fix-filter-null
 # Hotfix published 1.0 train
 git checkout release/1.0 && git pull
 git checkout -b hotfix/1.0-null-filter
-# PR → release/1.0 → bump Version → tag v1.0.0-alpha.2 → merge back to main
+# PR → release/1.0 → bump Version → tag v1.0.0-beta.2 → merge back to main
 ```
 
 nuget.org publish is **tag-only** and the tagged commit must be on `release/*` (CI guard). Full policy, CI table, and first-tag steps: [CONTRIBUTING.md](CONTRIBUTING.md) (Branching & releases).

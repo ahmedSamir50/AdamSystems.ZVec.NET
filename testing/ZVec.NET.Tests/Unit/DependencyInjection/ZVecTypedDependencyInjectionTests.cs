@@ -35,7 +35,7 @@ public class ZVecTypedDependencyInjectionTests
     }
 
     [Fact]
-    public void AddZVecCollectionOfT_CreateFalse_DoesNotForceSchema()
+    public void AddZVecCollectionOfT_CreateFalse_RegistersOpenOnly()
     {
         var previousBypass = ZVecDefaults.Version.BypassAbiCheck;
         try
@@ -49,6 +49,7 @@ public class ZVecTypedDependencyInjectionTests
                 o.Create = false;
             });
 
+            // Open path relies on native schema load; registration must still succeed.
             services.Should().Contain(d => d.ServiceType == typeof(IZvecCollection<DiProduct>));
         }
         finally

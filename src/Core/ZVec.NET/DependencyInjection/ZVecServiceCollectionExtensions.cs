@@ -97,10 +97,9 @@ public static class ZVecServiceCollectionExtensions
             var regOptions = new ZVecCollectionRegistrationOptions();
             configure(regOptions);
 
+            // Create needs a schema; Open loads schema from on-disk metadata.
             if (regOptions.Create)
                 regOptions.Schema ??= ZVecCollectionSchemaBuilder.From<T>().Build();
-            else
-                regOptions.Schema = null;
 
             var untyped = OpenCollection(factory, regOptions);
             return new ZVecCollection<T>(untyped);
@@ -121,8 +120,12 @@ public static class ZVecServiceCollectionExtensions
             throw new ArgumentException(ZVecDefaults.Errors.CollectionPathRequired, nameof(regOptions));
 
         var options = regOptions.ResolveOptions();
-        if (regOptions.Schema != null)
+        if (regOptions.Create)
+        {
+            if (regOptions.Schema is null)
+                throw new ArgumentException(ZVecDefaults.Errors.CollectionSchemaRequired, nameof(regOptions));
             return factory.CreateAndOpen(regOptions.Path, regOptions.Schema, options);
+        }
 
         return factory.Open(regOptions.Path, options);
     }

@@ -66,7 +66,11 @@ public sealed class RagQueryService
 
         foreach (var c in ordered)
         {
-            var norm = Normalize(c.ContextText);
+            var contextNorm = Normalize(c.ContextText);
+            // If payload binding failed, still keep a citation keyed by title/id (defense-in-depth).
+            var norm = !string.IsNullOrEmpty(contextNorm)
+                ? contextNorm
+                : DedupeKeyWhenEmptyContext(c);
             if (string.IsNullOrEmpty(norm))
                 continue;
 
@@ -80,6 +84,17 @@ public sealed class RagQueryService
         }
 
         return kept;
+    }
+
+    private static string DedupeKeyWhenEmptyContext(RagCitation c)
+    {
+        var title = Normalize(c.Title);
+        if (!string.IsNullOrEmpty(title))
+            return "title:" + title;
+        var id = Normalize(c.Id);
+        if (!string.IsNullOrEmpty(id))
+            return "id:" + id;
+        return "";
     }
 
     private static bool IsNearDuplicate(string a, string b)

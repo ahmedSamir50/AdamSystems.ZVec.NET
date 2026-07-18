@@ -79,10 +79,41 @@ jobs:
           dotnet build src/Core/ZVec.NET/ZVec.NET.csproj -c Release --no-restore
           dotnet build testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj -c Release --no-restore
 
+      - name: Assert native in test output
+        if: ${{ inputs.require_native == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rid="${{ matrix.rid }}"
+          case "$rid" in
+            win-*) libname="zvec_c_api.dll" ;;
+            osx-*|iossimulator-*|ios-*|maccatalyst-*) libname="libzvec_c_api.dylib" ;;
+            *) libname="libzvec_c_api.so" ;;
+          esac
+          checked=0
+          for tfm_dir in testing/ZVec.NET.Tests/bin/Release/net*; do
+            [ -d "$tfm_dir" ] || continue
+            checked=$((checked + 1))
+            candidate="$tfm_dir/runtimes/${rid}/native/${libname}"
+            echo "Checking $candidate"
+            if [ ! -f "$candidate" ]; then
+              echo "ERROR: missing ${candidate}" >&2
+              find testing/ZVec.NET.Tests/bin/Release -type f 2>/dev/null | head -n 80 || true
+              exit 1
+            fi
+            ls -la "$candidate"
+          done
+          if [ "$checked" -eq 0 ]; then
+            echo "ERROR: no testing/ZVec.NET.Tests/bin/Release/net* output directories" >&2
+            exit 1
+          fi
+
       - name: Test (unit + integration)
+        env:
+          ZVEC_REQUIRE_NATIVE: ${{ inputs.require_native == true && '1' || '0' }}
         run: dotnet test testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj -c Release --no-build --logger "trx;LogFileName=test.trx"
         # Without require_native: integration Skip if RID binary missing.
-        # With require_native (Pack): RID must be present; integration runs for real.
+        # With require_native (Pack): RID must be in test output; detection failure fails the job.
 
       - name: Upload test results
         if: always()

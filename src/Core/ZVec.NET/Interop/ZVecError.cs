@@ -13,6 +13,22 @@ internal static class ZVecError
     internal const string LibraryNotLoadedFallback = "Native library not loaded (error details unavailable)";
 
     /// <summary>
+    /// Native <c>zvec_error_details_t</c> layout. Must match C ABI (padding on 64-bit → 40 bytes).
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeErrorDetails
+    {
+        public int Code;
+        public IntPtr Message;
+        public IntPtr File;
+        public int Line;
+        public IntPtr Function;
+    }
+
+    /// <summary>Unmanaged size of <see cref="NativeErrorDetails"/> (40 on 64-bit).</summary>
+    internal static int NativeErrorDetailsSize => Marshal.SizeOf<NativeErrorDetails>();
+
+    /// <summary>
     /// Throws a ZVecNativeException if the given native error code is not Ok.
     /// </summary>
     internal static void ThrowIfFailed(ZVecErrorCode code, string context)
@@ -41,7 +57,7 @@ internal static class ZVecError
                 return;
             }
 
-            // Fallback to simple message via zvec_get_last_error.
+            // Fallback to simple message via zvec_get_last_error (caller-owned; must free).
             int rc = NativeMethods.zvec_get_last_error(out IntPtr msgPtr);
             if (msgPtr != IntPtr.Zero)
             {
@@ -63,15 +79,12 @@ internal static class ZVecError
         sourceLine = 0;
         sourceFunction = null;
 
-        // Allocate unmanaged memory for zvec_error_details_t.
-        // Layout: zvec_error_code_t code (int) + const char* message + const char* file + int line + const char* function
-        int structSize = sizeof(int) + IntPtr.Size + IntPtr.Size + sizeof(int) + IntPtr.Size;
-        // Align to pointer size for safety.
-        structSize = (structSize + IntPtr.Size - 1) & ~(IntPtr.Size - 1);
+        // Allocate full C ABI size (includes pointer alignment padding). Manual 32-byte
+        // field-sum under-allocated on x64 and caused STATUS_HEAP_CORRUPTION (0xC0000374).
+        int structSize = NativeErrorDetailsSize;
         IntPtr detailsPtr = Marshal.AllocHGlobal(structSize);
         try
         {
-            // Zero-initialize the struct.
             unsafe
             {
                 new Span<byte>((void*)detailsPtr, structSize).Clear();
@@ -80,31 +93,18 @@ internal static class ZVecError
             int rc = NativeMethods.zvec_get_last_error_details(detailsPtr);
             if (rc != 0) return false;
 
-            // Read fields: code (int at offset 0), message (IntPtr), file (IntPtr), line (int), function (IntPtr)
-            int offset = 0;
-            // code (int) — skip, we already have it
-            offset += sizeof(int);
-            // padding to IntPtr alignment
-            offset = (offset + IntPtr.Size - 1) & ~(IntPtr.Size - 1);
+            var details = Marshal.PtrToStructure<NativeErrorDetails>(detailsPtr);
 
-            IntPtr msgPtr = Marshal.ReadIntPtr(detailsPtr, offset);
-            offset += IntPtr.Size;
-            IntPtr filePtr = Marshal.ReadIntPtr(detailsPtr, offset);
-            offset += IntPtr.Size;
-            sourceLine = Marshal.ReadInt32(detailsPtr, offset);
-            offset += sizeof(int);
-            // padding
-            offset = (offset + IntPtr.Size - 1) & ~(IntPtr.Size - 1);
-            IntPtr funcPtr = Marshal.ReadIntPtr(detailsPtr, offset);
-
-            message = (msgPtr != IntPtr.Zero) ? Marshal.PtrToStringUTF8(msgPtr) ?? UnknownErrorMessageFallback : UnknownErrorMessageFallback;
-            sourceFile = (filePtr != IntPtr.Zero) ? Marshal.PtrToStringUTF8(filePtr) : null;
-            sourceFunction = (funcPtr != IntPtr.Zero) ? Marshal.PtrToStringUTF8(funcPtr) : null;
-
-            // Free native strings.
-            if (msgPtr != IntPtr.Zero) NativeMethods.zvec_free(msgPtr);
-            if (filePtr != IntPtr.Zero) NativeMethods.zvec_free(filePtr);
-            if (funcPtr != IntPtr.Zero) NativeMethods.zvec_free(funcPtr);
+            // Pointers from zvec_get_last_error_details refer to TLS / string literals —
+            // do NOT zvec_free them (that also corrupted the heap).
+            message = details.Message != IntPtr.Zero
+                ? Marshal.PtrToStringUTF8(details.Message) ?? UnknownErrorMessageFallback
+                : UnknownErrorMessageFallback;
+            sourceFile = details.File != IntPtr.Zero ? Marshal.PtrToStringUTF8(details.File) : null;
+            sourceLine = details.Line;
+            sourceFunction = details.Function != IntPtr.Zero
+                ? Marshal.PtrToStringUTF8(details.Function)
+                : null;
 
             return true;
         }

@@ -117,7 +117,7 @@ Audit basis: remote `https://zvec.org/llms-full.txt` saved as [`docs/llms-full.t
 | Global shutdown | `zvec_shutdown` | `Shutdown` / `ShutdownAsync`, factory `IAsyncDisposable` | Covered |
 | Create and open | `zvec_collection_create_and_open` | `CreateAndOpen` / `CreateAndOpenAsync` | Covered |
 | Open / close / destroy | `zvec_collection_open` / `close` / `destroy` | `Open` / `OpenAsync`; `Dispose`→close only; `Destroy`→destroy+close | Covered |
-| Inspect (schema/stats/options/path) | `zvec_collection_get_schema` / `stats` / `options` | Collection properties | Covered |
+| Inspect (schema/stats/options/path) | `zvec_collection_get_schema` / `stats` / `options` | Collection properties; `Open`/`OpenAsync` call `zvec_collection_get_schema` to bind managed `Schema`/`FieldTypeMap` for unmarshalling | Covered |
 | Optimize | `zvec_collection_optimize` | `Optimize` / `OptimizeAsync` | Covered |
 | Schema + field/vector indexes | schema + `zvec_index_params_*` | SchemaBuilder + IndexParams | Covered |
 | Schema evolution (add/alter/drop column, create/drop index) | `zvec_collection_add_column`, schema alter/drop, index add/drop | DDL methods on `IZvecCollection` / typed `IZvecCollection<T>` (sync + async). Native `add_column` and typed `EnsureSchema` add **nullable numeric** columns only — put string/array fields in the create-time schema. | Covered |

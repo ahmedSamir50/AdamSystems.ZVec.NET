@@ -17,7 +17,7 @@
 | `pack.yml` | `release/**`, tags `v*`, manual | No (pack + smoke only) |
 | `publish-nuget.yml` | tags `v*` only | **Yes** — commit must be on `release/*` |
 
-**Pack order:** desktop natives → managed tests with `require_native` (download `zvec-native-{rid}` into `runtimes/`, then test) → pack nupkg. Mobile natives run in parallel and are soft-fail.
+**Pack order:** desktop natives → managed tests with `require_native` (download `zvec-native-{rid}` into `runtimes/`, assert copy into test `bin/.../runtimes/`, `ZVEC_REQUIRE_NATIVE=1`, then test) → pack nupkg. Pack stays gated on managed success. Mobile / optional desktop RIDs are soft-fail (`continue-on-error`).
 
 **Standalone managed** (push/PR): no native download; integration tests Skip if the RID binary is missing. Unit tests still gate the job.
 
@@ -29,8 +29,9 @@ Samples live under `samples/ZVec.NET.Samples.slnx` and are never built by these 
 development  → daily PRs
 main         → stable trunk (cut releases from here)
 release/1.0  → 1.0.x maintenance (hotfixes + tags)
-tag v1.0.0-alpha.1  → first nuget.org ship (Version 1.0.0-alpha.1+zvec.0.5.1 in csproj)
+tag v1.0.0-beta.1  → nuget.org beta ship (Version 1.0.0-beta.1+zvec.0.5.1 in csproj)
 ```
+
 
 Full policy: [CONTRIBUTING.md](../../CONTRIBUTING.md) → Branching & releases.
 

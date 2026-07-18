@@ -59,15 +59,20 @@ public class CollectionLifecycleIntegrationTests : IClassFixture<ZVecRealNativeF
 
         using (var reopened = _factory.Open(_testPath))
         {
+            reopened.Schema.Should().NotBeNull();
             var fetched = reopened.Fetch("persist1", includeVector: false);
             fetched.Should().NotBeNull();
             fetched!.Id.Should().Be("persist1");
+            fetched.Fields.Should().ContainKey("title");
+            fetched.Fields["title"].Should().Be("updated-title");
 
             var hits = reopened.Query(
                 new ZVecQuery { FieldName = "embedding", Vector = vector },
-                topk: 1);
+                topk: 1,
+                includeVector: false);
             hits.Should().ContainSingle();
             hits[0].Id.Should().Be("persist1");
+            hits[0].Fields["title"].Should().Be("updated-title");
         }
     }
 

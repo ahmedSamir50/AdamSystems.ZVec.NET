@@ -114,6 +114,40 @@ internal static partial class NativeMethods
     internal static partial int zvec_collection_schema_add_field(IntPtr schema, IntPtr fieldSchema);
 
     [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_get_schema(IntPtr collection, out IntPtr schema);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_collection_schema_get_name(IntPtr schema);
+
+    [LibraryImport(LibraryName)]
+    internal static partial ulong zvec_collection_schema_get_max_doc_count_per_segment(IntPtr schema);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_schema_get_forward_fields(
+        IntPtr schema,
+        out IntPtr fields,
+        out nuint count);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_schema_get_vector_fields(
+        IntPtr schema,
+        out IntPtr fields,
+        out nuint count);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_field_schema_get_name(IntPtr fieldSchema);
+
+    [LibraryImport(LibraryName)]
+    internal static partial uint zvec_field_schema_get_data_type(IntPtr fieldSchema);
+
+    [LibraryImport(LibraryName)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static partial bool zvec_field_schema_is_nullable(IntPtr fieldSchema);
+
+    [LibraryImport(LibraryName)]
+    internal static partial uint zvec_field_schema_get_dimension(IntPtr fieldSchema);
+
+    [LibraryImport(LibraryName)]
     internal static partial IntPtr zvec_collection_options_create();
 
     [LibraryImport(LibraryName)]

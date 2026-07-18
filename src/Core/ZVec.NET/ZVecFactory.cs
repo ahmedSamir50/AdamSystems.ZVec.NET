@@ -248,7 +248,19 @@ public sealed class ZVecFactory : IZvecFactory
         var rc = NativeMethods.zvec_collection_open(path, nativeOptions?.Handle ?? IntPtr.Zero, out IntPtr handle);
         ZVecError.ThrowIfFailed((ZVecErrorCode)rc, nameof(Open));
 
-        var collection = new ZVecCollection(handle, path, schema: null, _shutdownCts.Token, this, options);
+        // Bind on-disk schema via zvec_collection_get_schema for FieldTypeMap / unmarshalling.
+        ZVecCollectionSchema schema;
+        try
+        {
+            schema = Internal.NativeSchemaMarshaller.FromOpenCollection(handle);
+        }
+        catch
+        {
+            try { NativeMethods.zvec_collection_close(handle); } catch { /* best effort */ }
+            throw;
+        }
+
+        var collection = new ZVecCollection(handle, path, schema, _shutdownCts.Token, this, options);
         TrackCollection(collection, handle);
         return collection;
     }
