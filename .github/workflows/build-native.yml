@@ -111,21 +111,26 @@ jobs:
             -S .
 
       # Arrow MSVC ExternalProject defaults to VS generator → FTK1011 / multi-hour hangs.
-      # Cannot commit into alibaba/zvec; apply the local workaround patch before configure.
-      - name: Patch Arrow MSVC ExternalProject to Ninja
+      # Cannot commit into alibaba/zvec; apply local workaround patches before configure.
+      - name: Patch Arrow MSVC ExternalProject (Ninja/SIMD/ccache) + pcg ARM64
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $zvec = "src/Native/ZVec.Native/external/zvec"
+          $arrow = Join-Path $zvec "thirdparty/arrow/apache-arrow-21.0.0"
           # Absolute path: git -C resolves relative patch paths inside the submodule.
-          $patch = Join-Path $env:GITHUB_WORKSPACE "build/ci/patches/zvec-arrow-msvc-ninja.patch"
-          git -C $zvec apply --check $patch
-          git -C $zvec apply $patch
+          $ninja = Join-Path $env:GITHUB_WORKSPACE "build/ci/patches/zvec-arrow-msvc-ninja.patch"
+          $pcg = Join-Path $env:GITHUB_WORKSPACE "build/ci/patches/zvec-arrow-pcg-msvc-arm64.patch"
+          git -C $zvec apply --check $ninja
+          git -C $zvec apply $ninja
+          git -C $arrow apply --check $pcg
+          git -C $arrow apply $pcg
 
       # win-x64 and win-arm64 both use Ninja + MSVC from msvc-dev-cmd (not VS generator).
       # Quote 3.5 — unquoted, pwsh splits into "3" and ".5" and CMake fails.
       # Short build root D:/b/{rid}: GHA path under D:/a/<repo>/<repo>/... exceeds
       # CMAKE_OBJECT_PATH_MAX (~250) inside Arrow nested ExternalProjects (zlib/re2).
+      # Strip Strawberry ccache from PATH — cold MSVC+ccache stalls CI vs local ~15m builds.
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
         working-directory: src/Native/ZVec.Native
@@ -133,26 +138,41 @@ jobs:
         env:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
           CMAKE_GENERATOR: Ninja
+          CCACHE_DISABLE: "1"
         run: |
+          $env:PATH = (
+            $env:PATH -split ';' |
+            Where-Object { $_ -and ($_ -notmatch '(?i)Strawberry[\\/]c[\\/]bin') }
+          ) -join ';'
+          if (Get-Command ccache -ErrorAction SilentlyContinue) {
+            Write-Host "WARN: ccache still on PATH at $((Get-Command ccache).Source)"
+          } else {
+            Write-Host "ccache not on PATH (expected)"
+          }
           New-Item -ItemType Directory -Force -Path "D:/b" | Out-Null
           cmake -B "D:/b/${{ matrix.rid }}" -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
             -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF `
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON -S .
 
-      # Nested ExternalProject cmake (Lz4/Arrow) runs at build time — must inherit policy floor
-      # (matches local _build_ninja.bat). Dump EP logs in this step so hangs never skip them.
+      # Nested ExternalProject cmake (Lz4/Arrow) runs at build time — must inherit policy floor.
+      # Fail-fast (no -k 1): one EP failure must not burn the rest of the step timeout.
       - name: Build zvec_c_api (Windows)
         if: runner.os == 'Windows'
         working-directory: src/Native/ZVec.Native
         shell: pwsh
-        timeout-minutes: 45
+        timeout-minutes: 60
         env:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
           CMAKE_GENERATOR: Ninja
+          CCACHE_DISABLE: "1"
         run: |
+          $env:PATH = (
+            $env:PATH -split ';' |
+            Where-Object { $_ -and ($_ -notmatch '(?i)Strawberry[\\/]c[\\/]bin') }
+          ) -join ';'
           $root = "D:/b/${{ matrix.rid }}"
-          cmake --build $root --config Release --target zvec_c_api -- -k 1
+          cmake --build $root --config Release --target zvec_c_api
           $code = $LASTEXITCODE
           if ($code -ne 0) {
             Get-ChildItem -Recurse $root -Filter "ARROW.BUILD-*.log" -ErrorAction SilentlyContinue |
@@ -160,6 +180,29 @@ jobs:
             Get-ChildItem -Recurse $root -Filter "Lz4.BUILD-*.log" -ErrorAction SilentlyContinue |
               ForEach-Object { Write-Host "===== $($_.FullName) ====="; Get-Content $_.FullName -ErrorAction SilentlyContinue }
             exit $code
+          }
+
+      # Timeout/cancel kills the build step before its dump runs — always dump EP logs after.
+      - name: Dump Windows ExternalProject logs
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $root = "D:/b/${{ matrix.rid }}"
+          if (-not (Test-Path $root)) {
+            Write-Host "Build root missing: $root"
+            exit 0
+          }
+          $logs = @(
+            Get-ChildItem -Recurse $root -Filter "ARROW.BUILD-*.log" -ErrorAction SilentlyContinue
+            Get-ChildItem -Recurse $root -Filter "Lz4.BUILD-*.log" -ErrorAction SilentlyContinue
+          )
+          if (-not $logs -or $logs.Count -eq 0) {
+            Write-Host "No ARROW/Lz4 ExternalProject logs under $root"
+            exit 0
+          }
+          foreach ($log in $logs) {
+            Write-Host "===== $($log.FullName) ====="
+            Get-Content $log.FullName -ErrorAction SilentlyContinue
           }
 
       - name: Build zvec_c_api (Unix)
