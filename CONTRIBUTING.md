@@ -171,48 +171,20 @@ There is **no** merge of “different development branches into different `relea
 
 **Pack:** desktop natives finish → managed downloads `zvec-native-{rid}` and runs integration tests → pack. Pack stays gated on managed success. Mobile / optional desktop RIDs are soft-fail. PR managed CI does not wait for natives (integration Skip if missing). See [`build/ci/README.md`](build/ci/README.md).
 
-### NuGet publish & upstream announce (maintainers)
+### NuGet publish (maintainers only — not for contributors)
 
-- PackageId **`ZVec.NET`** (not the GitHub repo name). nuget.org owner: **AdamSystems**.
-- Trusted Publishing: workflow `publish-nuget.yml`, repo `ahmedSamir50/AdamSystems.ZVec.NET`.
-- **Publish only from tags whose commit is on `release/*`** (CI enforces this). Manual `workflow_dispatch` on publish is for emergencies only — still prefer a tag on `release/*`.
-- After the package is live: Community SDK issue on [alibaba/zvec](https://github.com/alibaba/zvec) (Project Plan §9.4).
+Contributors **never** configure nuget.org, Trusted Publishing, API keys, or GitHub Actions secrets. Only **@ahmedSamir50** ships packages.
 
-#### One-time nuget.org / GitHub setup (required before first publish)
+**What contributors do:** open a PR → wait for CI → wait for maintainer review/merge. That is all.
 
-Publish fails with `No matching trust policy owned by user 'AdamSystems'` until this exists.
+**What the maintainer does to ship:**
 
-**Option A — Trusted Publishing (preferred)**
+1. Merge the PR into the right train (`development` or `release/1.0`).
+2. Manually run **Pack NuGet**.
+3. Bump `<Version>` if needed, then create/push a `v*` tag (tag ruleset allows only the maintainer).
+4. **Publish NuGet** runs on the tag (or via `workflow_dispatch` + Pack `source_run_id`).
 
-1. Sign in to [nuget.org](https://www.nuget.org/) and open **Trusted Publishing**. Confirm a policy exists for:
-   - **Repository Owner:** `ahmedSamir50`
-   - **Repository:** `AdamSystems.ZVec.NET`
-   - **Workflow File:** `publish-nuget.yml`
-   - **Package owner:** AdamSystems  
-   If the UI shows “Use within N day(s)” / **Activate for 7 days**, click activate so the bootstrap window is open.
-2. Note the **nuget.org username you are logged in as** (avatar menu) — that is the **policy creator**. It is often *not* `AdamSystems` when AdamSystems is the package/org owner.
-3. GitHub repo → Settings → Secrets and variables → Actions → add **`NUGET_USER`** = that creator username (profile name, not email). The workflow passes it to `NuGet/login`. Using the owner name `AdamSystems` here causes HTTP 401 “No matching trust policy…”.
-4. Re-run the failed **Publish NuGet** job (or re-dispatch with the Pack `source_run_id`). No natives rebuild.
-
-**Option B — API key fallback**
-
-1. nuget.org → API Keys → create a key with **Push** for `ZVec.NET` (or `*`).
-2. GitHub repo → Settings → Secrets → Actions → add `NUGET_API_KEY`.
-3. Re-run Publish. Trusted Publishing is tried first; if it fails, the workflow uses this secret.
-
-### First publish on `release/1.0`
-
-Confirm Pack CI is green on `release/1.0`, then:
-
-```bash
-git fetch origin
-git checkout release/1.0 && git pull
-# csproj Version must be 1.0.0-alpha.1+zvec.0.5.1 (SemVer + native pin; no TFM in the version)
-git tag -a v1.0.0-alpha.1 -m "ZVec.NET 1.0.0-alpha.1 (native zvec 0.5.1)"
-git push origin v1.0.0-alpha.1
-```
-
-Tag name is **`v1.0.0-alpha.1`** only (no `+zvec…`). That push runs `publish-nuget.yml` → nuget.org.
+Secrets already on the repo (`NUGET_USER`, optional `NUGET_API_KEY`) and the nuget.org Trusted Publishing policy are **private maintainer credentials**. Do not document or rotate them in PRs. If Publish 401s again, the maintainer fixes secrets/policy outside of contributor docs.
 
 ## How to Contribute
 
