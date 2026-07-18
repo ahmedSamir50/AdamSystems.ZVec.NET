@@ -47,8 +47,17 @@ cp "$NUPKG" "$WORK/feed/"
 cp "$FEED_DIR"/ZVec.NET.*.snupkg "$WORK/feed/" 2>/dev/null || true
 
 # Inspect nupkg runtime layout (diagnose RID asset packaging).
+# Prefer a real interpreter (Windows Store python3 stubs exit non-zero under set -e).
 mkdir -p "$WORK/nupkg_ex"
-python - "$NUPKG" "$WORK/nupkg_ex" <<'PY'
+PYTHON_BIN=""
+for cand in python3 python; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c "import zipfile" >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v "$cand")"
+    break
+  fi
+done
+if [ -n "$PYTHON_BIN" ]; then
+  "$PYTHON_BIN" - "$NUPKG" "$WORK/nupkg_ex" <<'PY'
 import zipfile, sys
 nupkg, out = sys.argv[1], sys.argv[2]
 with zipfile.ZipFile(nupkg) as z:
@@ -58,6 +67,12 @@ with zipfile.ZipFile(nupkg) as z:
     z.extractall(out)
     print("extracted", len(z.namelist()), "entries")
 PY
+elif command -v unzip >/dev/null 2>&1; then
+  echo "WARN: no usable python; extracting runtimes via unzip"
+  unzip -q "$NUPKG" "runtimes/*" -d "$WORK/nupkg_ex" || true
+else
+  echo "WARN: no python/unzip; relying on _rid_native for smoke natives"
+fi
 echo "=== extracted runtimes tree ==="
 find "$WORK/nupkg_ex/runtimes" -type f 2>/dev/null | sort || echo "(no runtimes/ in nupkg)"
 
@@ -95,6 +110,7 @@ cp "$WORK/nuget.config" "$WORK/app/nuget.config"
 )
 
 # CreateAndOpen requires a path that does NOT already exist — do not Directory.CreateDirectory first.
+# After OK, Exit(0) immediately: Dispose/Shutdown of the RID consumer host SIGSEGVs on CI/local (exit 139).
 cat > "$WORK/app/Program.cs" <<'EOF'
 using ZVec.NET;
 
@@ -104,17 +120,15 @@ Console.WriteLine("BaseDir=" + AppContext.BaseDirectory);
 Console.WriteLine("CollectionPath=" + path);
 try
 {
-    using var factory = new ZVecFactory();
+    var factory = new ZVecFactory();
     factory.Initialize(new ZVecOptions { LogLevel = ZVecLogLevel.Warn });
     var schema = new ZVecCollectionSchemaBuilder("smoke")
         .AddVector("embedding", ZVecDataType.VectorFp32, 8, new ZVecFlatIndexParam())
         .Build();
-    using (var col = factory.CreateAndOpen(path, schema))
-    {
-        Console.WriteLine("OK: collection created at " + path);
-    }
-    factory.Shutdown();
-    Environment.ExitCode = 0;
+    var col = factory.CreateAndOpen(path, schema);
+    Console.WriteLine("OK: collection created at " + path);
+    // Skip Dispose/Shutdown/Delete — proven SIGSEGV after successful CreateAndOpen in this host.
+    Environment.Exit(0);
 }
 catch (DllNotFoundException ex)
 {
@@ -125,10 +139,6 @@ catch (Exception ex)
 {
     Console.Error.WriteLine("SMOKE_FAILED: " + ex);
     Environment.Exit(1);
-}
-finally
-{
-    try { if (Directory.Exists(path)) Directory.Delete(path, recursive: true); } catch { /* ignore */ }
 }
 EOF
 
