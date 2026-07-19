@@ -3,7 +3,6 @@
 [![NuGet](https://img.shields.io/nuget/v/ZVec.NET.svg)](https://www.nuget.org/packages/ZVec.NET/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512bd4.svg)](https://dotnet.microsoft.com/)
-[![CI](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/workflows/build-managed.yml/badge.svg)](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/workflows/build-managed.yml)
 
 > **Beta** — `1.0.0-beta.2+zvec.0.5.1`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.2`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
 
