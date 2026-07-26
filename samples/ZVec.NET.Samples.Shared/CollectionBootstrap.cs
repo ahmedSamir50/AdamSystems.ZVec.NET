@@ -36,8 +36,7 @@ public static class CollectionBootstrap
         => OpenOrCreate<RecommendItem>(factory, path, enableMmap);
 
     /// <summary>
-    /// App-level open-or-create (upstream has no open_or_create — create throws if path exists).
-    /// Only creates the parent directory; never pre-creates an empty collection path.
+    /// Typed wrapper around <see cref="IZvecFactory.OpenOrCreate"/>.
     /// </summary>
     public static IZvecCollection<T> OpenOrCreate<T>(
         IZvecFactory factory,
@@ -48,25 +47,9 @@ public static class CollectionBootstrap
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        var parent = Path.GetDirectoryName(Path.GetFullPath(path));
-        if (!string.IsNullOrEmpty(parent))
-            Directory.CreateDirectory(parent);
-
         var options = new ZVecCollectionOptions { EnableMmap = enableMmap };
-        if (Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any())
-        {
-            var opened = factory.Open(path, options);
-            return new ZVecCollection<T>(opened);
-        }
-
-        // Remove empty dir left by a previous failed create attempt.
-        if (Directory.Exists(path) && !Directory.EnumerateFileSystemEntries(path).Any())
-        {
-            try { Directory.Delete(path); } catch { /* best effort */ }
-        }
-
         var schema = ZVecCollectionSchemaBuilder.From<T>().Build();
-        var created = factory.CreateAndOpen(path, schema, options);
-        return new ZVecCollection<T>(created);
+        var untyped = factory.OpenOrCreate(path, schema, options);
+        return new ZVecCollection<T>(untyped);
     }
 }

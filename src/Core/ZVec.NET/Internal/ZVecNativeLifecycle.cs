@@ -11,6 +11,7 @@ internal static class ZVecNativeLifecycle
 {
     private static int _globalNativeInitCount;
     private static readonly object GlobalInitLock = new();
+    private static ZVecNativeTeardownPolicy _teardownPolicy = ZVecNativeTeardownPolicy.Auto;
 
     /// <summary>True when at least one factory holds a live native init reference.</summary>
     internal static bool IsNativeLibraryInitialized
@@ -18,6 +19,21 @@ internal static class ZVecNativeLifecycle
         get
         {
             lock (GlobalInitLock) return _globalNativeInitCount > 0;
+        }
+    }
+
+    /// <summary>
+    /// True when native close/shutdown should be skipped (Linux Auto / Suppress).
+    /// Tracked: https://github.com/alibaba/zvec/issues/619 — remove when upstream is fixed.
+    /// </summary>
+    internal static bool ShouldSuppressNativeTeardown
+    {
+        get
+        {
+            lock (GlobalInitLock)
+            {
+                return ResolveSuppress(_teardownPolicy);
+            }
         }
     }
 
@@ -38,6 +54,7 @@ internal static class ZVecNativeLifecycle
             {
                 if (_globalNativeInitCount == 0)
                 {
+                    _teardownPolicy = options?.NativeTeardownPolicy ?? ZVecNativeTeardownPolicy.Auto;
                     NativeLibraryResolver.EnsureLoaded();
                     ApplyNativeConfig(options);
                     nativeInitOwned = true;
@@ -55,8 +72,7 @@ internal static class ZVecNativeLifecycle
             {
                 if (nativeInitOwned)
                 {
-                    try { NativeMethods.zvec_shutdown(); }
-                    catch { /* best-effort rollback */ }
+                    TryShutdownNativeUnlocked();
                 }
 
                 throw;
@@ -65,7 +81,8 @@ internal static class ZVecNativeLifecycle
     }
 
     /// <summary>
-    /// Decrements the process-wide refcount and calls <c>zvec_shutdown</c> when it reaches zero.
+    /// Decrements the process-wide refcount and calls <c>zvec_shutdown</c> when it reaches zero
+    /// (unless teardown is suppressed — see <see cref="ShouldSuppressNativeTeardown"/>).
     /// </summary>
     internal static void Release()
     {
@@ -75,14 +92,28 @@ internal static class ZVecNativeLifecycle
             if (_globalNativeInitCount != 0)
                 return;
 
-            try
-            {
-                NativeMethods.zvec_shutdown();
-            }
-            catch (DllNotFoundException)
-            {
-                // Native library already unloaded or resolver poisoned.
-            }
+            TryShutdownNativeUnlocked();
+        }
+    }
+
+    /// <summary>
+    /// Best-effort <c>zvec_collection_close</c>, respecting Linux teardown suppression (#619).
+    /// </summary>
+    internal static void TryCloseCollection(nint handle)
+    {
+        if (handle == IntPtr.Zero)
+            return;
+
+        if (ShouldSuppressNativeTeardown)
+            return;
+
+        try
+        {
+            _ = NativeMethods.zvec_collection_close(handle);
+        }
+        catch
+        {
+            // Best effort.
         }
     }
 
@@ -101,6 +132,30 @@ internal static class ZVecNativeLifecycle
         lock (GlobalInitLock)
         {
             return func();
+        }
+    }
+
+    private static bool ResolveSuppress(ZVecNativeTeardownPolicy policy) => policy switch
+    {
+        ZVecNativeTeardownPolicy.AlwaysCall => false,
+        ZVecNativeTeardownPolicy.Suppress => true,
+        // Auto: skip on Linux until https://github.com/alibaba/zvec/issues/619 is fixed.
+        _ => OperatingSystem.IsLinux()
+    };
+
+    /// <summary>Caller must hold <see cref="GlobalInitLock"/>.</summary>
+    private static void TryShutdownNativeUnlocked()
+    {
+        if (ResolveSuppress(_teardownPolicy))
+            return;
+
+        try
+        {
+            NativeMethods.zvec_shutdown();
+        }
+        catch (DllNotFoundException)
+        {
+            // Native library already unloaded or resolver poisoned.
         }
     }
 

@@ -15,7 +15,7 @@
 | `build-managed.yml` | PRs (+ manual) | No — core + tests only (not samples) |
 | `build-native.yml` / `build-native-mobile.yml` | PRs with path filters (+ manual) | No |
 | `pack.yml` | Manual `workflow_dispatch` only (+ `workflow_call`) | No (pack + smoke only) |
-| `publish-nuget.yml` | tags `v*` + manual | **Yes** — commit must be on `release/*` |
+| `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
 | `validate-consumer-rerun.yml` | Manual only | No |
 
 **Ship:** PR CI → merge → manually run **Pack NuGet** → tag `v*` (maintainer only) → Publish reuses Pack artifacts.
@@ -61,9 +61,10 @@ To promote an optional RID: keep the job green, set `optional: false` / drop `co
 development  → daily PRs
 main         → stable trunk (cut releases from here)
 release/1.0  → 1.0.x maintenance (hotfixes + tags)
-tag v1.0.0-beta.2  → nuget.org beta ship (Version 1.0.0-beta.2+zvec.0.5.1 in csproj; Publish reuses green Pack artifacts)
+tag v1.0.0-beta.3  → nuget.org + GitHub Packages beta ship (Version 1.0.0-beta.3+zvec.0.5.1 in csproj; Publish reuses green Pack artifacts)
 ```
 
+**GitHub Packages:** Publish dual-pushes `.nupkg` (not `.snupkg`) to `nuget.pkg.github.com/{owner}`. Primary install remains nuget.org; optional consumers need a PAT with `read:packages` — see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 Full policy: [CONTRIBUTING.md](../../CONTRIBUTING.md) → Branching & releases.
 

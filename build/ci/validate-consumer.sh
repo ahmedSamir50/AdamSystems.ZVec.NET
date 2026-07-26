@@ -110,12 +110,14 @@ cp "$WORK/nuget.config" "$WORK/app/nuget.config"
 )
 
 # CreateAndOpen requires a path that does NOT already exist — do not Directory.CreateDirectory first.
-# After OK, Exit(0) immediately: Dispose/Shutdown of the RID consumer host SIGSEGVs on CI/local (exit 139).
+# Linux Auto teardown suppresses managed close/shutdown (alibaba/zvec#619). After that, libc
+# atexit/static dtors in libzvec_c_api.so can still SIGSEGV on Environment.Exit — use _exit(0).
 cat > "$WORK/app/Program.cs" <<'EOF'
+using System.Runtime.InteropServices;
 using ZVec.NET;
 
 var path = Path.Combine(Path.GetTempPath(), "zvec-consumer-smoke-" + Guid.NewGuid().ToString("N"));
-Console.WriteLine("RID=" + System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
+Console.WriteLine("RID=" + RuntimeInformation.RuntimeIdentifier);
 Console.WriteLine("BaseDir=" + AppContext.BaseDirectory);
 Console.WriteLine("CollectionPath=" + path);
 try
@@ -125,9 +127,15 @@ try
     var schema = new ZVecCollectionSchemaBuilder("smoke")
         .AddVector("embedding", ZVecDataType.VectorFp32, 8, new ZVecFlatIndexParam())
         .Build();
-    var col = factory.CreateAndOpen(path, schema);
+    using var col = factory.CreateAndOpen(path, schema);
     Console.WriteLine("OK: collection created at " + path);
-    // Skip Dispose/Shutdown/Delete — proven SIGSEGV after successful CreateAndOpen in this host.
+    factory.Shutdown();
+    Console.WriteLine("OK: shutdown complete");
+    if (OperatingSystem.IsLinux())
+    {
+        // Skip glibc atexit / native static destructors that SIGSEGV after suppressed teardown (#619).
+        NativeExit._exit(0);
+    }
     Environment.Exit(0);
 }
 catch (DllNotFoundException ex)
@@ -139,6 +147,12 @@ catch (Exception ex)
 {
     Console.Error.WriteLine("SMOKE_FAILED: " + ex);
     Environment.Exit(1);
+}
+
+static class NativeExit
+{
+    [DllImport("libc", EntryPoint = "_exit")]
+    internal static extern void _exit(int status);
 }
 EOF
 
@@ -182,15 +196,22 @@ ls -la "$OUT_DIR" || true
 ls -la "$OUT_NATIVE" || true
 find "$OUT_DIR" -iname '*zvec*' | sort || true
 
-# Functional success = OK line observed. Native teardown may SIGSEGV (139) after OK
-# on linux-x64 RID hosts; ignore process rc when create/open already proved green.
+# Require create OK + Shutdown OK + process exit 0 (Linux uses _exit after suppressed teardown).
 set +e
 dotnet run --project "$PROJ" -c Release --no-build --runtime "$RID" 2>&1 | tee "$WORK/smoke.out"
 rc=${PIPESTATUS[0]}
 set -e
-if grep -Eq '^OK: collection created' "$WORK/smoke.out"; then
-  echo "Consumer smoke passed for $RID (OK observed; process rc=${rc} ignored)"
-  exit 0
+if ! grep -Eq '^OK: collection created' "$WORK/smoke.out"; then
+  echo "ERROR: smoke did not report collection OK for $RID (rc=${rc})" >&2
+  exit "${rc:-1}"
 fi
-echo "ERROR: smoke did not report OK for $RID (rc=${rc})" >&2
-exit "${rc:-1}"
+if ! grep -Eq '^OK: shutdown complete' "$WORK/smoke.out"; then
+  echo "ERROR: smoke did not complete Shutdown for $RID (rc=${rc}) — likely SIGSEGV during teardown (#619)" >&2
+  exit "${rc:-1}"
+fi
+if [[ "$rc" -ne 0 ]]; then
+  echo "ERROR: smoke process exited ${rc} for $RID (expected 0)" >&2
+  exit "$rc"
+fi
+echo "Consumer smoke passed for $RID (create+shutdown OK; process rc=0)"
+exit 0

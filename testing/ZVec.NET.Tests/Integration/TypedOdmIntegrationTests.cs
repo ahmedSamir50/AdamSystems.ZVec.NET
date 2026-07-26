@@ -141,7 +141,7 @@ public class TypedOdmIntegrationTests : IClassFixture<ZVecRealNativeFixture>, ID
             {
                 o.Path = _testPath;
                 o.EnableMmap = true;
-                o.Create = true;
+                o.OpenMode = ZVecCollectionOpenMode.CreateOnly;
             });
 
             using var sp = services.BuildServiceProvider();

@@ -10,8 +10,7 @@ namespace ZVec.NET.Samples.Shared;
 public static class SampleServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers <see cref="IZvecCollection{T}"/> with sample-level open-or-create
-    /// (upstream create throws if the path already exists).
+    /// Registers <see cref="IZvecCollection{T}"/> via SDK <see cref="IZvecFactory.OpenOrCreate"/>.
     /// </summary>
     public static IServiceCollection AddSampleCollectionOpenOrCreate<T>(
         this IServiceCollection services,
