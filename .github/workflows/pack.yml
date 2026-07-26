@@ -72,12 +72,20 @@ jobs:
           find src/Core/ZVec.NET/runtimes -type f | sort
 
       - name: Pack
+        env:
+          GITHUB_SHA: ${{ github.sha }}
         run: |
-          dotnet pack src/Core/ZVec.NET/ZVec.NET.csproj -c Release -o artifacts/nuget
+          set -euo pipefail
+          # Stamp RepositoryCommit so nuspec proves which commit was packed (tag Publish SHA gate).
+          dotnet pack src/Core/ZVec.NET/ZVec.NET.csproj -c Release -o artifacts/nuget \
+            -p:RepositoryCommit="${GITHUB_SHA}" \
+            -p:SourceRevisionId="${GITHUB_SHA}"
           ls -la artifacts/nuget
           NUPKG=$(ls artifacts/nuget/ZVec.NET.*.nupkg | head -n1)
           echo "=== nupkg runtimes ==="
           python -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); print('\n'.join(n for n in z.namelist() if '/native/' in n))" "$NUPKG"
+          echo "=== nuspec repository ==="
+          unzip -p "$NUPKG" '*.nuspec' | grep -E 'repository|version' | head -n 20 || true
 
       - name: Assert snupkg + size note
         shell: bash

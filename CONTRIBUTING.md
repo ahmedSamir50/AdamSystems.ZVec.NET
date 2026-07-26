@@ -134,9 +134,10 @@ Bug in a published alpha/RTM on the 1.0 line:
 1. git fetch && git checkout release/1.0 && git pull
 2. git checkout -b hotfix/1.0-null-filter
 3. PR → release/1.0   (not → development)
-4. On release/1.0: bump Version in csproj (e.g. 1.0.0-beta.3+zvec.0.5.1)
-5. Manually run **Pack NuGet**, then tag v1.0.0-beta.3 on release/1.0 → Publish CI
-6. Merge release/1.0 → main, then main → development (so the fix is not lost)
+4. On release/1.0: bump Version in csproj (e.g. 1.0.0-beta.3.1+zvec.0.5.1)
+5. **Local:** run `build/ci/simulate-pack.ps1` to green (Pack-parity; do not discover failures on remote Pack)
+6. Tag `v1.0.0-beta.3.1` on release/1.0 → **Publish NuGet** (reuses same-SHA green Pack, or Packs inline)
+7. Merge release/1.0 → main, then main → development (so the fix is not lost)
 ```
 
 If the bug is truly 1.0-only (already fixed differently upstream), leave it on `release/1.0` only.
@@ -167,9 +168,9 @@ There is **no** merge of “different development branches into different `relea
 | `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
 | `validate-consumer-rerun.yml` | Manual only | No |
 
-**Ship flow:** PR (CI) → maintainer merge → **Actions → Pack NuGet** (manual) → maintainer tags `v*` → Publish reuses Pack artifacts. No Pack on every push to `release/**`.
+**Ship flow:** PR (CI) → maintainer merge → **local `simulate-pack.ps1` green** → maintainer tags `v*` on `release/*` → **Publish NuGet** reuses a **same-SHA** Pack with `conclusion=success`, or calls Pack inline. Optional manual Pack before tag is fine but not required. No Pack on every push to `release/**`.
 
-**Pack:** desktop natives finish → managed downloads `zvec-native-{rid}` and runs integration tests → pack. Pack stays gated on managed success. Mobile / optional desktop RIDs are soft-fail. PR managed CI does not wait for natives (integration Skip if missing). See [`build/ci/README.md`](build/ci/README.md).
+**Pack:** desktop natives finish → managed downloads `zvec-native-{rid}` and runs integration tests → pack (stamps `RepositoryCommit`). Pack stays gated on managed success. Mobile / optional desktop RIDs are soft-fail. PR managed CI does not wait for natives (integration Skip if missing). See [`build/ci/README.md`](build/ci/README.md).
 
 ### NuGet publish (maintainers only — not for contributors)
 
@@ -180,9 +181,14 @@ Contributors **never** configure nuget.org, Trusted Publishing, API keys, or Git
 **What the maintainer does to ship:**
 
 1. Merge the PR into the right train (`development` or `release/1.0`).
-2. Manually run **Pack NuGet**.
-3. Bump `<Version>` if needed, then create/push a `v*` tag (tag ruleset allows only the maintainer).
-4. **Publish NuGet** runs on the tag (or via `workflow_dispatch` + Pack `source_run_id`). It pushes to **nuget.org** (primary public feed), then dual-publishes the `.nupkg` to **GitHub Packages** so the repo Packages sidebar lists `ZVec.NET`.
+2. Bump `<Version>` if needed.
+3. Run **`pwsh -File build/ci/simulate-pack.ps1`** until green (mandatory Pack-parity gate; reuses downloaded native artifacts — do not wait an hour on remote Pack to learn).
+4. Optional: manually run **Pack NuGet** on that exact commit for a green GHA badge.
+5. Create/push a `v*` tag on `release/*` (tag ruleset allows only the maintainer).
+6. **Publish NuGet** runs on the tag. It only accepts Pack artifacts when Pack `head_sha` equals the tag commit **and** Pack concluded **success**. Otherwise it Packs inline for that SHA. Then pushes to **nuget.org** (Trusted Publishing; primary public feed), then dual-publishes the `.nupkg` to **GitHub Packages**.
+7. Prove provenance: tag SHA == Pack `headSha` == nuspec `repository` commit (see `build/ci/verify-release-provenance.sh`). Sync `release/*` → `main` → `development`.
+
+Emergency `workflow_dispatch` with `source_run_id` still requires the **same SHA** and **success** — it cannot publish a different commit’s nupkg.
 
 **Consumers of GitHub Packages (optional):** nuget.org remains the recommended install source. To restore from GitHub Packages instead, use a PAT with `read:packages` and a `nuget.config` such as:
 

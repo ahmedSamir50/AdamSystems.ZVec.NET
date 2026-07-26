@@ -6,8 +6,9 @@
 | `build-android.sh` | NDK CMake build → `android-arm64` / `android-x64` |
 | `build-ios.sh` | Xcode CMake build → `ios-*` / `maccatalyst-*` (macOS only) |
 | `validate-consumer.sh` | Clean `dotnet new` app + restore local `.nupkg` + create collection smoke |
-| `simulate-pack.ps1` | Local Pack-parity gate: reuse Pack native artifacts → Win+Docker Linux managed (`ZVEC_REQUIRE_NATIVE=1`) → pack → win+linux consumers (rc 0) |
+| `simulate-pack.ps1` | **Mandatory local Pack-parity gate** before remote Pack/tag: reuse Pack native artifacts → Win+Docker Linux managed (`ZVEC_REQUIRE_NATIVE=1`) → pack → win+linux consumers (rc 0) |
 | `docker-linux-managed.sh` | Helper for `simulate-pack.ps1` Linux managed suite (`sdk:10.0-noble` + SDK 8/9 AppHost packs) |
+| `verify-release-provenance.sh` | After a tag: assert Pack `head_sha` == tag commit, Pack `conclusion=success`, optional nuspec commit check (needs `gh` + git; no secrets) |
 | `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 (shallow/no-tags), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, linux-aarch64 Arrow cross (+OPENSSL=OFF), osx-x64 march, iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi |
 
 ## Workflows
@@ -20,9 +21,21 @@
 | `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
 | `validate-consumer-rerun.yml` | Manual only | No |
 
-**Ship:** PR CI → merge → manually run **Pack NuGet** → tag `v*` (maintainer only) → Publish reuses Pack artifacts.
+**Ship:** PR CI → merge → **local `simulate-pack.ps1` green** → tag `v*` (maintainer) → Publish reuses **same-SHA** green Pack or Packs inline. Do not use remote Pack as the first discovery of managed/consumer failures.
 
-**Pack order:** desktop natives → managed tests with `require_native` (download `zvec-native-{rid}` into `runtimes/`, assert copy into test `bin/.../runtimes/`, `ZVEC_REQUIRE_NATIVE=1`, then test) → pack nupkg. Pack stays gated on managed success. Mobile / optional desktop RIDs are soft-fail (`continue-on-error`).
+**Local sim vs GHA**
+
+| Gate | Local `simulate-pack.ps1` | Remote Pack |
+|------|---------------------------|-------------|
+| Win managed require_native (net8 then net9) | Yes | Yes |
+| Linux managed require_native (Docker noble) | Yes | Yes |
+| osx-arm64 managed | No (no local macOS in sim) | Yes |
+| `dotnet pack` + nupkg natives | Yes | Yes |
+| win + linux consumers (rc 0) | Yes | Yes |
+| Optional RID natives (win-arm64, …) | No (reuse prior artifacts / soft-fail) | Soft-fail |
+| Trusted Publishing / nuget.org push | No | Publish only |
+
+**Pack order:** desktop natives → managed tests with `require_native` → pack (stamps `RepositoryCommit`) → consumers. Pack stays gated on managed success. Mobile / optional desktop RIDs are soft-fail (`continue-on-error`).
 
 **Standalone managed** (PR): no native download; integration tests Skip if the RID binary is missing. Unit tests still gate the job.
 
@@ -63,7 +76,7 @@ To promote an optional RID: keep the job green, set `optional: false` / drop `co
 development  → daily PRs
 main         → stable trunk (cut releases from here)
 release/1.0  → 1.0.x maintenance (hotfixes + tags)
-tag v1.0.0-beta.3  → nuget.org + GitHub Packages beta ship (Version 1.0.0-beta.3+zvec.0.5.1 in csproj; Publish reuses green Pack artifacts)
+tag v1.0.0-beta.3.1  → nuget.org + GitHub Packages (Version 1.0.0-beta.3.1+zvec.0.5.1; Publish requires same-SHA green Pack or Packs inline)
 ```
 
 **GitHub Packages:** Publish dual-pushes `.nupkg` (not `.snupkg`) to `nuget.pkg.github.com/{owner}`. Primary install remains nuget.org; optional consumers need a PAT with `read:packages` — see [CONTRIBUTING.md](../../CONTRIBUTING.md).

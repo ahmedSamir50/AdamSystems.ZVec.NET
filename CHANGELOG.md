@@ -2,6 +2,22 @@
 
 All notable changes to ZVec.NET are documented in this file.
 
+## [1.0.0-beta.3.1] - 2026-07-26
+
+Native pin unchanged: **zvec 0.5.1**.
+
+### Changed
+
+- Root `LICENSE` is the standard Apache-2.0 text (GitHub license detection)
+- Publish NuGet refuses Pack artifacts unless Pack `head_sha` equals the tag commit and Pack concluded **success** (no cross-SHA publish)
+- Tag push alone can Pack via `workflow_call` when no same-SHA green Pack exists
+- Packed nupkg stamps `RepositoryCommit` from the pack commit for provenance
+- Maintainer docs: mandatory local `simulate-pack.ps1` before remote Pack/tag
+
+### Fixed
+
+- Consumer smoke HardExit after Shutdown on Windows (`TerminateProcess`) as well as Linux (`_exit`) so Pack consumer does not AV on `Environment.Exit`
+
 ## [1.0.0-beta.3] - 2026-07-26
 
 Native pin unchanged: **zvec 0.5.1**.

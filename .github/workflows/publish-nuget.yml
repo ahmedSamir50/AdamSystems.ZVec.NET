@@ -2,8 +2,8 @@ name: Publish NuGet
 
 # nuget.org publish is release-line only:
 # - Tags: v* whose commit is on a release/* branch (guard below).
-# - workflow_dispatch: emergency only; prefer tagging on release/* so the same guard applies.
-#   Prefer source_run_id = a green Pack run so Publish does NOT rebuild natives (~1h).
+# - Tag push alone is enough: reuse same-SHA green Pack, else workflow_call pack.yml.
+# - source_run_id (workflow_dispatch) must be the same commit SHA and conclusion=success.
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       source_run_id:
-        description: Green Pack run ID whose nuget-packages artifact to publish (skips rebuild)
+        description: Same-SHA green Pack run ID (must match tag/dispatch commit; else fails)
         required: false
         type: string
 
@@ -66,8 +66,29 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+
+          assert_pack_run() {
+            local run_id="$1"
+            local meta
+            meta="$(gh api -H 'Accept: application/vnd.github+json' \
+              "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}")"
+            local head conclusion
+            head="$(echo "$meta" | jq -r '.head_sha')"
+            conclusion="$(echo "$meta" | jq -r '.conclusion')"
+            echo "Pack run ${run_id}: head_sha=${head} conclusion=${conclusion} (need SHA=${SHA} success)"
+            if [[ "$head" != "$SHA" ]]; then
+              echo "::error::Pack run ${run_id} head_sha=${head} does not match publish SHA=${SHA}. Refusing cross-SHA publish."
+              exit 1
+            fi
+            if [[ "$conclusion" != "success" ]]; then
+              echo "::error::Pack run ${run_id} conclusion=${conclusion} (required: success). Refusing publish from a failed Pack."
+              exit 1
+            fi
+          }
+
           if [ -n "${INPUT_RUN:-}" ]; then
-            echo "Using workflow_dispatch source_run_id=${INPUT_RUN}"
+            echo "Validating workflow_dispatch source_run_id=${INPUT_RUN}"
+            assert_pack_run "${INPUT_RUN}"
             echo "pack_run_id=${INPUT_RUN}" >> "$GITHUB_OUTPUT"
             echo "need_pack=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -82,6 +103,7 @@ jobs:
 
           if [ -n "${RUN_ID:-}" ]; then
             echo "Found green Pack run ${RUN_ID} for ${SHA}"
+            assert_pack_run "${RUN_ID}"
             echo "pack_run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
             echo "need_pack=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -137,6 +159,23 @@ jobs:
           set -euo pipefail
           ls -la artifacts/nuget
           test -n "$(ls artifacts/nuget/ZVec.NET.*.nupkg 2>/dev/null | head -n1)"
+
+      - name: Assert nupkg version matches tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          EXPECT="${TAG#v}"
+          NUPKG=$(ls artifacts/nuget/ZVec.NET.*.nupkg | grep -v symbols | head -n1)
+          BASE=$(basename "$NUPKG" .nupkg)
+          # ZVec.NET.1.0.0-beta.3.1.nupkg → 1.0.0-beta.3.1 (NuGet drops +build metadata)
+          GOT="${BASE#ZVec.NET.}"
+          echo "tag=$TAG expect_version=$EXPECT nupkg_version=$GOT"
+          if [[ "$GOT" != "$EXPECT" ]]; then
+            echo "::error::nupkg version '$GOT' does not match tag SemVer '$EXPECT'"
+            exit 1
+          fi
 
       # NuGet/login `user` = nuget.org username of the person who CREATED the Trusted
       # Publishing policy — NOT the package owner org (AdamSystems). Wrong value → HTTP 401

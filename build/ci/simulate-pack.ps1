@@ -190,7 +190,9 @@ if ($SkipPack) {
     Get-ChildItem $ArtifactsNuget -Filter "ZVec.NET.*" -ErrorAction SilentlyContinue |
         Remove-Item -Force
 
-    dotnet pack src/Core/ZVec.NET/ZVec.NET.csproj -c Release -o $ArtifactsNuget
+    $commit = (git rev-parse HEAD).Trim()
+    dotnet pack src/Core/ZVec.NET/ZVec.NET.csproj -c Release -o $ArtifactsNuget `
+        "-p:RepositoryCommit=$commit" "-p:SourceRevisionId=$commit"
     Assert-Exit0 "dotnet pack"
 
     $nupkg = Get-ChildItem $ArtifactsNuget -Filter "ZVec.NET.*.nupkg" |
