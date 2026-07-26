@@ -1,0 +1,9 @@
+ZVec.NET
+Copyright 2026 Ahmed Samir Abd ELAAL @ Adam Systems - Egypt
+
+This product includes software developed by Alibaba ZVec contributors
+(https://github.com/alibaba/zvec), licensed under the Apache License 2.0.
+
+Native binaries redistributed in this package are built from upstream zvec
+and remain subject to the Apache License 2.0 and any third-party notices
+included with that project.

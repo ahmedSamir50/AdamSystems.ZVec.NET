@@ -1,10 +1,10 @@
 # ZVec.NET
 
 [![NuGet](https://img.shields.io/nuget/v/ZVec.NET.svg)](https://www.nuget.org/packages/ZVec.NET/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512bd4.svg)](https://dotnet.microsoft.com/)
 
-> **Beta** — `1.0.0-beta.2+zvec.0.5.1`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.2`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
+> **Beta** — `1.0.0-beta.3+zvec.0.5.1`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.3`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
 
 **Production .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)** — DI, typed ODM, async, SafeHandles, full indexes/FTS, and mobile RIDs. Not a thin P/Invoke wrapper.
 
@@ -76,7 +76,7 @@ Managed TFMs are `net8.0` / `net9.0` / `net10.0` (samples need .NET 10). Natives
 
 **Why some RIDs are missing:** not unfinished C# P/Invoke — **cross-compiling Alibaba zvec’s bundled C++ third parties** (mainly Apache Arrow and FastPFOR/SIMDe, plus host `protoc`, and on Apple Lz4/Arrow macabi). ZVec.NET applies [CI-only patches](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/build/ci/patches) (not pushed to alibaba/zvec). A RID ships when that build is **reliably green** and pack always includes it in the nupkg — no calendar date promised. Engineering detail: [build/ci/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/build/ci/README.md#rid-ship-gate).
 
-#### Supported in `1.0.0-beta.2`
+#### Supported in `1.0.0-beta.3`
 
 | RID | Native file | Status |
 |-----|-------------|--------|
@@ -111,10 +111,10 @@ Package size grows with each RID. There is **no** fixed 50 MB gate — see pack 
 ### Install
 
 ```bash
-dotnet add package ZVec.NET --version 1.0.0-beta.2
+dotnet add package ZVec.NET --version 1.0.0-beta.3
 ```
 
-Version scheme: `1.0.0-beta.2+zvec.0.5.1` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires desktop natives.
+Version scheme: `1.0.0-beta.3+zvec.0.5.1` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires desktop natives.
 
 ### Two APIs
 
@@ -234,12 +234,11 @@ builder.Services.AddZVec(options =>
     options.MemoryLimitMb = 512;
 });
 
-// Create: true (default) = CreateAndOpen — first run only; see Create vs Open below
+// OpenMode default = OpenOrCreate (restart-safe). Override with CreateOnly / OpenOnly if needed.
 builder.Services.AddZVecCollection<Product>(options =>
 {
     options.Path = "/data/products";
     options.EnableMmap = true;
-    options.Create = true; // set false to Open an existing path
 });
 
 var app = builder.Build();
@@ -284,30 +283,28 @@ builder.Services.AddZVec(builder.Configuration);
 
 ### Create vs Open (restart-safe collections)
 
-Upstream `CreateAndOpen` **throws if the path already exists** (same as Python/Node). There is no native `open_or_create`.
+Upstream `CreateAndOpen` **throws if the path already exists** (same as Python/Node). There is no native `open_or_create`. ZVec.NET adds managed `OpenOrCreate` and defaults DI to it.
 
 | API | Behavior |
 |-----|----------|
 | `factory.CreateAndOpen(path, schema)` | Create new collection; fails if path exists |
 | `factory.Open(path)` | Open existing; loads schema from on-disk metadata |
-| `AddZVecCollection<T>(… Create = true)` | DI → `CreateAndOpen` (default; **first run only**) |
-| `AddZVecCollection<T>(… Create = false)` | DI → `Open` |
-
-App-level open-or-create (used by samples):
+| `factory.OpenOrCreate(path, schema)` | Open if path has content; otherwise create |
+| `AddZVecCollection<T>(… OpenMode = OpenOrCreate)` | DI default — **restart-safe** |
+| `AddZVecCollection<T>(… OpenMode = CreateOnly)` | DI → `CreateAndOpen` |
+| `AddZVecCollection<T>(… OpenMode = OpenOnly)` | DI → `Open` |
 
 ```csharp
-IZvecCollection<Product> OpenOrCreate(IZvecFactory factory, string path)
+builder.Services.AddZVecCollection<Product>(options =>
 {
-    var options = new ZVecCollectionOptions { EnableMmap = true };
-    if (Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any())
-        return new ZVecCollection<Product>(factory.Open(path, options));
-
-    var schema = ZVecCollectionSchemaBuilder.From<Product>().Build();
-    return new ZVecCollection<Product>(factory.CreateAndOpen(path, schema, options));
-}
+    options.Path = "/data/products";
+    options.OpenMode = ZVecCollectionOpenMode.OpenOrCreate; // default
+});
 ```
 
-See [samples `CollectionBootstrap.OpenOrCreate`](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/ZVec.NET.Samples.Shared/CollectionBootstrap.cs).
+```csharp
+using var col = factory.OpenOrCreate(path, schema, options);
+```
 
 ### Keyed dynamic collection
 
@@ -315,11 +312,24 @@ See [samples `CollectionBootstrap.OpenOrCreate`](https://github.com/ahmedSamir50
 builder.Services.AddZVecCollection("products", options =>
 {
     options.Path = "/data/products";
-    options.Create = false; // open existing
+    options.OpenMode = ZVecCollectionOpenMode.OpenOnly;
 });
-
-// Inject: [FromKeyedServices("products")] IZvecCollection products
 ```
+
+### Known issue — Linux native teardown (temporary)
+
+> **Alert — Linux native teardown (temporary)**  
+> Upstream zvec may **SIGSEGV** on collection close / library shutdown on Linux (process exit **139** = failure, never a normal exit). `try`/`catch` **cannot** handle SIGSEGV.  
+> ZVec.NET **suppresses** those native calls on Linux by default (`ZVecNativeTeardownPolicy.Auto`) so apps exit cleanly. Set `NativeTeardownPolicy = AlwaysCall` only when debugging the upstream bug.  
+> **Drawbacks while this workaround is active:**  
+> - Possible skipped final native flush on close  
+> - Native handles leaked until process exit  
+> - Same-process dispose → reopen same path is fragile — use **singleton for process lifetime**  
+> - Prefer **one Initialize per process** on Linux  
+> - Behavior differs from Windows/macOS (which still call native teardown)  
+> - Other APIs (e.g. Destroy) may still be unsafe if they hit the same bug  
+> Tracked upstream: [alibaba/zvec#619](https://github.com/alibaba/zvec/issues/619).  
+> **Removal checklist when #619 is fixed:** verify Dispose+Shutdown exit 0 with `AlwaysCall` on linux-x64 → remove Auto suppress → restore unconditional close/shutdown → delete this alert → require clean teardown in consumer smoke.
 
 ### Health checks
 
@@ -624,7 +634,8 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 |---------|-------------------|
 | `DllNotFoundException` / native load failure | Host RID not in the nupkg, or local `runtimes/{rid}/native/` is empty. Check [supported vs not-yet RIDs](#native-rids-nuget-runtimes). Use a shipped RID, or build/deploy natives (see [CONTRIBUTING.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/CONTRIBUTING.md)). |
 | `ZVecAbiMismatchException` | Native ABI below floor or major mismatch. Use a package whose `+zvec.*` pin matches the shipped `zvec_c_api`. |
-| Create fails: path already exists | Use `factory.Open` / `Create = false`, or the [open-or-create pattern](#create-vs-open-restart-safe-collections). |
+| Create fails: path already exists | Use `factory.Open` / `OpenMode = OpenOnly`, or `factory.OpenOrCreate` / default DI `OpenOrCreate`. |
+| Linux process exit 139 on stop | Upstream teardown SIGSEGV ([#619](https://github.com/alibaba/zvec/issues/619)). SDK Auto policy suppresses native close/shutdown on Linux — see [Known issue](#known-issue--linux-native-teardown-temporary). Do not try/catch. |
 | `PlatformNotSupportedException` (RaBitQ) | HNSW-RaBitQ needs x86_64 + AVX2; not available on Arm/Arm64 ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
 | `PlatformNotSupportedException` (DiskANN) | DiskANN is Linux + libaio only ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
 
@@ -638,14 +649,14 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 
 | What | Format | Example |
 |------|--------|---------|
-| **SDK version** | SemVer | `1.0.0-beta.2` |
+| **SDK version** | SemVer | `1.0.0-beta.3` |
 | **ZVec native pin** | Build metadata after `+` | `+zvec.0.5.1` |
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
 | **ABI floor** | `ZVecNativeAbi` | Minimum `0.5.1`, same major |
-| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.2` |
+| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.3` |
 | **Git branch (train)** | `release/1.0` | Long-lived 1.0.x line |
 
-NuGet version example: `1.0.0-beta.2+zvec.0.5.1`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.2+zvec.0.5.1`.
+NuGet version example: `1.0.0-beta.3+zvec.0.5.1`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.3+zvec.0.5.1`.
 
 At startup the ABI gate requires:
 1. `zvec_check_version(MinimumMajor, MinimumMinor, MinimumPatch)` (native ≥ minimum), **and**
@@ -686,7 +697,7 @@ We welcome contributions! Please read [CONTRIBUTING.md](https://github.com/ahmed
 
 ## License
 
-[MIT](LICENSE) — same as [upstream ZVec](https://github.com/alibaba/zvec/blob/main/LICENSE).
+[Apache License 2.0](LICENSE) — same license as [upstream ZVec](https://github.com/alibaba/zvec/blob/main/LICENSE). See [NOTICE](NOTICE) for attribution.
 
 ---
 

@@ -61,6 +61,25 @@ public interface IZvecFactory : IAsyncDisposable, IDisposable
     ValueTask<IZvecCollection> OpenAsync(string path, ZVecCollectionOptions? options = null, CancellationToken ct = default);
 
     /// <summary>
+    /// Opens an existing collection at <paramref name="path"/> if it has content; otherwise creates it.
+    /// </summary>
+    /// <remarks>
+    /// Upstream has no native <c>open_or_create</c>. Empty directories left by a failed create are removed
+    /// before create. Prefer this for restart-safe hosts; use <see cref="CreateAndOpen"/> /
+    /// <see cref="Open"/> when you need strict create-only or open-only semantics.
+    /// </remarks>
+    IZvecCollection OpenOrCreate(string path, ZVecCollectionSchema schema, ZVecCollectionOptions? options = null);
+
+    /// <summary>
+    /// Asynchronously opens an existing collection or creates it when missing.
+    /// </summary>
+    ValueTask<IZvecCollection> OpenOrCreateAsync(
+        string path,
+        ZVecCollectionSchema schema,
+        ZVecCollectionOptions? options = null,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Returns the native library version string (for example <c>0.5.1</c>).
     /// Requires the factory to be initialized and the native library to be loaded.
     /// </summary>

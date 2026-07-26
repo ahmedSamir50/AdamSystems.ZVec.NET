@@ -20,6 +20,7 @@ permissions:
   contents: read
   actions: read
   id-token: write   # NuGet Trusted Publishing (OIDC)
+  packages: write   # GitHub Packages dual-publish
 
 jobs:
   guard-release-line:
@@ -177,5 +178,20 @@ jobs:
             dotnet nuget push "$pkg" \
               --api-key "$NUGET_API_KEY" \
               --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+      # Dual-publish so the repo Packages sidebar lists ZVec.NET.
+      # Primary public feed remains nuget.org; GitHub Packages needs a PAT with read:packages.
+      - name: Push to GitHub Packages
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          SOURCE="https://nuget.pkg.github.com/${GITHUB_REPOSITORY_OWNER}/index.json"
+          for pkg in artifacts/nuget/*.nupkg; do
+            echo "Pushing $(basename "$pkg") to GitHub Packages..."
+            dotnet nuget push "$pkg" \
+              --api-key "${{ secrets.GITHUB_TOKEN }}" \
+              --source "$SOURCE" \
               --skip-duplicate
           done

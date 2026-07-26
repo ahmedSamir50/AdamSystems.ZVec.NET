@@ -229,7 +229,7 @@ public sealed class ZVecFactory : IZvecFactory
         }
         catch
         {
-            try { NativeMethods.zvec_collection_close(handle); } catch { /* best effort */ }
+            ZVecNativeLifecycle.TryCloseCollection(handle);
             throw;
         }
 
@@ -246,6 +246,44 @@ public sealed class ZVecFactory : IZvecFactory
     {
         ct.ThrowIfCancellationRequested();
         return ValueTask.FromResult(Open(path, options));
+    }
+
+    /// <inheritdoc/>
+    public IZvecCollection OpenOrCreate(string path, ZVecCollectionSchema schema, ZVecCollectionOptions? options = null)
+    {
+        ThrowIfNotInitialized();
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        ArgumentNullException.ThrowIfNull(schema);
+
+        var parent = Path.GetDirectoryName(Path.GetFullPath(path));
+        if (!string.IsNullOrEmpty(parent))
+            Directory.CreateDirectory(parent);
+
+        if (Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any())
+            return Open(path, options);
+
+        // Remove empty dir left by a previous failed create attempt.
+        if (Directory.Exists(path) && !Directory.EnumerateFileSystemEntries(path).Any())
+        {
+            try { Directory.Delete(path); }
+            catch
+            {
+                // Best effort — CreateAndOpen will fail clearly if the path still blocks create.
+            }
+        }
+
+        return CreateAndOpen(path, schema, options);
+    }
+
+    /// <inheritdoc/>
+    public ValueTask<IZvecCollection> OpenOrCreateAsync(
+        string path,
+        ZVecCollectionSchema schema,
+        ZVecCollectionOptions? options = null,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(OpenOrCreate(path, schema, options));
     }
 
     /// <inheritdoc/>

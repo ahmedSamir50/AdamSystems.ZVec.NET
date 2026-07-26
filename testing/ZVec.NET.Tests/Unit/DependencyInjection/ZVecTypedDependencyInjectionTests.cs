@@ -46,7 +46,7 @@ public class ZVecTypedDependencyInjectionTests
             services.AddZVecCollection<DiProduct>(o =>
             {
                 o.Path = "open_only";
-                o.Create = false;
+                o.OpenMode = ZVecCollectionOpenMode.OpenOnly;
             });
 
             // Open path relies on native schema load; registration must still succeed.
