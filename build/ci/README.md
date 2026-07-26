@@ -6,6 +6,8 @@
 | `build-android.sh` | NDK CMake build → `android-arm64` / `android-x64` |
 | `build-ios.sh` | Xcode CMake build → `ios-*` / `maccatalyst-*` (macOS only) |
 | `validate-consumer.sh` | Clean `dotnet new` app + restore local `.nupkg` + create collection smoke |
+| `simulate-pack.ps1` | Local Pack-parity gate: reuse Pack native artifacts → Win+Docker Linux managed (`ZVEC_REQUIRE_NATIVE=1`) → pack → win+linux consumers (rc 0) |
+| `docker-linux-managed.sh` | Helper for `simulate-pack.ps1` Linux managed suite (`sdk:10.0-noble` + SDK 8/9 AppHost packs) |
 | `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 (shallow/no-tags), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, linux-aarch64 Arrow cross (+OPENSSL=OFF), osx-x64 march, iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi |
 
 ## Workflows

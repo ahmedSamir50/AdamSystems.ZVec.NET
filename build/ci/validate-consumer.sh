@@ -110,8 +110,8 @@ cp "$WORK/nuget.config" "$WORK/app/nuget.config"
 )
 
 # CreateAndOpen requires a path that does NOT already exist — do not Directory.CreateDirectory first.
-# Linux Auto teardown suppresses managed close/shutdown (alibaba/zvec#619). After that, libc
-# atexit/static dtors in libzvec_c_api.so can still SIGSEGV on Environment.Exit — use _exit(0).
+# After Shutdown, native atexit/static dtors in zvec_c_api can AccessViolation / SIGSEGV on
+# Environment.Exit (Linux Auto teardown #619; also seen on Windows Pack consumer). Hard-exit.
 cat > "$WORK/app/Program.cs" <<'EOF'
 using System.Runtime.InteropServices;
 using ZVec.NET;
@@ -131,12 +131,8 @@ try
     Console.WriteLine("OK: collection created at " + path);
     factory.Shutdown();
     Console.WriteLine("OK: shutdown complete");
-    if (OperatingSystem.IsLinux())
-    {
-        // Skip glibc atexit / native static destructors that SIGSEGV after suppressed teardown (#619).
-        NativeExit._exit(0);
-    }
-    Environment.Exit(0);
+    // Skip CLR + native atexit: Environment.Exit can AV after Shutdown (linux #619; win Pack smoke).
+    NativeExit.HardExit(0);
 }
 catch (DllNotFoundException ex)
 {
@@ -151,8 +147,30 @@ catch (Exception ex)
 
 static class NativeExit
 {
+    internal static void HardExit(int status)
+    {
+        if (OperatingSystem.IsLinux())
+        {
+            _exit(status);
+            return;
+        }
+        if (OperatingSystem.IsWindows())
+        {
+            // TerminateProcess skips DLL_PROCESS_DETACH / atexit (ExitProcess can still AV).
+            TerminateProcess(GetCurrentProcess(), (uint)status);
+            return;
+        }
+        Environment.Exit(status);
+    }
+
     [DllImport("libc", EntryPoint = "_exit")]
-    internal static extern void _exit(int status);
+    private static extern void _exit(int status);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
 }
 EOF
 
@@ -196,7 +214,7 @@ ls -la "$OUT_DIR" || true
 ls -la "$OUT_NATIVE" || true
 find "$OUT_DIR" -iname '*zvec*' | sort || true
 
-# Require create OK + Shutdown OK + process exit 0 (Linux uses _exit after suppressed teardown).
+# Require create OK + Shutdown OK + process exit 0 (HardExit skips native atexit after Shutdown).
 set +e
 dotnet run --project "$PROJ" -c Release --no-build --runtime "$RID" 2>&1 | tee "$WORK/smoke.out"
 rc=${PIPESTATUS[0]}

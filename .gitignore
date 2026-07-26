@@ -13,6 +13,11 @@
 *.snupkg
 /artifacts/
 /_ci_artifacts/
+/_sim_natives/
+/_sim_feed/
+/_feed_beta3/
+/_rid_native*/
+/_docker_nuget/
 **/BenchmarkDotNet.Artifacts/
 
 # =========================
