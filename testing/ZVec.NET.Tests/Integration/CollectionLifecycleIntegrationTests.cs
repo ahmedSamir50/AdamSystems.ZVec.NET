@@ -57,6 +57,11 @@ public class CollectionLifecycleIntegrationTests : IClassFixture<ZVecRealNativeF
             col.Update(updated).IsSuccess.Should().BeTrue();
         }
 
+        // On Linux, Auto teardown skips native close (#619), so the LOCK stays held and
+        // same-process reopen of the same path is unsupported until upstream is fixed.
+        if (ZVec.NET.Internal.ZVecNativeLifecycle.ShouldSuppressNativeTeardown)
+            return;
+
         using (var reopened = _factory.Open(_testPath))
         {
             reopened.Schema.Should().NotBeNull();
