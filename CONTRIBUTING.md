@@ -164,7 +164,7 @@ There is **no** merge of “different development branches into different `relea
 | `build-managed.yml` | **PRs** (+ manual dispatch) | No — core + tests only (not `samples/`) |
 | `build-native.yml` / `build-native-mobile.yml` | **PRs** with path filters (+ manual) | No |
 | `pack.yml` | **Manual** `workflow_dispatch` only (also called by Publish if needed) | No — natives → managed with RID artifacts → pack → consumer smoke |
-| `publish-nuget.yml` | tags `v*` + manual | **Yes** — commit must be on `release/*` |
+| `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
 | `validate-consumer-rerun.yml` | Manual only | No |
 
 **Ship flow:** PR (CI) → maintainer merge → **Actions → Pack NuGet** (manual) → maintainer tags `v*` → Publish reuses Pack artifacts. No Pack on every push to `release/**`.
@@ -182,7 +182,24 @@ Contributors **never** configure nuget.org, Trusted Publishing, API keys, or Git
 1. Merge the PR into the right train (`development` or `release/1.0`).
 2. Manually run **Pack NuGet**.
 3. Bump `<Version>` if needed, then create/push a `v*` tag (tag ruleset allows only the maintainer).
-4. **Publish NuGet** runs on the tag (or via `workflow_dispatch` + Pack `source_run_id`).
+4. **Publish NuGet** runs on the tag (or via `workflow_dispatch` + Pack `source_run_id`). It pushes to **nuget.org** (primary public feed), then dual-publishes the `.nupkg` to **GitHub Packages** so the repo Packages sidebar lists `ZVec.NET`.
+
+**Consumers of GitHub Packages (optional):** nuget.org remains the recommended install source. To restore from GitHub Packages instead, use a PAT with `read:packages` and a `nuget.config` such as:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="github" value="https://nuget.pkg.github.com/ahmedSamir50/index.json" />
+  </packageSources>
+  <packageSourceCredentials>
+    <github>
+      <add key="Username" value="YOUR_GITHUB_USERNAME" />
+      <add key="ClearTextPassword" value="YOUR_PAT_WITH_read:packages" />
+    </github>
+  </packageSourceCredentials>
+</configuration>
+```
 
 Secrets already on the repo (`NUGET_USER`, optional `NUGET_API_KEY`) and the nuget.org Trusted Publishing policy are **private maintainer credentials**. Do not document or rotate them in PRs. If Publish 401s again, the maintainer fixes secrets/policy outside of contributor docs.
 

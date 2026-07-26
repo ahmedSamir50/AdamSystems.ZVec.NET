@@ -97,8 +97,8 @@ public static class ZVecServiceCollectionExtensions
             var regOptions = new ZVecCollectionRegistrationOptions();
             configure(regOptions);
 
-            // Create needs a schema; Open loads schema from on-disk metadata.
-            if (regOptions.Create)
+            // Create / OpenOrCreate need a schema; Open loads schema from on-disk metadata.
+            if (regOptions.OpenMode != ZVecCollectionOpenMode.OpenOnly)
                 regOptions.Schema ??= ZVecCollectionSchemaBuilder.From<T>().Build();
 
             var untyped = OpenCollection(factory, regOptions);
@@ -120,14 +120,22 @@ public static class ZVecServiceCollectionExtensions
             throw new ArgumentException(ZVecDefaults.Errors.CollectionPathRequired, nameof(regOptions));
 
         var options = regOptions.ResolveOptions();
-        if (regOptions.Create)
+        switch (regOptions.OpenMode)
         {
-            if (regOptions.Schema is null)
-                throw new ArgumentException(ZVecDefaults.Errors.CollectionSchemaRequired, nameof(regOptions));
-            return factory.CreateAndOpen(regOptions.Path, regOptions.Schema, options);
-        }
+            case ZVecCollectionOpenMode.OpenOnly:
+                return factory.Open(regOptions.Path, options);
 
-        return factory.Open(regOptions.Path, options);
+            case ZVecCollectionOpenMode.CreateOnly:
+                if (regOptions.Schema is null)
+                    throw new ArgumentException(ZVecDefaults.Errors.CollectionSchemaRequired, nameof(regOptions));
+                return factory.CreateAndOpen(regOptions.Path, regOptions.Schema, options);
+
+            case ZVecCollectionOpenMode.OpenOrCreate:
+            default:
+                if (regOptions.Schema is null)
+                    throw new ArgumentException(ZVecDefaults.Errors.CollectionSchemaRequired, nameof(regOptions));
+                return factory.OpenOrCreate(regOptions.Path, regOptions.Schema, options);
+        }
     }
 
     private static IServiceCollection AddZVecCore(this IServiceCollection services)

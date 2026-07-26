@@ -1,3 +1,5 @@
+using ZVec.NET.Internal;
+
 namespace ZVec.NET.Interop;
 
 /// <summary>
@@ -37,7 +39,12 @@ internal sealed class SafeZvecHandle : SafeZvecHandleBase
 
         // US-E5.1: SafeHandle finalizer / Dispose safety net: CLOSE ONLY.
         // Never call zvec_collection_destroy here — that permanently deletes on-disk data.
-        if (!IsInvalid)
+        //
+        // TODO(alibaba/zvec#619): On Linux, Auto teardown policy skips zvec_collection_close
+        // because upstream may SIGSEGV (exit 139). When https://github.com/alibaba/zvec/issues/619
+        // is fixed and verified with NativeTeardownPolicy.AlwaysCall, remove the suppress branch
+        // and always call close here.
+        if (!IsInvalid && !ZVecNativeLifecycle.ShouldSuppressNativeTeardown)
         {
             _ = NativeMethods.zvec_collection_close(handle);
         }

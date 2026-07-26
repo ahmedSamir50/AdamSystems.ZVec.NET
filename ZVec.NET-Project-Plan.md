@@ -68,7 +68,7 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 | Inner project path | `src/Core/...` for layout only | Folder/project may use `Core` internally; **never** ship a public `*.Core` namespace or PackageId |
 | .NET Target | `net8.0` – `net10.0` (pack all three `lib/` TFMs) | LTS baseline net8.0; ship net9/net10 assemblies in the same package; **never** encode TFM in the SemVer string |
 | C++ Standard | C++17 | Matches ZVec upstream |
-| License | MIT via `<PackageLicenseExpression>` | Correct NuGet metadata property (not `<License>`) |
+| License | Apache-2.0 via `<PackageLicenseExpression>` | Matches upstream zvec; see NOTICE |
 | Strong-naming | Yes, open signing key (`.snk` committed to repo) | Enterprise / strong-named consumer compatibility. The `.snk` is an **identity key** (not a security secret) — like SQLitePCLRaw's approach. Generated once via `sn -k ZVec.NET.snk` and placed in `build/`. It lets strong-named consumers reference our assembly |
 | Test Framework | xUnit + FluentAssertions | User decision |
 | Test Strategy | Real native + Skip when DLL missing; `SetMockLibrary` only for missing-path failure tests | Mock C++ project retired (E17 canceled) |
@@ -1276,7 +1276,7 @@ No `build/*.props` for RID native packing — the .NET runtime resolves `runtime
      <Company>Adam Systems EGY</Company>
     <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory<float>), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries (win/linux/mac, x64/arm64).</Description>
     <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Wraps ZVec C++ 1.2.3; targets .NET 8.0+ (LTS baseline)</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
@@ -2202,7 +2202,7 @@ restriction does not apply.
        head -1 src/Native/ZVec.Native/external/zvec/LICENSE | grep -q "Apache License"
    ```
 2. If license changes, CI fails and blocks the build.
-3. NuGet metadata: `<PackageLicenseExpression>MIT</PackageLicenseExpression>` covers our package. The upstream Apache-2.0 license is for the native binary which we redistribute — legally compatible with MIT wrapping.
+3. NuGet metadata: `<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>` — same as upstream zvec. See root NOTICE for attribution.
 
 ---
 

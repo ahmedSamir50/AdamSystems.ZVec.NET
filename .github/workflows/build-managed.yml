@@ -109,7 +109,18 @@ jobs:
       - name: Test (unit + integration)
         env:
           ZVEC_REQUIRE_NATIVE: ${{ inputs.require_native == true && '1' || '0' }}
-        run: dotnet test testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj -c Release --no-build --logger "trx;LogFileName=test.trx"
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Run TFMs one at a time. A single `dotnet test` across net8/net9 on Windows
+          # with the vendored win-x64 native can SIGSEGV/heap-corrupt the second host
+          # (exit -1073740940) after a green first TFM.
+          for tfm in net8.0 net9.0; do
+            echo "=== testing $tfm ==="
+            dotnet test testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj \
+              -c Release -f "$tfm" --no-build \
+              --logger "trx;LogFileName=test-${tfm}.trx"
+          done
         # Without require_native: integration Skip if RID binary missing.
         # With require_native (Pack): RID must be in test output; detection failure fails the job.
 

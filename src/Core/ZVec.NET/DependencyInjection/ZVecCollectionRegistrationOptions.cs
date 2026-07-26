@@ -11,9 +11,9 @@ public sealed class ZVecCollectionRegistrationOptions
     public string Path { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the collection schema. If provided, the collection will be created and opened.
-    /// If null, the collection is assumed to exist and will only be opened.
-    /// For <c>AddZVecCollection&lt;T&gt;</c>, defaults to schema from the mapped type when unset.
+    /// Gets or sets the collection schema. Required for <see cref="ZVecCollectionOpenMode.CreateOnly"/>
+    /// and <see cref="ZVecCollectionOpenMode.OpenOrCreate"/>. For <c>AddZVecCollection&lt;T&gt;</c>,
+    /// defaults to schema from the mapped type when unset.
     /// </summary>
     public ZVecCollectionSchema? Schema { get; set; }
 
@@ -34,10 +34,23 @@ public sealed class ZVecCollectionRegistrationOptions
     public bool ReadOnly { get; set; } = ZVecDefaults.CollectionOptions.ReadOnly;
 
     /// <summary>
-    /// When true (default for typed registration), create-and-open using <see cref="Schema"/>
-    /// (or schema-from-type). When false, open an existing collection path only.
+    /// How to open the path. Default <see cref="ZVecCollectionOpenMode.OpenOrCreate"/> is restart-safe.
     /// </summary>
-    public bool Create { get; set; } = true;
+    public ZVecCollectionOpenMode OpenMode { get; set; } = ZVecCollectionOpenMode.OpenOrCreate;
+
+    /// <summary>
+    /// Obsolete shim: <see langword="true"/> maps to <see cref="ZVecCollectionOpenMode.CreateOnly"/>;
+    /// <see langword="false"/> maps to <see cref="ZVecCollectionOpenMode.OpenOnly"/>.
+    /// Prefer <see cref="OpenMode"/> (default <see cref="ZVecCollectionOpenMode.OpenOrCreate"/>).
+    /// </summary>
+    [Obsolete("Use OpenMode instead. true → CreateOnly, false → OpenOnly. Default OpenMode is OpenOrCreate.")]
+    public bool Create
+    {
+        get => OpenMode == ZVecCollectionOpenMode.CreateOnly;
+        set => OpenMode = value
+            ? ZVecCollectionOpenMode.CreateOnly
+            : ZVecCollectionOpenMode.OpenOnly;
+    }
 
     internal ZVecCollectionOptions ResolveOptions()
         => Options ?? new ZVecCollectionOptions

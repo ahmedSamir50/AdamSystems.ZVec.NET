@@ -187,10 +187,58 @@ public class ZVecFactoryIntegrationTests : IClassFixture<ZVecRealNativeFixture>,
         var useDisposed = () => col.GetStats();
         useDisposed.Should().Throw<ObjectDisposedException>();
 
-        // Close-only Shutdown preserves on-disk data; re-init and Open should succeed.
+        // Close-only Shutdown preserves on-disk data; re-init and Open should succeed
+        // when native close ran. On Linux, Auto teardown skips native close (#619), so
+        // same-process reopen of the same path is unsupported until upstream is fixed.
+        if (ZVec.NET.Internal.ZVecNativeLifecycle.ShouldSuppressNativeTeardown)
+            return;
+
         _factory.Initialize();
         using var reopened = _factory.Open(_testPath);
         reopened.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void OpenOrCreate_SecondCall_OpensExisting_WithoutThrow()
+    {
+        _fixture.SkipIfNotAvailable();
+
+        _factory = new ZVecFactory();
+        _factory.Initialize();
+
+        var schema = new ZVecCollectionSchema
+        {
+            Name = "open_or_create",
+            Vectors =
+            [
+                new ZVecVectorSchema
+                {
+                    Name = "embedding",
+                    DataType = ZVecDataType.VectorFp32,
+                    Dimension = 4,
+                    IndexParam = new ZVecFlatIndexParam()
+                }
+            ]
+        };
+
+        using (var created = _factory.OpenOrCreate(_testPath, schema))
+        {
+            created.Should().NotBeNull();
+            var doc = ZVecDoc.Create("pk1",
+                denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
+                {
+                    ["embedding"] = new float[] { 0.1f, 0.2f, 0.3f, 0.4f }
+                });
+            created.Insert(doc).IsSuccess.Should().BeTrue();
+        }
+
+        // Same-process reopen after Dispose is fragile when native close is suppressed (#619).
+        if (ZVec.NET.Internal.ZVecNativeLifecycle.ShouldSuppressNativeTeardown)
+            return;
+
+        using var opened = _factory.OpenOrCreate(_testPath, schema);
+        opened.Should().NotBeNull();
+        opened.GetStats().DocCount.Should().BeGreaterThan(0);
     }
 
     public void Dispose()

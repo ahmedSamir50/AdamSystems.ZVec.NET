@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using ZVec.NET.DependencyInjection;
+using ZVec.NET.Internal;
 using ZVec.NET.Mapping;
 
 namespace ZVec.NET.Tests.Integration;
@@ -19,6 +20,14 @@ public class OpenSchemaBindingIntegrationTests : IClassFixture<ZVecRealNativeFix
     {
         _fixture = fixture;
         _testPath = Path.Combine(Path.GetTempPath(), $"zvec_open_schema_{Guid.NewGuid():N}");
+    }
+
+    private void SkipIfSameProcessReopenUnsupported()
+    {
+        // Linux Auto teardown skips zvec_collection_close (alibaba/zvec#619), so dispose→reopen
+        // the same path in one process is unsupported until upstream is fixed.
+        if (ZVecNativeLifecycle.ShouldSuppressNativeTeardown)
+            Assert.Skip("Same-process reopen requires native close; suppressed on Linux until alibaba/zvec#619.");
     }
 
     private static ZVecCollectionSchema CreateSchema() => new()
@@ -89,6 +98,7 @@ public class OpenSchemaBindingIntegrationTests : IClassFixture<ZVecRealNativeFix
     [Fact]
     public void Open_Reopen_Fetch_ReturnsScalarFields()
     {
+        SkipIfSameProcessReopenUnsupported();
         var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
         SeedUntypedCollection(vector);
 
@@ -106,6 +116,7 @@ public class OpenSchemaBindingIntegrationTests : IClassFixture<ZVecRealNativeFix
     [Fact]
     public void Open_Reopen_Query_ReturnsScalarFields()
     {
+        SkipIfSameProcessReopenUnsupported();
         var vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
         SeedUntypedCollection(vector);
 
@@ -128,6 +139,7 @@ public class OpenSchemaBindingIntegrationTests : IClassFixture<ZVecRealNativeFix
     public void TypedWrap_Open_Reopen_Query_ReturnsMappedProperties()
     {
         _fixture.SkipIfNotAvailable();
+        SkipIfSameProcessReopenUnsupported();
         _factory = new ZVecFactory();
         _factory.Initialize();
 
@@ -164,6 +176,7 @@ public class OpenSchemaBindingIntegrationTests : IClassFixture<ZVecRealNativeFix
     public void TypedDI_CreateFalse_Reopen_ReturnsScalars()
     {
         _fixture.SkipIfNotAvailable();
+        SkipIfSameProcessReopenUnsupported();
         var path = Path.Combine(Path.GetTempPath(), $"zvec_open_schema_di_{Guid.NewGuid():N}");
         var previous = ZVecDefaults.Version.BypassAbiCheck;
         try
@@ -177,7 +190,7 @@ public class OpenSchemaBindingIntegrationTests : IClassFixture<ZVecRealNativeFix
                 services.AddZVecCollection<Product>(o =>
                 {
                     o.Path = path;
-                    o.Create = true;
+                    o.OpenMode = ZVecCollectionOpenMode.CreateOnly;
                 });
 
                 using var sp = services.BuildServiceProvider();
@@ -197,7 +210,7 @@ public class OpenSchemaBindingIntegrationTests : IClassFixture<ZVecRealNativeFix
                 services.AddZVecCollection<Product>(o =>
                 {
                     o.Path = path;
-                    o.Create = false;
+                    o.OpenMode = ZVecCollectionOpenMode.OpenOnly;
                 });
 
                 using var sp = services.BuildServiceProvider();
