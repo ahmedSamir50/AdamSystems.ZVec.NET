@@ -62,3 +62,5 @@ Thumbs.db
 /tools
 /githubActions.pipline.log
 githubActions.pipline.log
+_sim_pack*.log
+_sim_pack_run.log

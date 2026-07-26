@@ -43,18 +43,19 @@ Because this project relies on a native C++ engine, you cannot simply press "Run
 flowchart LR
   feat[feature branches]
   dev[development]
-  main[main]
+  mainNode[main]
   rel["release/1.0"]
-  tag["tag v1.0.0-alpha.1"]
+  tagNode["tag v1.0.0-beta.3.1"]
 
   feat --> dev
-  dev -->|"PR merge"| main
-  main -->|"cut release line"| rel
-  rel -->|"tag for nuget.org"| tag
-  rel -->|"hotfix commits"| rel
-  rel -->|"merge backfixes"| main
-  main -->|"merge"| dev
+  dev -->|"PR merge"| mainNode
+  mainNode -->|"cut release line"| rel
+  rel -->|"tag for nuget.org"| tagNode
+  rel -->|"merge backfixes"| mainNode
+  mainNode -->|"merge"| dev
 ```
+
+Hotfixes land on `release/1.0` via PR (same branch train) — see Hotfix section below; not shown as a self-loop (GitHub Mermaid).
 
 | Branch | Role | Parent / cut from |
 |--------|------|-------------------|
@@ -84,30 +85,31 @@ There is **no** git branch `release/1.0.0-alpha.1+zvec.0.5.1`. Contributors neve
 | Piece | Value |
 |-------|--------|
 | ZVec C++ pin | `0.5.1` |
-| SDK SemVer | `1.0.0-alpha.1` |
-| NuGet package | `1.0.0-alpha.1+zvec.0.5.1` |
-| First git tag | `v1.0.0-alpha.1` |
+| SDK SemVer | `1.0.0-beta.3.1` |
+| NuGet package | `1.0.0-beta.3.1+zvec.0.5.1` |
+| Current git tag | `v1.0.0-beta.3.1` |
 
 ### Daily work vs ship/maintain
 
 ```mermaid
 flowchart TB
-  subgraph daily [Daily work]
-    feat[feature_or_bugfix_branch]
-    devel[development]
-    feat -->|"PR"| devel
-    devel -->|"PR"| mainBr[main]
-  end
-  subgraph ship [Ship and maintain 1.0]
-    mainBr -->|"cut once"| rel10[release_1.0]
-    rel10 -->|"tag"| t1[v1.0.0-alpha.1]
-    hf[hotfix_branch]
-    rel10 -->|"checkout base"| hf
-    hf -->|"PR"| rel10
-    rel10 -->|"tag"| t2[v1.0.0-alpha.2]
-    rel10 -->|"merge back"| mainBr
-    mainBr -->|"merge"| devel
-  end
+  feat[feature_or_bugfix_branch]
+  devel[development]
+  mainDaily[main]
+  rel10["release/1.0"]
+  t1["v1.0.0-beta.3.1"]
+  hf[hotfix_branch]
+  mainShip[main]
+  develShip[development]
+
+  feat -->|"PR"| devel
+  devel -->|"PR"| mainDaily
+  mainDaily -->|"cut once"| rel10
+  rel10 -->|"tag"| t1
+  rel10 -->|"checkout base"| hf
+  hf -->|"PR"| rel10
+  rel10 -->|"merge back"| mainShip
+  mainShip -->|"merge"| develShip
 ```
 
 ### Normal contributions (features / most bugs)
