@@ -6,7 +6,11 @@ All notable changes to ZVec.NET are documented in this file.
 
 ### Planned
 
-- Promote `maccatalyst-arm64` from soft CI (best-effort in nupkg) to pack-required HARD after sustained full-matrix green
+- Promote `maccatalyst-arm64` from soft CI (included in Pack [30311588652](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/runs/30311588652)) to pack-required HARD
+
+### Changed
+
+- Managed tests (CI + `simulate-pack` / Docker) run on **net8.0** only; package still ships `net8.0` / `net9.0` / `net10.0`
 
 ## [1.0.0-beta.3.2] - 2026-07-28
 
@@ -23,7 +27,7 @@ Native pin unchanged: **zvec 0.5.1**.
 ### Changed
 
 - Pack-required natives: add `linux-arm64`, `osx-x64`, `android-arm64`, `android-x64`, `ios-arm64`, `iossimulator-arm64` (HARD CI + Pack assert)
-- Soft CI only: `win-arm64` ([alibaba/zvec#622](https://github.com/alibaba/zvec/issues/622)); `maccatalyst-arm64` (ship in nupkg when job succeeds)
+- Soft CI only: `win-arm64` ([alibaba/zvec#622](https://github.com/alibaba/zvec/issues/622)); `maccatalyst-arm64` (included in Pack [30311588652](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/runs/30311588652); soft until next HARD promote)
 - Desktop optional RIDs build on native runners (`ubuntu-24.04-arm`, `macos-15-intel`)
 - Pack requires desktop + hard-mobile workflow success; asserts HARD RID folders
 

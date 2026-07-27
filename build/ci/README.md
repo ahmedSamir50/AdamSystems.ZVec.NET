@@ -7,7 +7,7 @@
 | `build-ios.sh` | Xcode CMake build → `ios-*` / `maccatalyst-*` (macOS only) |
 | `validate-consumer.sh` | Clean `dotnet new` app + restore local `.nupkg` + create collection smoke |
 | `simulate-pack.ps1` | **Mandatory local Pack-parity gate** before remote Pack/tag: reuse Pack native artifacts → Win+Docker Linux managed (`ZVEC_REQUIRE_NATIVE=1`) → pack → win+linux consumers (rc 0) |
-| `docker-linux-managed.sh` | Helper for `simulate-pack.ps1` Linux managed suite (`sdk:10.0-noble` + SDK 8/9 AppHost packs) |
+| `docker-linux-managed.sh` | Helper for `simulate-pack.ps1` Linux managed suite (`sdk:10.0-noble` + SDK 8/9 AppHost packs; tests **net8.0** only) |
 | `verify-release-provenance.sh` | After a tag: assert Pack `head_sha` == tag commit, Pack `conclusion=success`, optional nuspec commit check (needs `gh` + git; no secrets) |
 | `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 ([#621](https://github.com/alibaba/zvec/issues/621)), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi + RocksDB `HAS_ARMV8_CRC` |
 
@@ -27,7 +27,7 @@
 
 | Image | Gate |
 |-------|------|
-| `mcr.microsoft.com/dotnet/sdk:10.0-noble` | `docker-linux-managed.sh` (managed net8 + net9, `ZVEC_REQUIRE_NATIVE=1`) — matches GHA `ubuntu-latest` |
+| `mcr.microsoft.com/dotnet/sdk:10.0-noble` | `docker-linux-managed.sh` (managed **net8.0**, `ZVEC_REQUIRE_NATIVE=1`) — matches GHA `ubuntu-latest` |
 | `mcr.microsoft.com/dotnet/sdk:8.0-noble` | `validate-consumer.sh linux-x64` via `simulate-pack.ps1` step 6 |
 | Newer rolling tag (e.g. `mcr.microsoft.com/dotnet/sdk:10.0`) | Re-run managed + consumer for forward compatibility |
 
@@ -44,15 +44,15 @@ Linux consumer smoke uses normal `Environment.Exit(0)` after Shutdown (Windows m
 
 | Gate | Local `simulate-pack.ps1` | Remote Pack |
 |------|---------------------------|-------------|
-| Win managed require_native (net8 then net9) | Yes | Yes |
+| Win managed require_native (**net8.0**) | Yes | Yes |
 | Linux managed require_native (Docker noble) | Yes | Yes |
 | osx-arm64 managed | No (no local macOS in sim) | Yes |
 | `dotnet pack` + nupkg natives | Yes | Yes |
 | win + linux consumers (rc 0) | Yes | Yes |
-| Soft RID natives (`win-arm64`, `maccatalyst-arm64`) | No (best-effort) | Soft-fail; ship if present |
+| Soft RID natives (`win-arm64`, `maccatalyst-arm64`) | No | Soft-fail; Catalyst included in Pack 30311588652 |
 | Trusted Publishing / nuget.org push | No | Publish only |
 
-**Pack order:** desktop natives → managed (`require_native`) → mobile natives → pack (asserts HARD RIDs; stamps `RepositoryCommit`) → consumers. Soft RIDs must not block Pack.
+**Pack order:** desktop natives → managed (`require_native`) → mobile natives → pack (asserts HARD RIDs; stamps `RepositoryCommit`) → consumers. Soft RIDs must not block Pack. **Managed tests = net8.0 only**; package still ships net8/net9/net10.
 
 **Standalone managed** (PR): no native download; integration tests Skip if the RID binary is missing. Unit tests still gate the job.
 
@@ -70,7 +70,7 @@ Consumer-facing matrix: [README.md — Native RIDs](../../README.md#native-rids-
 | `osx-x64` | HARD | `macos-15-intel` | Pack-required |
 | `android-arm64`, `android-x64` | mobile HARD | NDK | Pack-required |
 | `ios-arm64`, `iossimulator-arm64` | mobile HARD | macOS + Xcode | Pack-required |
-| `maccatalyst-arm64` | mobile SOFT | macOS + Xcode | Best-effort in nupkg; HARD next release |
+| `maccatalyst-arm64` | mobile SOFT | macOS + Xcode | Included in Pack 30311588652; CI soft until HARD next release |
 | `win-arm64` | desktop SOFT | MSVC amd64→arm64 | Not pack-required (#622) |
 
 **Try optional only:** `win-arm64`. **Try Catalyst only:** `maccatalyst-arm64` (hard-fail on that try path).

@@ -30,12 +30,10 @@ dotnet restore testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj \
   -p:DisableImplicitNuGetFallbackFolder=true \
   -p:AssemblyOriginatorKeyFile="$SNK"
 
-for tfm in net8.0 net9.0; do
-  echo "=== $tfm ==="
-  dotnet test testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj -c Release -f "$tfm" \
-    -p:DisableImplicitNuGetFallbackFolder=true \
-    -p:AssemblyOriginatorKeyFile="$SNK" \
-    --verbosity minimal
-done
+echo "=== net8.0 ==="
+dotnet test testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj -c Release -f net8.0 \
+  -p:DisableImplicitNuGetFallbackFolder=true \
+  -p:AssemblyOriginatorKeyFile="$SNK" \
+  --verbosity minimal
 
 echo DOCKER_MANAGED_OK

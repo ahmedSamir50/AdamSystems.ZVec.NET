@@ -51,7 +51,7 @@ Both wrap Alibaba ZVec. Prefer **`ZVec.NET`** for ASP.NET / MAUI / app code; the
 | Surface | Sync P/Invoke helpers | DI + typed ODM + sync/async |
 | Vectors | `float[]` | `ReadOnlyMemory<float>` pin path |
 | Indexes | HNSW / IVF / Flat / Invert | + RaBitQ, DiskANN, Vamana, FTS |
-| Platforms | Desktop + Android + iOS RIDs (Catalyst optional); net8 / net9 / net10 |
+| Platforms | Desktop + Android + iOS HARD RIDs; Catalyst in Pack (soft CI); net8 / net9 / net10 |
 | Lifecycle | Dispose each document | SafeHandle collections; factory shutdown |
 
 Install this SDK as **`ZVec.NET`** — not `Zvec`.
@@ -99,7 +99,7 @@ Shipped before the Linux teardown ownership fix ([alibaba/zvec#619](https://gith
 | `android-arm64`, `android-x64` | `libzvec_c_api.so` | Mobile HARD |
 | `ios-arm64`, `iossimulator-arm64` | `libzvec_c_api.dylib` | Mobile HARD |
 
-**Best-effort (soft CI; included in nupkg when the job succeeds):** `maccatalyst-arm64` — Mac Catalyst / MAUI (`macabi`); soft-fail this release; promote to pack-required in a later release after sustained full-matrix green.
+**Included in `1.0.0-beta.3.2` Pack** ([run 30311588652](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/runs/30311588652)); CI remains **soft** until a later release promotes it to pack-required HARD: `maccatalyst-arm64` — Mac Catalyst / MAUI (`macabi`).
 
 #### Not yet shipped — cause and unblock
 
@@ -127,7 +127,7 @@ Package size grows with each RID. There is **no** fixed 50 MB gate — see pack 
 dotnet add package ZVec.NET --version 1.0.0-beta.3.2
 ```
 
-Version scheme: `1.0.0-beta.3.2+zvec.0.5.1` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires pack-required RID natives.
+Version scheme: `1.0.0-beta.3.2+zvec.0.5.1` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires pack-required RID natives. Managed CI / `simulate-pack` run tests on **net8.0** only (LTS floor); the package still ships net8/net9/net10.
 
 ### Two APIs
 
