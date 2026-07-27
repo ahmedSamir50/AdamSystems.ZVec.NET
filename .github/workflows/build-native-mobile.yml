@@ -6,26 +6,62 @@ on:
       - "src/Native/**"
       - "build/ci/**"
       - ".github/workflows/build-native-mobile.yml"
+      - ".github/workflows/build-native-try-catalyst.yml"
   workflow_dispatch:
+    inputs:
+      try_catalyst_only:
+        description: "If true, only build maccatalyst-arm64 (hard-fail for validation). Skips Android + iOS."
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      try_catalyst_only:
+        description: "If true, only build maccatalyst-arm64 (hard-fail for validation)."
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: read
 
 jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      android: ${{ steps.set.outputs.android }}
+      apple_hard: ${{ steps.set.outputs.apple_hard }}
+      apple_soft: ${{ steps.set.outputs.apple_soft }}
+      catalyst_only: ${{ steps.set.outputs.catalyst_only }}
+    steps:
+      - id: set
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRY="${{ inputs.try_catalyst_only }}"
+          if [ "$TRY" = "true" ]; then
+            echo 'android=[]' >> "$GITHUB_OUTPUT"
+            echo 'apple_hard=[]' >> "$GITHUB_OUTPUT"
+            echo 'apple_soft=["maccatalyst-arm64"]' >> "$GITHUB_OUTPUT"
+            echo 'catalyst_only=true' >> "$GITHUB_OUTPUT"
+          else
+            # HARD: android + ios + iossim. SOFT: maccatalyst (ship if green; do not block Pack).
+            echo 'android=[{"abi":"arm64-v8a","rid":"android-arm64"},{"abi":"x86_64","rid":"android-x64"}]' >> "$GITHUB_OUTPUT"
+            echo 'apple_hard=["ios-arm64","iossimulator-arm64"]' >> "$GITHUB_OUTPUT"
+            echo 'apple_soft=["maccatalyst-arm64"]' >> "$GITHUB_OUTPUT"
+            echo 'catalyst_only=false' >> "$GITHUB_OUTPUT"
+          fi
+          echo "Resolved try_catalyst_only=$TRY"
+
   android:
     name: android-${{ matrix.abi }}
+    needs: matrix
+    if: needs.matrix.outputs.android != '[]'
     runs-on: ubuntu-latest
-    # First NDK/CMake green may need iteration; do not block desktop pack.
-    continue-on-error: true
+    continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - abi: arm64-v8a
-            rid: android-arm64
-          - abi: x86_64
-            rid: android-x64
+        include: ${{ fromJSON(needs.matrix.outputs.android) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,17 +104,58 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  apple-mobile:
+  apple-hard:
     name: ${{ matrix.target }}
+    needs: matrix
+    if: needs.matrix.outputs.apple_hard != '[]'
     runs-on: macos-latest
-    continue-on-error: true
+    continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - ios-arm64
-          - iossimulator-arm64
-          - maccatalyst-arm64
+        target: ${{ fromJSON(needs.matrix.outputs.apple_hard) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Fetch zvec tags + version fallback patch
+        run: |
+          set -euo pipefail
+          zvec="src/Native/ZVec.Native/external/zvec"
+          git -C "$zvec" fetch --tags --force origin || true
+          git -C "$zvec" fetch --deepen=200 origin || true
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.5.1.patch"
+          git -C "$zvec" apply --check "$patch"
+          git -C "$zvec" apply "$patch"
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Build Apple mobile native
+        run: |
+          chmod +x build/ci/build-ios.sh build/ci/deploy-native.sh
+          ./build/ci/build-ios.sh "${{ matrix.target }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zvec-native-${{ matrix.target }}
+          path: src/Core/ZVec.NET/runtimes/${{ matrix.target }}/native/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # Soft on full matrix; hard when try_catalyst_only (dedicated CRC validation).
+  apple-soft:
+    name: ${{ matrix.target }}
+    needs: matrix
+    if: needs.matrix.outputs.apple_soft != '[]'
+    runs-on: macos-latest
+    continue-on-error: ${{ needs.matrix.outputs.catalyst_only != 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.matrix.outputs.apple_soft) }}
     steps:
       - uses: actions/checkout@v4
         with:

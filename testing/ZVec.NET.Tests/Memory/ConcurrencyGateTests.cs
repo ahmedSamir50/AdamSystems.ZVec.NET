@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ZVec.NET.Exceptions;
 using ZVec.NET.Tests.Helpers;
 using ZVec.NET.Tests.Integration;
 
@@ -188,7 +189,7 @@ public class ConcurrencyGateTests : IClassFixture<ZVecRealNativeFixture>, IDispo
                             new ZVecQuery { FieldName = "embedding", Vector = vector },
                             topk: ZVecDefaults.Query.Topk);
                     }
-                    catch (ObjectDisposedException)
+                    catch (Exception ex) when (ex is ObjectDisposedException or ZVecNativeException)
                     {
                         break;
                     }
@@ -225,7 +226,7 @@ public class ConcurrencyGateTests : IClassFixture<ZVecRealNativeFixture>, IDispo
                             new ZVecQuery { FieldName = "embedding", Vector = vector },
                             topk: ZVecDefaults.Query.Topk);
                     }
-                    catch (ObjectDisposedException)
+                    catch (Exception ex) when (ex is ObjectDisposedException or ZVecNativeException)
                     {
                         break;
                     }

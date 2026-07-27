@@ -100,12 +100,10 @@ if ($SkipWinManaged) {
     Write-Host "Skipped (-SkipWinManaged)"
     $winManagedOk = $true
 } else {
-    # Clean host bin/obj so Pack-built DLL is what tests load (no stale Docker/obj mix).
+    # Clean host bin so Pack-built DLL is what tests load (keep obj — xUnit v3 apphost needs it).
     @(
         "src\Core\ZVec.NET\bin",
-        "src\Core\ZVec.NET\obj",
-        "testing\ZVec.NET.Tests\bin",
-        "testing\ZVec.NET.Tests\obj"
+        "testing\ZVec.NET.Tests\bin"
     ) | ForEach-Object {
         $p = Join-Path $Root $_
         if (Test-Path $p) { Remove-Item -Recurse -Force $p }
@@ -119,8 +117,10 @@ if ($SkipWinManaged) {
         Assert-Exit0 "dotnet restore tests"
         dotnet build src/Core/ZVec.NET/ZVec.NET.csproj -c Release --no-restore
         Assert-Exit0 "dotnet build core"
-        dotnet build testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj -c Release --no-restore
-        Assert-Exit0 "dotnet build tests"
+        foreach ($buildTfm in @("net8.0", "net9.0")) {
+            dotnet build testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj -c Release -f $buildTfm --no-restore
+            Assert-Exit0 "dotnet build tests $buildTfm"
+        }
 
         $dll = Join-Path $Root "testing\ZVec.NET.Tests\bin\Release\net8.0\runtimes\win-x64\native\zvec_c_api.dll"
         if (-not (Test-Path $dll)) { throw "Missing native in test output: $dll" }

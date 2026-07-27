@@ -2,6 +2,7 @@ using FluentAssertions;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 public class FtsIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDisposable
 {
     private readonly ZVecRealNativeFixture _fixture;

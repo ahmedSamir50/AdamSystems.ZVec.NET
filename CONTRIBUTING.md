@@ -45,7 +45,7 @@ flowchart LR
   dev[development]
   mainNode[main]
   rel["release/1.0"]
-  tagNode["tag v1.0.0-beta.3.1"]
+  tagNode["tag v1.0.0-beta.3.2"]
 
   feat --> dev
   dev -->|"PR merge"| mainNode
@@ -85,9 +85,9 @@ There is **no** git branch `release/1.0.0-alpha.1+zvec.0.5.1`. Contributors neve
 | Piece | Value |
 |-------|--------|
 | ZVec C++ pin | `0.5.1` |
-| SDK SemVer | `1.0.0-beta.3.1` |
-| NuGet package | `1.0.0-beta.3.1+zvec.0.5.1` |
-| Current git tag | `v1.0.0-beta.3.1` |
+| SDK SemVer | `1.0.0-beta.3.2` |
+| NuGet package | `1.0.0-beta.3.2+zvec.0.5.1` |
+| Current git tag | `v1.0.0-beta.3.2` |
 
 ### Daily work vs ship/maintain
 
@@ -97,7 +97,7 @@ flowchart TB
   devel[development]
   mainDaily[main]
   rel10["release/1.0"]
-  t1["v1.0.0-beta.3.1"]
+  t1["v1.0.0-beta.3.2"]
   hf[hotfix_branch]
   mainShip[main]
   develShip[development]
@@ -136,9 +136,9 @@ Bug in a published alpha/RTM on the 1.0 line:
 1. git fetch && git checkout release/1.0 && git pull
 2. git checkout -b hotfix/1.0-null-filter
 3. PR → release/1.0   (not → development)
-4. On release/1.0: bump Version in csproj (e.g. 1.0.0-beta.3.1+zvec.0.5.1)
+4. On release/1.0: bump Version in csproj (e.g. 1.0.0-beta.3.2+zvec.0.5.1)
 5. **Local:** run `build/ci/simulate-pack.ps1` to green (Pack-parity; do not discover failures on remote Pack)
-6. Tag `v1.0.0-beta.3.1` on release/1.0 → **Publish NuGet** (reuses same-SHA green Pack, or Packs inline)
+6. Tag `v1.0.0-beta.3.2` on release/1.0 → **Publish NuGet** (reuses same-SHA green Pack, or Packs inline)
 7. Merge release/1.0 → main, then main → development (so the fix is not lost)
 ```
 
