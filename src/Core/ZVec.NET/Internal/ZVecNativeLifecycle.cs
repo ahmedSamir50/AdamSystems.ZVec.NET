@@ -188,10 +188,19 @@ internal static class ZVecNativeLifecycle
         try
         {
             if (options.QueryThreads > 0)
-                NativeMethods.zvec_config_data_set_query_thread_count(cfg, (uint)options.QueryThreads);
+            {
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_config_data_set_query_thread_count(cfg, (uint)options.QueryThreads),
+                    nameof(ZVecFactory.Initialize));
+            }
 
             if (options.MemoryLimitMb.HasValue)
-                NativeMethods.zvec_config_data_set_memory_limit(cfg, (ulong)options.MemoryLimitMb.Value * 1024 * 1024);
+            {
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_config_data_set_memory_limit(
+                        cfg, (ulong)options.MemoryLimitMb.Value * 1024 * 1024),
+                    nameof(ZVecFactory.Initialize));
+            }
 
             IntPtr logCfg = options.LogType == ZVecLogType.File
                 ? NativeMethods.zvec_config_log_create_file(
