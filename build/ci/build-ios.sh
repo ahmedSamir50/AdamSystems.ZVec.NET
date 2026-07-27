@@ -44,6 +44,7 @@ apply_zvec_patch() {
 apply_zvec_patch "zvec-ios-static-output-name.patch"
 apply_zvec_patch "zvec-lz4-maccatalyst.patch"
 apply_zvec_patch "zvec-arrow-maccatalyst.patch"
+apply_zvec_patch "zvec-rocksdb-maccatalyst-crc.patch"
 
 # Host protoc: iOS-built protoc is killed (SIGKILL) when run on the Mac host.
 # Same pattern as Android GLOBAL_CC_PROTOBUF_PROTOC / win-arm64 host protoc.

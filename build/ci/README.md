@@ -9,7 +9,7 @@
 | `simulate-pack.ps1` | **Mandatory local Pack-parity gate** before remote Pack/tag: reuse Pack native artifacts → Win+Docker Linux managed (`ZVEC_REQUIRE_NATIVE=1`) → pack → win+linux consumers (rc 0) |
 | `docker-linux-managed.sh` | Helper for `simulate-pack.ps1` Linux managed suite (`sdk:10.0-noble` + SDK 8/9 AppHost packs) |
 | `verify-release-provenance.sh` | After a tag: assert Pack `head_sha` == tag commit, Pack `conclusion=success`, optional nuspec commit check (needs `gh` + git; no secrets) |
-| `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 (shallow/no-tags; see [alibaba/zvec#621](https://github.com/alibaba/zvec/issues/621)), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, legacy linux-aarch64 cross / osx-x64 march (unused while optional RIDs build on native runners), iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi |
+| `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 (shallow/no-tags; see [alibaba/zvec#621](https://github.com/alibaba/zvec/issues/621)), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, legacy linux-aarch64 cross / osx-x64 march (unused while optional RIDs build on native runners), iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi + RocksDB `HAS_ARMV8_CRC` |
 
 ## Workflows
 
@@ -18,6 +18,7 @@
 | `build-managed.yml` | PRs (+ manual) | No — core + tests only (not samples) |
 | `build-native.yml` / `build-native-mobile.yml` | PRs with path filters (+ manual) | No |
 | `build-native-try-optional.yml` | Manual only — **linux-arm64 + osx-x64** on native runners | No (fast optional RID check) |
+| `build-native-try-catalyst.yml` | Manual only — **maccatalyst-arm64** only | No (fast Catalyst check) |
 | `pack.yml` | Manual `workflow_dispatch` only (+ `workflow_call`) | No (pack + smoke only) |
 | `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
 | `validate-consumer-rerun.yml` | Manual only | No |
@@ -88,6 +89,9 @@ Missing RIDs are blocked by **building zvec’s bundled C++ third parties** (Arr
 | `zvec-osx-x64-march.patch` | Legacy (arm64 host → x86_64 slice); unused while `osx-x64` uses `macos-15-intel` |
 | `zvec-ios-static-output-name.patch` | iOS / simulator |
 | `zvec-lz4-maccatalyst.patch`, `zvec-arrow-maccatalyst.patch` | `maccatalyst-arm64` (+ applied from `build-ios.sh`) |
+| `zvec-rocksdb-maccatalyst-crc.patch` | `maccatalyst-arm64` — force `HAS_ARMV8_CRC` (iOS already does; Darwin+macabi skipped that path) |
+
+**Try Catalyst only:** Actions → **Build Native (try Catalyst)** → Run workflow. Builds only `maccatalyst-arm64` (no Android / iOS matrix).
 
 To promote an optional RID: keep the job green, set `optional: false` / drop `continue-on-error`, ensure pack always assembles that artifact, bump `PackageReleaseNotes` + README.
 

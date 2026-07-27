@@ -1,0 +1,44 @@
+name: Build Native (try Catalyst)
+
+# Manual-only validation for maccatalyst-arm64 (RocksDB CRC / macabi link).
+# Avoids the full mobile matrix (Android + iOS + simulator).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  maccatalyst-arm64:
+    name: maccatalyst-arm64
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Fetch zvec tags + version fallback patch
+        run: |
+          set -euo pipefail
+          zvec="src/Native/ZVec.Native/external/zvec"
+          git -C "$zvec" fetch --tags --force origin || true
+          git -C "$zvec" fetch --deepen=200 origin || true
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.5.1.patch"
+          git -C "$zvec" apply --check "$patch"
+          git -C "$zvec" apply "$patch"
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Build Apple mobile native
+        run: |
+          chmod +x build/ci/build-ios.sh build/ci/deploy-native.sh
+          ./build/ci/build-ios.sh maccatalyst-arm64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zvec-native-maccatalyst-arm64
+          path: src/Core/ZVec.NET/runtimes/maccatalyst-arm64/native/*
+          if-no-files-found: error
+          retention-days: 14
