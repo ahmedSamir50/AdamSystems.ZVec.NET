@@ -2,6 +2,7 @@ using FluentAssertions;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 /// <summary>US-E18.8 — Destroy → directory gone.</summary>
 public class DestroyIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDisposable
 {

@@ -2,6 +2,7 @@ using FluentAssertions;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 /// <summary>
 /// Exercises sparse insert + fetch unmarshall via zvec_doc_get_field_value_copy packing.
 /// Would have caught the orphan zvec_doc_get_sparse_vector_field.

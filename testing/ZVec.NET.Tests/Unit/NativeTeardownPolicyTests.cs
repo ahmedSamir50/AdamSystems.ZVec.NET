@@ -7,10 +7,10 @@ namespace ZVec.NET.Tests.Unit;
 public class NativeTeardownPolicyTests
 {
     [Fact]
-    public void ShouldSuppressNativeTeardown_Auto_MatchesLinux()
+    public void ShouldSuppressNativeTeardown_Auto_IsFalse()
     {
         // Default policy is Auto until first Initialize overrides it.
-        ZVecNativeLifecycle.ShouldSuppressNativeTeardown.Should().Be(OperatingSystem.IsLinux());
+        ZVecNativeLifecycle.ShouldSuppressNativeTeardown.Should().BeFalse();
     }
 
     [Fact]

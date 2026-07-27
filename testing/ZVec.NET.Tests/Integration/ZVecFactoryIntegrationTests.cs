@@ -187,12 +187,6 @@ public class ZVecFactoryIntegrationTests : IClassFixture<ZVecRealNativeFixture>,
         var useDisposed = () => col.GetStats();
         useDisposed.Should().Throw<ObjectDisposedException>();
 
-        // Close-only Shutdown preserves on-disk data; re-init and Open should succeed
-        // when native close ran. On Linux, Auto teardown skips native close (#619), so
-        // same-process reopen of the same path is unsupported until upstream is fixed.
-        if (ZVec.NET.Internal.ZVecNativeLifecycle.ShouldSuppressNativeTeardown)
-            return;
-
         _factory.Initialize();
         using var reopened = _factory.Open(_testPath);
         reopened.Should().NotBeNull();
@@ -231,10 +225,6 @@ public class ZVecFactoryIntegrationTests : IClassFixture<ZVecRealNativeFixture>,
                 });
             created.Insert(doc).IsSuccess.Should().BeTrue();
         }
-
-        // Same-process reopen after Dispose is fragile when native close is suppressed (#619).
-        if (ZVec.NET.Internal.ZVecNativeLifecycle.ShouldSuppressNativeTeardown)
-            return;
 
         using var opened = _factory.OpenOrCreate(_testPath, schema);
         opened.Should().NotBeNull();

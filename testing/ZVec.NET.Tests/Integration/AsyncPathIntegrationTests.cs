@@ -2,6 +2,7 @@ using FluentAssertions;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 /// <summary>US-E18.10 — Async CRUD + query integration.</summary>
 public class AsyncPathIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDisposable
 {

@@ -28,11 +28,12 @@ jobs:
   pack:
     name: pack ZVec.NET
     needs: [natives, natives-mobile, managed]
-    # Pack when managed + desktop native workflow finished; mobile may be partial/fail.
+    # Require desktop + hard mobile success. Soft RIDs (win-arm64, maccatalyst) may be absent.
     if: |
       always() &&
       needs.managed.result == 'success' &&
-      (needs.natives.result == 'success' || needs.natives.result == 'skipped')
+      (needs.natives.result == 'success' || needs.natives.result == 'skipped') &&
+      (needs.natives-mobile.result == 'success' || needs.natives-mobile.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +56,7 @@ jobs:
           path: _native_artifacts
           merge-multiple: false
 
-      - name: Assemble runtimes/
+      - name: Assemble runtimes/ + assert HARD RIDs
         shell: bash
         run: |
           set -euo pipefail
@@ -70,6 +71,33 @@ jobs:
           done
           echo "=== RID tree ==="
           find src/Core/ZVec.NET/runtimes -type f | sort
+
+          # Pack-required (HARD). Soft: win-arm64, maccatalyst-arm64 (include if present).
+          HARD_RIDS=(
+            win-x64 linux-x64 linux-arm64 osx-arm64 osx-x64
+            android-arm64 android-x64
+            ios-arm64 iossimulator-arm64
+          )
+          missing=0
+          for rid in "${HARD_RIDS[@]}"; do
+            if ! find "src/Core/ZVec.NET/runtimes/${rid}/native" -type f 2>/dev/null | grep -q .; then
+              echo "::error::Missing HARD RID native: runtimes/${rid}/native/"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          if find src/Core/ZVec.NET/runtimes/maccatalyst-arm64/native -type f 2>/dev/null | grep -q .; then
+            echo "Optional maccatalyst-arm64 present — will ship in nupkg"
+          else
+            echo "Optional maccatalyst-arm64 absent — Pack continues"
+          fi
+          if find src/Core/ZVec.NET/runtimes/win-arm64/native -type f 2>/dev/null | grep -q .; then
+            echo "Optional win-arm64 present — will ship in nupkg"
+          else
+            echo "Optional win-arm64 absent — Pack continues"
+          fi
 
       - name: Pack
         env:

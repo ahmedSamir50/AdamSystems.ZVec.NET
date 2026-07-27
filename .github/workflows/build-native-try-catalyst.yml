@@ -1,0 +1,17 @@
+name: Build Native (try Catalyst)
+
+# Manual-only validation for maccatalyst-arm64 (RocksDB CRC / macabi link).
+# Avoids the full mobile matrix (Android + iOS + simulator).
+# Note: until this file is on the default branch, dispatch via:
+#   gh workflow run "Build Native (mobile)" --ref <branch> -f try_catalyst_only=true
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile:
+    uses: ./.github/workflows/build-native-mobile.yml
+    with:
+      try_catalyst_only: true

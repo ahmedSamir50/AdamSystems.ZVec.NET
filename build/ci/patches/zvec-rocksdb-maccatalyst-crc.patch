@@ -1,0 +1,24 @@
+diff --git a/thirdparty/rocksdb/CMakeLists.txt b/thirdparty/rocksdb/CMakeLists.txt
+index 8d95e88..ec4ff73 100644
+--- a/thirdparty/rocksdb/CMakeLists.txt
++++ b/thirdparty/rocksdb/CMakeLists.txt
+@@ -19,6 +19,19 @@ elseif(IOS)
+         set(HAS_ARMV8_CRC ON CACHE INTERNAL "Force ARM CRC for iOS arm64")
+     endif()
+ endif()
++
++# Mac Catalyst: CMAKE_SYSTEM_NAME is Darwin (not IOS), so the elseif(IOS) block above
++# is skipped. Apple Clang still defines __ARM_FEATURE_CRC32 under -target *-macabi,
++# so crc32c.cc references crc32c_arm64* without compiling crc32c_arm64.cc unless we
++# force HAS_ARMV8_CRC the same way iOS does.
++if(APPLE AND (ZVEC_MACCATALYST OR CMAKE_C_FLAGS MATCHES "macabi" OR CMAKE_CXX_FLAGS MATCHES "macabi"))
++    set(WITH_JNI OFF CACHE BOOL "Disable JNI for Mac Catalyst" FORCE)
++    set(WITH_GFLAGS OFF CACHE BOOL "Disable gflags for Mac Catalyst" FORCE)
++    add_definitions(-DOS_MACOSX)
++    if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
++        set(HAS_ARMV8_CRC ON CACHE INTERNAL "Force ARM CRC for Mac Catalyst arm64")
++    endif()
++endif()
+ if(MSVC)
+     # Replace /Zi with /Z7 for sccache compatibility (/Z7 embeds debug info in .obj, no .pdb).
+     set(ROCKSDB_WINDOWS_PATCH ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb.windows.patch)
