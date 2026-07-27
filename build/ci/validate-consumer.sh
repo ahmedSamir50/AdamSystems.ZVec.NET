@@ -109,9 +109,7 @@ cp "$WORK/nuget.config" "$WORK/app/nuget.config"
   dotnet add ConsumerSmoke.csproj package ZVec.NET --version "$VERSION"
 )
 
-# CreateAndOpen requires a path that does NOT already exist — do not Directory.CreateDirectory first.
-# After Shutdown, native atexit/static dtors in zvec_c_api can AccessViolation / SIGSEGV on
-# Environment.Exit (Linux Auto teardown #619; also seen on Windows Pack consumer). Hard-exit.
+# After Shutdown, Windows Pack consumer may AV on Environment.Exit; Linux uses normal exit.
 cat > "$WORK/app/Program.cs" <<'EOF'
 using System.Runtime.InteropServices;
 using ZVec.NET;
@@ -131,8 +129,7 @@ try
     Console.WriteLine("OK: collection created at " + path);
     factory.Shutdown();
     Console.WriteLine("OK: shutdown complete");
-    // Skip CLR + native atexit: Environment.Exit can AV after Shutdown (linux #619; win Pack smoke).
-    NativeExit.HardExit(0);
+    NativeExit.Exit(0);
 }
 catch (DllNotFoundException ex)
 {
@@ -147,13 +144,8 @@ catch (Exception ex)
 
 static class NativeExit
 {
-    internal static void HardExit(int status)
+    internal static void Exit(int status)
     {
-        if (OperatingSystem.IsLinux())
-        {
-            _exit(status);
-            return;
-        }
         if (OperatingSystem.IsWindows())
         {
             // TerminateProcess skips DLL_PROCESS_DETACH / atexit (ExitProcess can still AV).
@@ -162,9 +154,6 @@ static class NativeExit
         }
         Environment.Exit(status);
     }
-
-    [DllImport("libc", EntryPoint = "_exit")]
-    private static extern void _exit(int status);
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetCurrentProcess();
@@ -214,7 +203,7 @@ ls -la "$OUT_DIR" || true
 ls -la "$OUT_NATIVE" || true
 find "$OUT_DIR" -iname '*zvec*' | sort || true
 
-# Require create OK + Shutdown OK + process exit 0 (HardExit skips native atexit after Shutdown).
+# Require create OK + Shutdown OK + process exit 0.
 set +e
 dotnet run --project "$PROJ" -c Release --no-build --runtime "$RID" 2>&1 | tee "$WORK/smoke.out"
 rc=${PIPESTATUS[0]}
@@ -224,7 +213,7 @@ if ! grep -Eq '^OK: collection created' "$WORK/smoke.out"; then
   exit "${rc:-1}"
 fi
 if ! grep -Eq '^OK: shutdown complete' "$WORK/smoke.out"; then
-  echo "ERROR: smoke did not complete Shutdown for $RID (rc=${rc}) — likely SIGSEGV during teardown (#619)" >&2
+  echo "ERROR: smoke did not complete Shutdown for $RID (rc=${rc})" >&2
   exit "${rc:-1}"
 fi
 if [[ "$rc" -ne 0 ]]; then

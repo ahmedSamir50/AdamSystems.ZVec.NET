@@ -23,8 +23,7 @@ internal static class ZVecNativeLifecycle
     }
 
     /// <summary>
-    /// True when native close/shutdown should be skipped (Linux Auto / Suppress).
-    /// Tracked: https://github.com/alibaba/zvec/issues/619 — remove when upstream is fixed.
+    /// True when native close/shutdown should be skipped (<see cref="ZVecNativeTeardownPolicy.Suppress"/> only).
     /// </summary>
     internal static bool ShouldSuppressNativeTeardown
     {
@@ -97,7 +96,7 @@ internal static class ZVecNativeLifecycle
     }
 
     /// <summary>
-    /// Best-effort <c>zvec_collection_close</c>, respecting Linux teardown suppression (#619).
+    /// Best-effort <c>zvec_collection_close</c>, respecting <see cref="ZVecNativeTeardownPolicy.Suppress"/>.
     /// </summary>
     internal static void TryCloseCollection(nint handle)
     {
@@ -137,10 +136,8 @@ internal static class ZVecNativeLifecycle
 
     private static bool ResolveSuppress(ZVecNativeTeardownPolicy policy) => policy switch
     {
-        ZVecNativeTeardownPolicy.AlwaysCall => false,
         ZVecNativeTeardownPolicy.Suppress => true,
-        // Auto: skip on Linux until https://github.com/alibaba/zvec/issues/619 is fixed.
-        _ => OperatingSystem.IsLinux()
+        _ => false
     };
 
     /// <summary>Caller must hold <see cref="GlobalInitLock"/>.</summary>
@@ -191,10 +188,19 @@ internal static class ZVecNativeLifecycle
         try
         {
             if (options.QueryThreads > 0)
-                NativeMethods.zvec_config_data_set_query_thread_count(cfg, (uint)options.QueryThreads);
+            {
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_config_data_set_query_thread_count(cfg, (uint)options.QueryThreads),
+                    nameof(ZVecFactory.Initialize));
+            }
 
             if (options.MemoryLimitMb.HasValue)
-                NativeMethods.zvec_config_data_set_memory_limit(cfg, (ulong)options.MemoryLimitMb.Value * 1024 * 1024);
+            {
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_config_data_set_memory_limit(
+                        cfg, (ulong)options.MemoryLimitMb.Value * 1024 * 1024),
+                    nameof(ZVecFactory.Initialize));
+            }
 
             IntPtr logCfg = options.LogType == ZVecLogType.File
                 ? NativeMethods.zvec_config_log_create_file(
@@ -205,16 +211,22 @@ internal static class ZVecNativeLifecycle
                     options.LogOverdueDays)
                 : NativeMethods.zvec_config_log_create_console((int)options.LogLevel);
 
+            var logCfgOwnedByConfig = false;
             try
             {
-                NativeMethods.zvec_config_data_set_log_config(cfg, logCfg);
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_config_data_set_log_config(cfg, logCfg),
+                    nameof(ZVecFactory.Initialize));
+                logCfgOwnedByConfig = true;
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_initialize(cfg),
                     nameof(ZVecFactory.Initialize));
             }
             finally
             {
-                NativeMethods.zvec_config_log_destroy(logCfg);
+                // c_api.h: ownership transfers to config on success — do not destroy separately.
+                if (!logCfgOwnedByConfig && logCfg != IntPtr.Zero)
+                    NativeMethods.zvec_config_log_destroy(logCfg);
             }
         }
         finally

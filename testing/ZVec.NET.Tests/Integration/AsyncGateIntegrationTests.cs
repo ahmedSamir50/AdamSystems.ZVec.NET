@@ -2,6 +2,7 @@ using FluentAssertions;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 /// <summary>
 /// Integration coverage for opt-in gate WaitAsync: cancel while waiting must complete promptly
 /// for write and read async paths against the real native library.

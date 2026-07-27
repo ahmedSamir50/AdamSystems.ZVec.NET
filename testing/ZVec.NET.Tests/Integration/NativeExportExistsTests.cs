@@ -5,6 +5,7 @@ using ZVec.NET.Interop;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 /// <summary>
 /// Honest gate: every [LibraryImport] on NativeMethods must resolve in the loaded zvec_c_api DLL.
 /// Would have failed CI for orphan names like zvec_doc_get_sparse_vector_field.

@@ -49,10 +49,8 @@ public sealed class ZVecOptions
 
     /// <summary>
     /// Whether to call native collection close / library shutdown on dispose.
-    /// Default <see cref="ZVecNativeTeardownPolicy.Auto"/> suppresses those calls on Linux
-    /// to avoid SIGSEGV (exit 139) until
-    /// <see href="https://github.com/alibaba/zvec/issues/619">alibaba/zvec#619</see> is fixed.
-    /// Set <see cref="ZVecNativeTeardownPolicy.AlwaysCall"/> to force native teardown (debug / post-fix).
+    /// Default <see cref="ZVecNativeTeardownPolicy.Auto"/> invokes native teardown on all platforms.
+    /// Use <see cref="ZVecNativeTeardownPolicy.Suppress"/> only when abandoning handles at process exit.
     /// </summary>
     public ZVecNativeTeardownPolicy NativeTeardownPolicy { get; set; } = ZVecNativeTeardownPolicy.Auto;
 }

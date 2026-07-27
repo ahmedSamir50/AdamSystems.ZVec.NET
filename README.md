@@ -4,7 +4,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512bd4.svg)](https://dotnet.microsoft.com/)
 
-> **Beta** — `1.0.0-beta.3.1+zvec.0.5.1`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.3.1`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
+> **Beta** — `1.0.0-beta.3.2+zvec.0.5.1`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.3.2`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
 
 **Production .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)** — DI, typed ODM, async, SafeHandles, full indexes/FTS, and mobile RIDs. Not a thin P/Invoke wrapper.
 
@@ -51,7 +51,7 @@ Both wrap Alibaba ZVec. Prefer **`ZVec.NET`** for ASP.NET / MAUI / app code; the
 | Surface | Sync P/Invoke helpers | DI + typed ODM + sync/async |
 | Vectors | `float[]` | `ReadOnlyMemory<float>` pin path |
 | Indexes | HNSW / IVF / Flat / Invert | + RaBitQ, DiskANN, Vamana, FTS |
-| Platforms | Desktop RIDs | + Android (iOS planned); net8 / net9 / net10 |
+| Platforms | Desktop + Android + iOS RIDs (Catalyst optional); net8 / net9 / net10 |
 | Lifecycle | Dispose each document | SafeHandle collections; factory shutdown |
 
 Install this SDK as **`ZVec.NET`** — not `Zvec`.
@@ -74,25 +74,38 @@ Install this SDK as **`ZVec.NET`** — not `Zvec`.
 
 Managed TFMs are `net8.0` / `net9.0` / `net10.0` (samples need .NET 10). Natives ship under `runtimes/{rid}/native/`.
 
-**Why some RIDs are missing:** not unfinished C# P/Invoke — **cross-compiling Alibaba zvec’s bundled C++ third parties** (mainly Apache Arrow and FastPFOR/SIMDe, plus host `protoc`, and on Apple Lz4/Arrow macabi). ZVec.NET applies [CI-only patches](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/build/ci/patches) (not pushed to alibaba/zvec). A RID ships when that build is **reliably green** and pack always includes it in the nupkg — no calendar date promised. Engineering detail: [build/ci/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/build/ci/README.md#rid-ship-gate).
+**Why some RIDs are missing:** not unfinished C# P/Invoke — **building Alibaba zvec’s bundled C++ third parties** (mainly Apache Arrow and FastPFOR/SIMDe, plus host `protoc` on some mobile/cross paths, and on Apple Lz4/Arrow/RocksDB macabi). Desktop ARM/Intel optional paths use **native GHA runners** (`ubuntu-24.04-arm`, `macos-15-intel`). ZVec.NET applies [CI-only patches](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/build/ci/patches) (not pushed to alibaba/zvec). A RID is pack-required when CI is hard-green **and** Pack always places the binary under `runtimes/{rid}/native/`. Engineering detail: [build/ci/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/build/ci/README.md#rid-ship-gate).
 
 #### Supported in `1.0.0-beta.3.1`
 
 | RID | Native file | Status |
 |-----|-------------|--------|
-| `win-x64` | `zvec_c_api.dll` | Pack-required; desktop CI tested |
-| `linux-x64` | `libzvec_c_api.so` | Pack-required; desktop CI tested |
-| `osx-arm64` | `libzvec_c_api.dylib` | Pack-required; desktop CI tested |
-| `android-arm64`, `android-x64` | `libzvec_c_api.so` | Intended ship RID (NDK CI); mobile jobs still soft-fail until hardened |
+| `win-x64` | `zvec_c_api.dll` | Pack-required |
+| `linux-x64` | `libzvec_c_api.so` | Pack-required |
+| `osx-arm64` | `libzvec_c_api.dylib` | Pack-required |
+| `android-arm64`, `android-x64` | `libzvec_c_api.so` | Intended ship RID (NDK CI soft-fail at the time) |
+
+Shipped before the Linux teardown ownership fix ([alibaba/zvec#619](https://github.com/alibaba/zvec/issues/619) binding side).
+
+#### Supported in `1.0.0-beta.3.2` (pack-required)
+
+| RID | Native file | Status |
+|-----|-------------|--------|
+| `win-x64` | `zvec_c_api.dll` | Desktop HARD |
+| `linux-x64` | `libzvec_c_api.so` | Desktop HARD |
+| `linux-arm64` | `libzvec_c_api.so` | Desktop HARD (`ubuntu-24.04-arm`) |
+| `osx-arm64` | `libzvec_c_api.dylib` | Desktop HARD |
+| `osx-x64` | `libzvec_c_api.dylib` | Desktop HARD (`macos-15-intel`) |
+| `android-arm64`, `android-x64` | `libzvec_c_api.so` | Mobile HARD |
+| `ios-arm64`, `iossimulator-arm64` | `libzvec_c_api.dylib` | Mobile HARD |
+
+**Best-effort (soft CI; included in nupkg when the job succeeds):** `maccatalyst-arm64` — Mac Catalyst / MAUI (`macabi`); soft-fail this release; promote to pack-required in a later release after sustained full-matrix green.
 
 #### Not yet shipped — cause and unblock
 
 | RID | Native file | Real reason | Unblock when |
 |-----|-------------|-------------|--------------|
-| `win-arm64` | `zvec_c_api.dll` | MSVC amd64→arm64 cross: FastPFOR needs SIMDe; Arrow PCG MSVC ARM64; host `protoc` (ARM64-built protoc cannot run on the x64 runner). Compile-only today (no Windows ARM64 run gate). | Optional CI job hard-green (no `continue-on-error`); pack always includes `runtimes/win-arm64`; release notes bump. Local patches bridge until upstream FastPFOR/Arrow accept fixes. |
-| `linux-arm64` | `libzvec_c_api.so` | Cross from x86_64: Arrow EP enables SSE unless told aarch64/NEON; OpenSSL off for cross; host x86_64 `protoc` (aarch64 protoc won’t exec on the runner). | Same gate: optional→required + always in nupkg. |
-| `osx-x64` | `libzvec_c_api.dylib` | Building `x86_64` on arm64 macOS runners: zvec auto-detects **host** arch for `-march` incorrectly (needs `CMAKE_OSX_ARCHITECTURES`). | Hard-green + pack include. |
-| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | Apple mobile/Catalyst CMake + third parties (iOS dual-STATIC `OUTPUT_NAME`, Lz4/Arrow macabi); host `protoc` (iOS-built protoc SIGKILL on Mac). Mobile workflow still `continue-on-error`. | Sustained green Apple-mobile CI + pack always ships those RIDs + MAUI device QA. |
+| `win-arm64` | `zvec_c_api.dll` | MSVC: `ailego` CMake `if(MSVC) return()` skips `zvec_ailego` while shared still required ([alibaba/zvec#622](https://github.com/alibaba/zvec/issues/622)). FastPFOR SIMDe / Arrow PCG CI patches may still be needed afterward. | Optional CI hard-green + always in nupkg |
 
 #### Never supported / feature limits (not a RID packaging issue)
 
@@ -111,10 +124,10 @@ Package size grows with each RID. There is **no** fixed 50 MB gate — see pack 
 ### Install
 
 ```bash
-dotnet add package ZVec.NET --version 1.0.0-beta.3.1
+dotnet add package ZVec.NET --version 1.0.0-beta.3.2
 ```
 
-Version scheme: `1.0.0-beta.3.1+zvec.0.5.1` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires desktop natives.
+Version scheme: `1.0.0-beta.3.2+zvec.0.5.1` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires pack-required RID natives.
 
 ### Two APIs
 
@@ -316,20 +329,11 @@ builder.Services.AddZVecCollection("products", options =>
 });
 ```
 
-### Known issue — Linux native teardown (temporary)
+### Native lifecycle
 
-> **Alert — Linux native teardown (temporary)**  
-> Upstream zvec may **SIGSEGV** on collection close / library shutdown on Linux (process exit **139** = failure, never a normal exit). `try`/`catch` **cannot** handle SIGSEGV.  
-> ZVec.NET **suppresses** those native calls on Linux by default (`ZVecNativeTeardownPolicy.Auto`) so apps exit cleanly. Set `NativeTeardownPolicy = AlwaysCall` only when debugging the upstream bug.  
-> **Drawbacks while this workaround is active:**  
-> - Possible skipped final native flush on close  
-> - Native handles leaked until process exit  
-> - Same-process dispose → reopen same path is fragile — use **singleton for process lifetime**  
-> - Prefer **one Initialize per process** on Linux  
-> - Behavior differs from Windows/macOS (which still call native teardown)  
-> - Other APIs (e.g. Destroy) may still be unsafe if they hit the same bug  
-> Tracked upstream: [alibaba/zvec#619](https://github.com/alibaba/zvec/issues/619).  
-> **Removal checklist when #619 is fixed:** verify Dispose+Shutdown exit 0 with `AlwaysCall` on linux-x64 → remove Auto suppress → restore unconditional close/shutdown → delete this alert → require clean teardown in consumer smoke.
+Treat `IZvecFactory` as a **process singleton**: prefer one `Initialize` per process and call `Shutdown` once at host stop. Repeated init/shutdown cycles work but add overhead; DI host shutdown handles this automatically.
+
+Use `NativeTeardownPolicy.Suppress` only when abandoning native handles at process exit (rare).
 
 ### Health checks
 
@@ -635,7 +639,7 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 | `DllNotFoundException` / native load failure | Host RID not in the nupkg, or local `runtimes/{rid}/native/` is empty. Check [supported vs not-yet RIDs](#native-rids-nuget-runtimes). Use a shipped RID, or build/deploy natives (see [CONTRIBUTING.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/CONTRIBUTING.md)). |
 | `ZVecAbiMismatchException` | Native ABI below floor or major mismatch. Use a package whose `+zvec.*` pin matches the shipped `zvec_c_api`. |
 | Create fails: path already exists | Use `factory.Open` / `OpenMode = OpenOnly`, or `factory.OpenOrCreate` / default DI `OpenOrCreate`. |
-| Linux process exit 139 on stop | Upstream teardown SIGSEGV ([#619](https://github.com/alibaba/zvec/issues/619)). SDK Auto policy suppresses native close/shutdown on Linux — see [Known issue](#known-issue--linux-native-teardown-temporary). Do not try/catch. |
+| Linux process exit 139 on stop | Fixed in **`1.0.0-beta.3.2`**: was often log-config double-free after ownership transfer ([#619](https://github.com/alibaba/zvec/issues/619)); SDK no longer destroys log config after `zvec_config_data_set_log_config`. Upgrade to ≥3.2; ensure factory `Shutdown` / DI host stop. Do not try/catch SIGSEGV. |
 | `PlatformNotSupportedException` (RaBitQ) | HNSW-RaBitQ needs x86_64 + AVX2; not available on Arm/Arm64 ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
 | `PlatformNotSupportedException` (DiskANN) | DiskANN is Linux + libaio only ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
 
@@ -649,14 +653,14 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 
 | What | Format | Example |
 |------|--------|---------|
-| **SDK version** | SemVer | `1.0.0-beta.3.1` |
+| **SDK version** | SemVer | `1.0.0-beta.3.2` |
 | **ZVec native pin** | Build metadata after `+` | `+zvec.0.5.1` |
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
 | **ABI floor** | `ZVecNativeAbi` | Minimum `0.5.1`, same major |
-| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.3.1` |
+| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.3.2` |
 | **Git branch (train)** | `release/1.0` | Long-lived 1.0.x line |
 
-NuGet version example: `1.0.0-beta.3.1+zvec.0.5.1`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.3.1+zvec.0.5.1`.
+NuGet version example: `1.0.0-beta.3.2+zvec.0.5.1`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.3.2+zvec.0.5.1`.
 
 At startup the ABI gate requires:
 1. `zvec_check_version(MinimumMajor, MinimumMinor, MinimumPatch)` (native ≥ minimum), **and**
