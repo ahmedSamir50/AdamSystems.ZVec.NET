@@ -1,7 +1,7 @@
 name: Try optional native RIDs
 
-# Manual-only validation for linux-arm64 + osx-x64 on matching native runners.
-# Avoids the full desktop matrix (~win/linux/osx required RIDs) while we prove optional ships.
+# Manual-only validation for the remaining soft desktop RID (win-arm64).
+# Avoids the full desktop matrix while iterating on MSVC ARM64 / ailego (#622).
 on:
   workflow_dispatch:
 

@@ -10,13 +10,13 @@ on:
   workflow_dispatch:
     inputs:
       try_optional_only:
-        description: "If true, only build linux-arm64 + osx-x64 (native runners). Skips pack-required RIDs."
+        description: "If true, only build win-arm64 (soft RID). Skips pack-required desktop RIDs."
         type: boolean
         default: false
   workflow_call:
     inputs:
       try_optional_only:
-        description: "If true, only build linux-arm64 + osx-x64 (native runners)."
+        description: "If true, only build win-arm64 (soft RID)."
         type: boolean
         default: false
         required: false
@@ -37,10 +37,11 @@ jobs:
           set -euo pipefail
           TRY="${{ inputs.try_optional_only }}"
           if [ "$TRY" = "true" ]; then
-            # Native optional RIDs only (no cross-compile / no foreign-arch slice).
-            MATRIX_JSON='[{"os":"ubuntu-24.04-arm","rid":"linux-arm64","test":false,"optional":true,"cmake_extra":""},{"os":"macos-15-intel","rid":"osx-x64","test":true,"optional":true,"cmake_extra":""}]'
+            # Soft RID only (MSVC ARM64 / ailego #622).
+            MATRIX_JSON='[{"os":"windows-latest","rid":"win-arm64","test":false,"optional":true,"cmake_extra":"-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64"}]'
           else
-            MATRIX_JSON='[{"os":"windows-latest","rid":"win-x64","test":true,"optional":false,"cmake_extra":""},{"os":"windows-latest","rid":"win-arm64","test":false,"optional":true,"cmake_extra":"-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64"},{"os":"ubuntu-latest","rid":"linux-x64","test":true,"optional":false,"cmake_extra":""},{"os":"ubuntu-24.04-arm","rid":"linux-arm64","test":false,"optional":true,"cmake_extra":""},{"os":"macos-latest","rid":"osx-arm64","test":true,"optional":false,"cmake_extra":"-DCMAKE_OSX_ARCHITECTURES=arm64"},{"os":"macos-15-intel","rid":"osx-x64","test":true,"optional":true,"cmake_extra":""}]'
+            # HARD: win-x64, linux-x64, linux-arm64, osx-arm64, osx-x64. SOFT: win-arm64 only.
+            MATRIX_JSON='[{"os":"windows-latest","rid":"win-x64","test":true,"optional":false,"cmake_extra":""},{"os":"windows-latest","rid":"win-arm64","test":false,"optional":true,"cmake_extra":"-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64"},{"os":"ubuntu-latest","rid":"linux-x64","test":true,"optional":false,"cmake_extra":""},{"os":"ubuntu-24.04-arm","rid":"linux-arm64","test":false,"optional":false,"cmake_extra":""},{"os":"macos-latest","rid":"osx-arm64","test":true,"optional":false,"cmake_extra":"-DCMAKE_OSX_ARCHITECTURES=arm64"},{"os":"macos-15-intel","rid":"osx-x64","test":true,"optional":false,"cmake_extra":""}]'
           fi
           echo "include=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
           echo "Resolved matrix (try_optional_only=$TRY): $MATRIX_JSON"

@@ -9,7 +9,7 @@
 | `simulate-pack.ps1` | **Mandatory local Pack-parity gate** before remote Pack/tag: reuse Pack native artifacts → Win+Docker Linux managed (`ZVEC_REQUIRE_NATIVE=1`) → pack → win+linux consumers (rc 0) |
 | `docker-linux-managed.sh` | Helper for `simulate-pack.ps1` Linux managed suite (`sdk:10.0-noble` + SDK 8/9 AppHost packs) |
 | `verify-release-provenance.sh` | After a tag: assert Pack `head_sha` == tag commit, Pack `conclusion=success`, optional nuspec commit check (needs `gh` + git; no secrets) |
-| `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 (shallow/no-tags; see [alibaba/zvec#621](https://github.com/alibaba/zvec/issues/621)), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, legacy linux-aarch64 cross / osx-x64 march (unused while optional RIDs build on native runners), iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi + RocksDB `HAS_ARMV8_CRC` |
+| `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 ([#621](https://github.com/alibaba/zvec/issues/621)), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi + RocksDB `HAS_ARMV8_CRC` |
 
 ## Workflows
 
@@ -17,8 +17,8 @@
 |----------|------------------|-------------------------|
 | `build-managed.yml` | PRs (+ manual) | No — core + tests only (not samples) |
 | `build-native.yml` / `build-native-mobile.yml` | PRs with path filters (+ manual) | No |
-| `build-native-try-optional.yml` | Manual only — **linux-arm64 + osx-x64** on native runners | No (fast optional RID check) |
-| `build-native-try-catalyst.yml` | Manual only — **maccatalyst-arm64** only | No (fast Catalyst check) |
+| `build-native-try-optional.yml` | Manual only — **win-arm64** soft RID | No |
+| `build-native-try-catalyst.yml` | Manual only — **maccatalyst-arm64** (hard on try path) | No |
 | `pack.yml` | Manual `workflow_dispatch` only (+ `workflow_call`) | No (pack + smoke only) |
 | `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
 | `validate-consumer-rerun.yml` | Manual only | No |
@@ -49,10 +49,10 @@ Linux consumer smoke uses normal `Environment.Exit(0)` after Shutdown (Windows m
 | osx-arm64 managed | No (no local macOS in sim) | Yes |
 | `dotnet pack` + nupkg natives | Yes | Yes |
 | win + linux consumers (rc 0) | Yes | Yes |
-| Optional RID natives (win-arm64, …) | No (reuse prior artifacts / soft-fail) | Soft-fail |
+| Soft RID natives (`win-arm64`, `maccatalyst-arm64`) | No (best-effort) | Soft-fail; ship if present |
 | Trusted Publishing / nuget.org push | No | Publish only |
 
-**Pack order:** desktop natives → managed tests with `require_native` → pack (stamps `RepositoryCommit`) → consumers. Pack stays gated on managed success. Mobile / optional desktop RIDs are soft-fail (`continue-on-error`).
+**Pack order:** desktop natives → managed (`require_native`) → mobile natives → pack (asserts HARD RIDs; stamps `RepositoryCommit`) → consumers. Soft RIDs must not block Pack.
 
 **Standalone managed** (PR): no native download; integration tests Skip if the RID binary is missing. Unit tests still gate the job.
 
@@ -60,40 +60,32 @@ Samples live under `samples/ZVec.NET.Samples.slnx` and are never built by these 
 
 ## RID ship gate
 
-Consumer-facing matrix (supported / not yet / never): [README.md — Native RIDs](../../README.md#native-rids-nuget-runtimes).
+Consumer-facing matrix: [README.md — Native RIDs](../../README.md#native-rids-nuget-runtimes).
 
-Missing RIDs are blocked by **building zvec’s bundled C++ third parties** (Arrow, FastPFOR/SIMDe, Lz4, host `protoc` on some mobile/cross paths), not by managed P/Invoke. Prefer **native runners** that match the RID (no cross-compile / no foreign-arch slice) before filing upstream build bugs. A RID is “shipped” when CI is hard-green for that RID **and** pack always places the binary under `src/Core/ZVec.NET/runtimes/{rid}/native/`.
+| RID | Workflow matrix | Runner | Gate (beta.3.2) |
+|-----|-----------------|--------|-----------------|
+| `win-x64`, `linux-x64` | `build-native.yml` HARD | `windows-latest` / `ubuntu-latest` | Pack-required |
+| `osx-arm64` | HARD | Apple Silicon (`macos-latest`) | Pack-required |
+| `linux-arm64` | HARD | `ubuntu-24.04-arm` | Pack-required |
+| `osx-x64` | HARD | `macos-15-intel` | Pack-required |
+| `android-arm64`, `android-x64` | mobile HARD | NDK | Pack-required |
+| `ios-arm64`, `iossimulator-arm64` | mobile HARD | macOS + Xcode | Pack-required |
+| `maccatalyst-arm64` | mobile SOFT | macOS + Xcode | Best-effort in nupkg; HARD next release |
+| `win-arm64` | desktop SOFT | MSVC amd64→arm64 | Not pack-required (#622) |
 
-| RID | Workflow matrix | Runner | Gate today |
-|-----|-----------------|--------|------------|
-| `win-x64`, `linux-x64` | `build-native.yml` `optional: false` | `windows-latest` / `ubuntu-latest` | Required; pack + managed `require_native` |
-| `osx-arm64` | `build-native.yml` `optional: false` | Apple Silicon (`macos-latest`) | Required; pack + managed `require_native` |
-| `linux-arm64` | `build-native.yml` `optional: true` | **`ubuntu-24.04-arm`** (native aarch64) | Soft-fail; not pack-required |
-| `osx-x64` | `build-native.yml` `optional: true` | **`macos-15-intel`** (native x86_64) | Soft-fail; not pack-required |
-| `win-arm64` | `build-native.yml` `optional: true` | `windows-latest` (MSVC amd64→arm64 cross) | Soft-fail; not pack-required |
-| `android-arm64`, `android-x64` | `build-native-mobile.yml` `continue-on-error: true` | NDK CI | Soft-fail; advertised when artifact present |
-| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `build-native-mobile.yml` `continue-on-error: true` | macOS + Xcode | Soft-fail; not pack-required |
-
-**Try optional only:** Actions → **Try optional native RIDs** → Run workflow (or `build-native.yml` with `try_optional_only=true`). Builds only `linux-arm64` + `osx-x64` so you do not wait on the full desktop matrix.
+**Try optional only:** `win-arm64`. **Try Catalyst only:** `maccatalyst-arm64` (hard-fail on that try path).
 
 ### Patch ↔ RID map (`patches/`)
 
 | Patch / step | RID(s) |
 |--------------|--------|
-| `zvec-version-fallback-0.5.1.patch` | All (shallow submodule / ABI version; upstream [alibaba/zvec#621](https://github.com/alibaba/zvec/issues/621)) |
-| `zvec-arrow-msvc-ninja.patch` | Windows (Arrow + Ninja/MSVC) |
+| `zvec-version-fallback-0.5.1.patch` | All ([#621](https://github.com/alibaba/zvec/issues/621)) |
+| `zvec-arrow-msvc-ninja.patch` | Windows |
 | `zvec-fastpfor-msvc-arm64-simde.patch` | `win-arm64` |
-| `zvec-arrow-pcg-msvc-arm64.patch` | `win-arm64` (Arrow tree) |
+| `zvec-arrow-pcg-msvc-arm64.patch` | `win-arm64` |
 | Host win64 / osx `protoc` download | `win-arm64`, Android, iOS/Catalyst |
-| `zvec-arrow-linux-aarch64-cross.patch` | Legacy (x86→aarch64 cross); unused while `linux-arm64` uses `ubuntu-24.04-arm` |
-| `zvec-osx-x64-march.patch` | Legacy (arm64 host → x86_64 slice); unused while `osx-x64` uses `macos-15-intel` |
 | `zvec-ios-static-output-name.patch` | iOS / simulator |
-| `zvec-lz4-maccatalyst.patch`, `zvec-arrow-maccatalyst.patch` | `maccatalyst-arm64` (+ applied from `build-ios.sh`) |
-| `zvec-rocksdb-maccatalyst-crc.patch` | `maccatalyst-arm64` — force `HAS_ARMV8_CRC` (iOS already does; Darwin+macabi skipped that path) |
-
-**Try Catalyst only:** `gh workflow run "Build Native (mobile)" --ref <branch> -f try_catalyst_only=true` (or Actions → **Build Native (try Catalyst)** once that workflow is on the default branch). Builds only `maccatalyst-arm64`.
-
-To promote an optional RID: keep the job green, set `optional: false` / drop `continue-on-error`, ensure pack always assembles that artifact, bump `PackageReleaseNotes` + README.
+| `zvec-lz4-maccatalyst.patch`, `zvec-arrow-maccatalyst.patch`, `zvec-rocksdb-maccatalyst-crc.patch` | `maccatalyst-arm64` |
 
 ## Branch / tag cheat sheet
 
@@ -101,7 +93,7 @@ To promote an optional RID: keep the job green, set `optional: false` / drop `co
 development  → daily PRs
 main         → stable trunk (cut releases from here)
 release/1.0  → 1.0.x maintenance (hotfixes + tags)
-tag v1.0.0-beta.3.1  → nuget.org + GitHub Packages (Version 1.0.0-beta.3.1+zvec.0.5.1; Publish requires same-SHA green Pack or Packs inline)
+tag v1.0.0-beta.3.2  → nuget.org + GitHub Packages (Version 1.0.0-beta.3.2+zvec.0.5.1; Publish requires same-SHA green Pack or Packs inline)
 ```
 
 **GitHub Packages:** Publish dual-pushes `.nupkg` (not `.snupkg`) to `nuget.pkg.github.com/{owner}`. Primary install remains nuget.org; optional consumers need a PAT with `read:packages` — see [CONTRIBUTING.md](../../CONTRIBUTING.md).

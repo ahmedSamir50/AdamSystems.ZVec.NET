@@ -4,11 +4,28 @@ All notable changes to ZVec.NET are documented in this file.
 
 ## [Unreleased]
 
+### Planned
+
+- Promote `maccatalyst-arm64` from soft CI (best-effort in nupkg) to pack-required HARD after sustained full-matrix green
+
+## [1.0.0-beta.3.2] - 2026-07-28
+
+Native pin unchanged: **zvec 0.5.1**.
+
 ### Fixed
 
 - Linux teardown SIGSEGV (exit 139): stop double-freeing log config after `zvec_config_data_set_log_config` transfers ownership ([alibaba/zvec#619](https://github.com/alibaba/zvec/issues/619))
 - Restore native collection close/shutdown on Linux (`ZVecNativeTeardownPolicy.Auto` no longer suppresses teardown)
 - Linux consumer smoke uses normal `Environment.Exit(0)` after Shutdown (Windows still uses `TerminateProcess` where needed)
+- Apple host `protoc` path pollution in `build-ios.sh` (stdout → exit 127)
+- Mac Catalyst RocksDB ARM CRC link via CI patch (`HAS_ARMV8_CRC` for Darwin+macabi)
+
+### Changed
+
+- Pack-required natives: add `linux-arm64`, `osx-x64`, `android-arm64`, `android-x64`, `ios-arm64`, `iossimulator-arm64` (HARD CI + Pack assert)
+- Soft CI only: `win-arm64` ([alibaba/zvec#622](https://github.com/alibaba/zvec/issues/622)); `maccatalyst-arm64` (ship in nupkg when job succeeds)
+- Desktop optional RIDs build on native runners (`ubuntu-24.04-arm`, `macos-15-intel`)
+- Pack requires desktop + hard-mobile workflow success; asserts HARD RID folders
 
 ## [1.0.0-beta.3.1] - 2026-07-26
 
@@ -48,7 +65,7 @@ Native pin unchanged: **zvec 0.5.1**.
 
 - Linux host stop crashing with exit **139** (SIGSEGV on `zvec_collection_close` / `zvec_shutdown`): Auto policy skips those native calls on Linux so the process exits 0
   - Tracked upstream: https://github.com/alibaba/zvec/issues/619
-  - Temporary; removal checklist documented in README
+  - Temporary; removal checklist documented in README (superseded by **1.0.0-beta.3.2** ownership fix)
 
 ### Known limitations (Linux teardown workaround)
 
