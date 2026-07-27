@@ -6,6 +6,7 @@ using ZVec.NET.Mapping;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 public class TypedOdmIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDisposable
 {
     private readonly ZVecRealNativeFixture _fixture;

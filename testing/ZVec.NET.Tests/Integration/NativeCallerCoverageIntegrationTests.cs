@@ -4,6 +4,7 @@ using ZVec.NET.Query;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 /// <summary>
 /// Broad native-caller smoke for production NativeMethods paths that other suites may miss.
 /// Each fact exercises real DLL entry points via managed APIs (not TryGetExport).
@@ -452,6 +453,45 @@ public class NativeCallerCoverageIntegrationTests : IClassFixture<ZVecRealNative
 
         act.Should().Throw<ZVecNativeException>()
             .Which.NativeErrorMessage.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void ErrorPath_RepeatedNativeFailures_DoNotCorruptProcess()
+    {
+        _fixture.SkipIfNotAvailable();
+        _factory = new ZVecFactory();
+        _factory.Initialize();
+
+        var schema = new ZVecCollectionSchema
+        {
+            Name = "caller_err_stress",
+            Vectors =
+            [
+                new ZVecVectorSchema
+                {
+                    Name = "embedding",
+                    DataType = ZVecDataType.VectorFp32,
+                    Dimension = 4,
+                    IndexParam = new ZVecFlatIndexParam()
+                }
+            ]
+        };
+
+        for (var i = 0; i < 50; i++)
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"zvec_err_stress_{Guid.NewGuid():N}");
+            _extraPaths.Add(path);
+
+            using var col = _factory.CreateAndOpen(path, schema);
+            var act = () => col.Insert(ZVecDoc.Create($"bad{i}",
+                denseVectors: new Dictionary<string, ReadOnlyMemory<float>>
+                {
+                    ["embedding"] = new float[] { 0.1f, 0.2f }
+                }));
+
+            act.Should().Throw<ZVecNativeException>()
+                .Which.NativeErrorMessage.Should().NotBeNullOrWhiteSpace();
+        }
     }
 
     public void Dispose()

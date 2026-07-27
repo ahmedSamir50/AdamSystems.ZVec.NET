@@ -6,7 +6,7 @@ using Xunit;
 
 namespace ZVec.NET.Tests.Integration;
 
-[Collection("RealNativeCollection")]
+[Collection(nameof(NativeSessionCollection))]
 public class NativeCallsIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDisposable
 {
     private readonly ZVecRealNativeFixture _fixture;

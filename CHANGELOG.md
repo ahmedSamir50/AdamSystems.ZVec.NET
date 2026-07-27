@@ -2,6 +2,14 @@
 
 All notable changes to ZVec.NET are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- Linux teardown SIGSEGV (exit 139): stop double-freeing log config after `zvec_config_data_set_log_config` transfers ownership ([alibaba/zvec#619](https://github.com/alibaba/zvec/issues/619))
+- Restore native collection close/shutdown on Linux (`ZVecNativeTeardownPolicy.Auto` no longer suppresses teardown)
+- Linux consumer smoke uses normal `Environment.Exit(0)` after Shutdown (Windows still uses `TerminateProcess` where needed)
+
 ## [1.0.0-beta.3.1] - 2026-07-26
 
 Native pin unchanged: **zvec 0.5.1**.
