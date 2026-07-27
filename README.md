@@ -315,20 +315,11 @@ builder.Services.AddZVecCollection("products", options =>
 });
 ```
 
-### Known issue — Linux native teardown (temporary)
+### Native lifecycle
 
-> **Alert — Linux native teardown (temporary)**  
-> Upstream zvec may **SIGSEGV** on collection close / library shutdown on Linux (process exit **139** = failure, never a normal exit). `try`/`catch` **cannot** handle SIGSEGV.  
-> ZVec.NET **suppresses** those native calls on Linux by default (`ZVecNativeTeardownPolicy.Auto`) so apps exit cleanly. Set `NativeTeardownPolicy = AlwaysCall` only when debugging the upstream bug.  
-> **Drawbacks while this workaround is active:**  
-> - Possible skipped final native flush on close  
-> - Native handles leaked until process exit  
-> - Same-process dispose → reopen same path is fragile — use **singleton for process lifetime**  
-> - Prefer **one Initialize per process** on Linux  
-> - Behavior differs from Windows/macOS (which still call native teardown)  
-> - Other APIs (e.g. Destroy) may still be unsafe if they hit the same bug  
-> Tracked upstream: [alibaba/zvec#619](https://github.com/alibaba/zvec/issues/619).  
-> **Removal checklist when #619 is fixed:** verify Dispose+Shutdown exit 0 with `AlwaysCall` on linux-x64 → remove Auto suppress → restore unconditional close/shutdown → delete this alert → require clean teardown in consumer smoke.
+Treat `IZvecFactory` as a **process singleton**: prefer one `Initialize` per process and call `Shutdown` once at host stop. Repeated init/shutdown cycles work but add overhead; DI host shutdown handles this automatically.
+
+Use `NativeTeardownPolicy.Suppress` only when abandoning native handles at process exit (rare).
 
 ### Health checks
 

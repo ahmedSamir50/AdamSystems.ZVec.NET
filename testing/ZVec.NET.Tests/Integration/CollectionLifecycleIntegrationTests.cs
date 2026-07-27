@@ -2,6 +2,7 @@ using FluentAssertions;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 /// <summary>US-E18.7 — open → CRUD → close → reopen → verify data persists.</summary>
 public class CollectionLifecycleIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDisposable
 {
@@ -56,11 +57,6 @@ public class CollectionLifecycleIntegrationTests : IClassFixture<ZVecRealNativeF
                 fields: new Dictionary<string, object> { ["title"] = "updated-title" });
             col.Update(updated).IsSuccess.Should().BeTrue();
         }
-
-        // On Linux, Auto teardown skips native close (#619), so the LOCK stays held and
-        // same-process reopen of the same path is unsupported until upstream is fixed.
-        if (ZVec.NET.Internal.ZVecNativeLifecycle.ShouldSuppressNativeTeardown)
-            return;
 
         using (var reopened = _factory.Open(_testPath))
         {

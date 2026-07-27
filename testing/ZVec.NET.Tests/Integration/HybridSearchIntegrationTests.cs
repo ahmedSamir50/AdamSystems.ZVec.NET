@@ -3,6 +3,7 @@ using ZVec.NET.Query;
 
 namespace ZVec.NET.Tests.Integration;
 
+[Collection(nameof(NativeSessionCollection))]
 public class HybridSearchIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDisposable
 {
     private readonly ZVecRealNativeFixture _fixture;

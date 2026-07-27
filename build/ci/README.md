@@ -22,6 +22,21 @@
 | `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
 | `validate-consumer-rerun.yml` | Manual only | No |
 
+**Linux teardown fix branch:** after changing init/teardown, run the full local matrix before opening a PR:
+
+| Image | Gate |
+|-------|------|
+| `mcr.microsoft.com/dotnet/sdk:10.0-noble` | `docker-linux-managed.sh` (managed net8 + net9, `ZVEC_REQUIRE_NATIVE=1`) — matches GHA `ubuntu-latest` |
+| `mcr.microsoft.com/dotnet/sdk:8.0-noble` | `validate-consumer.sh linux-x64` via `simulate-pack.ps1` step 6 |
+| Newer rolling tag (e.g. `mcr.microsoft.com/dotnet/sdk:10.0`) | Re-run managed + consumer for forward compatibility |
+
+```powershell
+# From repo root (Windows host; Docker required for linux gates)
+powershell -NoProfile -File build/ci/simulate-pack.ps1 -SkipDownload
+```
+
+Linux consumer smoke uses normal `Environment.Exit(0)` after Shutdown (Windows may still use `TerminateProcess`).
+
 **Ship:** PR CI → merge → **local `simulate-pack.ps1` green** → tag `v*` (maintainer) → Publish reuses **same-SHA** green Pack or Packs inline. Do not use remote Pack as the first discovery of managed/consumer failures.
 
 **Local sim vs GHA**
