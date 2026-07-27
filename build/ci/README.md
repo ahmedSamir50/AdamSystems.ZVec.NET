@@ -91,7 +91,7 @@ Missing RIDs are blocked by **building zvec’s bundled C++ third parties** (Arr
 | `zvec-lz4-maccatalyst.patch`, `zvec-arrow-maccatalyst.patch` | `maccatalyst-arm64` (+ applied from `build-ios.sh`) |
 | `zvec-rocksdb-maccatalyst-crc.patch` | `maccatalyst-arm64` — force `HAS_ARMV8_CRC` (iOS already does; Darwin+macabi skipped that path) |
 
-**Try Catalyst only:** Actions → **Build Native (try Catalyst)** → Run workflow. Builds only `maccatalyst-arm64` (no Android / iOS matrix).
+**Try Catalyst only:** `gh workflow run "Build Native (mobile)" --ref <branch> -f try_catalyst_only=true` (or Actions → **Build Native (try Catalyst)** once that workflow is on the default branch). Builds only `maccatalyst-arm64`.
 
 To promote an optional RID: keep the job green, set `optional: false` / drop `continue-on-error`, ensure pack always assembles that artifact, bump `PackageReleaseNotes` + README.
 

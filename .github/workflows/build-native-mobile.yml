@@ -6,26 +6,59 @@ on:
       - "src/Native/**"
       - "build/ci/**"
       - ".github/workflows/build-native-mobile.yml"
+      - ".github/workflows/build-native-try-catalyst.yml"
   workflow_dispatch:
+    inputs:
+      try_catalyst_only:
+        description: "If true, only build maccatalyst-arm64. Skips Android + other Apple targets."
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      try_catalyst_only:
+        description: "If true, only build maccatalyst-arm64."
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: read
 
 jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      android: ${{ steps.set.outputs.android }}
+      apple: ${{ steps.set.outputs.apple }}
+      catalyst_only: ${{ steps.set.outputs.catalyst_only }}
+    steps:
+      - id: set
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRY="${{ inputs.try_catalyst_only }}"
+          if [ "$TRY" = "true" ]; then
+            echo 'android=[]' >> "$GITHUB_OUTPUT"
+            echo 'apple=["maccatalyst-arm64"]' >> "$GITHUB_OUTPUT"
+            echo 'catalyst_only=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'android=[{"abi":"arm64-v8a","rid":"android-arm64"},{"abi":"x86_64","rid":"android-x64"}]' >> "$GITHUB_OUTPUT"
+            echo 'apple=["ios-arm64","iossimulator-arm64","maccatalyst-arm64"]' >> "$GITHUB_OUTPUT"
+            echo 'catalyst_only=false' >> "$GITHUB_OUTPUT"
+          fi
+          echo "Resolved try_catalyst_only=$TRY"
+
   android:
     name: android-${{ matrix.abi }}
+    needs: matrix
+    if: needs.matrix.outputs.android != '[]'
     runs-on: ubuntu-latest
     # First NDK/CMake green may need iteration; do not block desktop pack.
     continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - abi: arm64-v8a
-            rid: android-arm64
-          - abi: x86_64
-            rid: android-x64
+        include: ${{ fromJSON(needs.matrix.outputs.android) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,15 +103,14 @@ jobs:
 
   apple-mobile:
     name: ${{ matrix.target }}
+    needs: matrix
     runs-on: macos-latest
-    continue-on-error: true
+    # Soft-fail full matrix; hard-fail when validating Catalyst-only (CRC patch check).
+    continue-on-error: ${{ needs.matrix.outputs.catalyst_only != 'true' }}
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - ios-arm64
-          - iossimulator-arm64
-          - maccatalyst-arm64
+        target: ${{ fromJSON(needs.matrix.outputs.apple) }}
     steps:
       - uses: actions/checkout@v4
         with:
