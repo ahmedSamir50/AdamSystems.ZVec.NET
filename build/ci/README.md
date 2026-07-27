@@ -9,7 +9,7 @@
 | `simulate-pack.ps1` | **Mandatory local Pack-parity gate** before remote Pack/tag: reuse Pack native artifacts → Win+Docker Linux managed (`ZVEC_REQUIRE_NATIVE=1`) → pack → win+linux consumers (rc 0) |
 | `docker-linux-managed.sh` | Helper for `simulate-pack.ps1` Linux managed suite (`sdk:10.0-noble` + SDK 8/9 AppHost packs) |
 | `verify-release-provenance.sh` | After a tag: assert Pack `head_sha` == tag commit, Pack `conclusion=success`, optional nuspec commit check (needs `gh` + git; no secrets) |
-| `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 (shallow/no-tags), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, linux-aarch64 Arrow cross (+OPENSSL=OFF), osx-x64 march, iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi |
+| `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 (shallow/no-tags; see [alibaba/zvec#621](https://github.com/alibaba/zvec/issues/621)), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, legacy linux-aarch64 cross / osx-x64 march (unused while optional RIDs build on native runners), iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi |
 
 ## Workflows
 
@@ -17,6 +17,7 @@
 |----------|------------------|-------------------------|
 | `build-managed.yml` | PRs (+ manual) | No — core + tests only (not samples) |
 | `build-native.yml` / `build-native-mobile.yml` | PRs with path filters (+ manual) | No |
+| `build-native-try-optional.yml` | Manual only — **linux-arm64 + osx-x64** on native runners | No (fast optional RID check) |
 | `pack.yml` | Manual `workflow_dispatch` only (+ `workflow_call`) | No (pack + smoke only) |
 | `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
 | `validate-consumer-rerun.yml` | Manual only | No |
@@ -45,26 +46,31 @@ Samples live under `samples/ZVec.NET.Samples.slnx` and are never built by these 
 
 Consumer-facing matrix (supported / not yet / never): [README.md — Native RIDs](../../README.md#native-rids-nuget-runtimes).
 
-Missing RIDs are blocked by **cross-compiling zvec’s bundled third parties** (Arrow, FastPFOR/SIMDe, Lz4, host `protoc`), not by managed P/Invoke. A RID is “shipped” when CI is hard-green for that RID **and** pack always places the binary under `src/Core/ZVec.NET/runtimes/{rid}/native/`.
+Missing RIDs are blocked by **building zvec’s bundled C++ third parties** (Arrow, FastPFOR/SIMDe, Lz4, host `protoc` on some mobile/cross paths), not by managed P/Invoke. Prefer **native runners** that match the RID (no cross-compile / no foreign-arch slice) before filing upstream build bugs. A RID is “shipped” when CI is hard-green for that RID **and** pack always places the binary under `src/Core/ZVec.NET/runtimes/{rid}/native/`.
 
-| RID | Workflow matrix | Gate today |
-|-----|-----------------|------------|
-| `win-x64`, `linux-x64`, `osx-arm64` | `build-native.yml` `optional: false` | Required; pack + managed `require_native` |
-| `win-arm64`, `linux-arm64`, `osx-x64` | `build-native.yml` `optional: true` (`continue-on-error`) | Soft-fail; not pack-required |
-| `android-arm64`, `android-x64` | `build-native-mobile.yml` `continue-on-error: true` | Soft-fail; advertised when artifact present |
-| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `build-native-mobile.yml` `continue-on-error: true` | Soft-fail; not pack-required |
+| RID | Workflow matrix | Runner | Gate today |
+|-----|-----------------|--------|------------|
+| `win-x64`, `linux-x64` | `build-native.yml` `optional: false` | `windows-latest` / `ubuntu-latest` | Required; pack + managed `require_native` |
+| `osx-arm64` | `build-native.yml` `optional: false` | Apple Silicon (`macos-latest`) | Required; pack + managed `require_native` |
+| `linux-arm64` | `build-native.yml` `optional: true` | **`ubuntu-24.04-arm`** (native aarch64) | Soft-fail; not pack-required |
+| `osx-x64` | `build-native.yml` `optional: true` | **`macos-15-intel`** (native x86_64) | Soft-fail; not pack-required |
+| `win-arm64` | `build-native.yml` `optional: true` | `windows-latest` (MSVC amd64→arm64 cross) | Soft-fail; not pack-required |
+| `android-arm64`, `android-x64` | `build-native-mobile.yml` `continue-on-error: true` | NDK CI | Soft-fail; advertised when artifact present |
+| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `build-native-mobile.yml` `continue-on-error: true` | macOS + Xcode | Soft-fail; not pack-required |
+
+**Try optional only:** Actions → **Try optional native RIDs** → Run workflow (or `build-native.yml` with `try_optional_only=true`). Builds only `linux-arm64` + `osx-x64` so you do not wait on the full desktop matrix.
 
 ### Patch ↔ RID map (`patches/`)
 
 | Patch / step | RID(s) |
 |--------------|--------|
-| `zvec-version-fallback-0.5.1.patch` | All (shallow submodule / ABI version) |
+| `zvec-version-fallback-0.5.1.patch` | All (shallow submodule / ABI version; upstream [alibaba/zvec#621](https://github.com/alibaba/zvec/issues/621)) |
 | `zvec-arrow-msvc-ninja.patch` | Windows (Arrow + Ninja/MSVC) |
 | `zvec-fastpfor-msvc-arm64-simde.patch` | `win-arm64` |
 | `zvec-arrow-pcg-msvc-arm64.patch` | `win-arm64` (Arrow tree) |
-| Host win64 / linux-x86_64 / osx `protoc` download | `win-arm64`, `linux-arm64`, Android, iOS/Catalyst |
-| `zvec-arrow-linux-aarch64-cross.patch` | `linux-arm64` |
-| `zvec-osx-x64-march.patch` | `osx-x64` |
+| Host win64 / osx `protoc` download | `win-arm64`, Android, iOS/Catalyst |
+| `zvec-arrow-linux-aarch64-cross.patch` | Legacy (x86→aarch64 cross); unused while `linux-arm64` uses `ubuntu-24.04-arm` |
+| `zvec-osx-x64-march.patch` | Legacy (arm64 host → x86_64 slice); unused while `osx-x64` uses `macos-15-intel` |
 | `zvec-ios-static-output-name.patch` | iOS / simulator |
 | `zvec-lz4-maccatalyst.patch`, `zvec-arrow-maccatalyst.patch` | `maccatalyst-arm64` (+ applied from `build-ios.sh`) |
 

@@ -74,7 +74,7 @@ Install this SDK as **`ZVec.NET`** — not `Zvec`.
 
 Managed TFMs are `net8.0` / `net9.0` / `net10.0` (samples need .NET 10). Natives ship under `runtimes/{rid}/native/`.
 
-**Why some RIDs are missing:** not unfinished C# P/Invoke — **cross-compiling Alibaba zvec’s bundled C++ third parties** (mainly Apache Arrow and FastPFOR/SIMDe, plus host `protoc`, and on Apple Lz4/Arrow macabi). ZVec.NET applies [CI-only patches](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/build/ci/patches) (not pushed to alibaba/zvec). A RID ships when that build is **reliably green** and pack always includes it in the nupkg — no calendar date promised. Engineering detail: [build/ci/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/build/ci/README.md#rid-ship-gate).
+**Why some RIDs are missing:** not unfinished C# P/Invoke — **building Alibaba zvec’s bundled C++ third parties** (mainly Apache Arrow and FastPFOR/SIMDe, plus host `protoc` on some mobile/cross paths, and on Apple Lz4/Arrow macabi). Optional desktop RIDs prefer **native GHA runners** that match the RID (`ubuntu-24.04-arm`, `macos-15-intel`) rather than cross-compiling. ZVec.NET applies [CI-only patches](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/build/ci/patches) (not pushed to alibaba/zvec). A RID ships when that build is **reliably green** and pack always includes it in the nupkg — no calendar date promised. Engineering detail: [build/ci/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/build/ci/README.md#rid-ship-gate).
 
 #### Supported in `1.0.0-beta.3.1`
 
@@ -90,9 +90,8 @@ Managed TFMs are `net8.0` / `net9.0` / `net10.0` (samples need .NET 10). Natives
 | RID | Native file | Real reason | Unblock when |
 |-----|-------------|-------------|--------------|
 | `win-arm64` | `zvec_c_api.dll` | MSVC amd64→arm64 cross: FastPFOR needs SIMDe; Arrow PCG MSVC ARM64; host `protoc` (ARM64-built protoc cannot run on the x64 runner). Compile-only today (no Windows ARM64 run gate). | Optional CI job hard-green (no `continue-on-error`); pack always includes `runtimes/win-arm64`; release notes bump. Local patches bridge until upstream FastPFOR/Arrow accept fixes. |
-| `linux-arm64` | `libzvec_c_api.so` | Cross from x86_64: Arrow EP enables SSE unless told aarch64/NEON; OpenSSL off for cross; host x86_64 `protoc` (aarch64 protoc won’t exec on the runner). | Same gate: optional→required + always in nupkg. |
-| `osx-x64` | `libzvec_c_api.dylib` | Building `x86_64` on arm64 macOS runners: zvec auto-detects **host** arch for `-march` incorrectly (needs `CMAKE_OSX_ARCHITECTURES`). | Hard-green + pack include. |
-| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | Apple mobile/Catalyst CMake + third parties (iOS dual-STATIC `OUTPUT_NAME`, Lz4/Arrow macabi); host `protoc` (iOS-built protoc SIGKILL on Mac). Mobile workflow still `continue-on-error`. | Sustained green Apple-mobile CI + pack always ships those RIDs + MAUI device QA. |
+| `linux-arm64` | `libzvec_c_api.so` | Built on native `ubuntu-24.04-arm` (no x86→aarch64 cross). Soft-fail until hard-green. | Same gate: optional→required + always in nupkg. |
+| `osx-x64` | `libzvec_c_api.dylib` | Built on native `macos-15-intel` (Apple Silicon still used for `osx-arm64`). Soft-fail until hard-green. | Hard-green + pack include. || `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | Apple mobile/Catalyst CMake + third parties (iOS dual-STATIC `OUTPUT_NAME`, Lz4/Arrow macabi); host `protoc` (iOS-built protoc SIGKILL on Mac). Mobile workflow still `continue-on-error`. | Sustained green Apple-mobile CI + pack always ships those RIDs + MAUI device QA. |
 
 #### Never supported / feature limits (not a RID packaging issue)
 

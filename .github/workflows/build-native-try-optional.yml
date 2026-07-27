@@ -1,0 +1,15 @@
+name: Try optional native RIDs
+
+# Manual-only validation for linux-arm64 + osx-x64 on matching native runners.
+# Avoids the full desktop matrix (~win/linux/osx required RIDs) while we prove optional ships.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    uses: ./.github/workflows/build-native.yml
+    with:
+      try_optional_only: true
