@@ -61,14 +61,16 @@ ensure_host_protoc() {
   if [[ "$(uname -m)" == "x86_64" ]]; then
     url="https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-osx-x86_64.zip"
   fi
-  echo "Downloading host protoc from $url ..."
+  # Status/--version must go to stderr: HOST_PROTOC="$(ensure_host_protoc)"
+  # captures stdout into -DGLOBAL_CC_PROTOBUF_PROTOC=... (newline → exit 127).
+  echo "Downloading host protoc from $url ..." >&2
   curl -fsSL -o "$zip" "$url"
   unzip -qo "$zip" -d "$HOST_PROTOC_DIR"
   if [[ ! -x "$protoc" ]]; then
     echo "Host protoc missing at $protoc" >&2
     exit 1
   fi
-  "$protoc" --version
+  "$protoc" --version >&2
   echo "$protoc"
 }
 HOST_PROTOC="$(ensure_host_protoc)"

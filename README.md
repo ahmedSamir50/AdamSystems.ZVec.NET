@@ -91,7 +91,8 @@ Managed TFMs are `net8.0` / `net9.0` / `net10.0` (samples need .NET 10). Natives
 |-----|-------------|-------------|--------------|
 | `win-arm64` | `zvec_c_api.dll` | MSVC amd64→arm64 cross: FastPFOR needs SIMDe; Arrow PCG MSVC ARM64; host `protoc` (ARM64-built protoc cannot run on the x64 runner). Compile-only today (no Windows ARM64 run gate). | Optional CI job hard-green (no `continue-on-error`); pack always includes `runtimes/win-arm64`; release notes bump. Local patches bridge until upstream FastPFOR/Arrow accept fixes. |
 | `linux-arm64` | `libzvec_c_api.so` | Built on native `ubuntu-24.04-arm` (no x86→aarch64 cross). Soft-fail until hard-green. | Same gate: optional→required + always in nupkg. |
-| `osx-x64` | `libzvec_c_api.dylib` | Built on native `macos-15-intel` (Apple Silicon still used for `osx-arm64`). Soft-fail until hard-green. | Hard-green + pack include. || `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | Apple mobile/Catalyst CMake + third parties (iOS dual-STATIC `OUTPUT_NAME`, Lz4/Arrow macabi); host `protoc` (iOS-built protoc SIGKILL on Mac). Mobile workflow still `continue-on-error`. | Sustained green Apple-mobile CI + pack always ships those RIDs + MAUI device QA. |
+| `osx-x64` | `libzvec_c_api.dylib` | Built on native `macos-15-intel` (Apple Silicon still used for `osx-arm64`). Soft-fail until hard-green. | Hard-green + pack include. |
+| `ios-arm64`, `iossimulator-arm64`, `maccatalyst-arm64` | `libzvec_c_api.dylib` | Apple mobile/Catalyst CMake + third parties (iOS dual-STATIC `OUTPUT_NAME`, Lz4/Arrow macabi); host `protoc` (iOS-built protoc SIGKILL on Mac). Mobile workflow still `continue-on-error`. | Sustained green Apple-mobile CI + pack always ships those RIDs + MAUI device QA. |
 
 #### Never supported / feature limits (not a RID packaging issue)
 
@@ -625,7 +626,7 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 | `DllNotFoundException` / native load failure | Host RID not in the nupkg, or local `runtimes/{rid}/native/` is empty. Check [supported vs not-yet RIDs](#native-rids-nuget-runtimes). Use a shipped RID, or build/deploy natives (see [CONTRIBUTING.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/CONTRIBUTING.md)). |
 | `ZVecAbiMismatchException` | Native ABI below floor or major mismatch. Use a package whose `+zvec.*` pin matches the shipped `zvec_c_api`. |
 | Create fails: path already exists | Use `factory.Open` / `OpenMode = OpenOnly`, or `factory.OpenOrCreate` / default DI `OpenOrCreate`. |
-| Linux process exit 139 on stop | Upstream teardown SIGSEGV ([#619](https://github.com/alibaba/zvec/issues/619)). SDK Auto policy suppresses native close/shutdown on Linux — see [Known issue](#known-issue--linux-native-teardown-temporary). Do not try/catch. |
+| Linux process exit 139 on stop | Was often log-config double-free after ownership transfer ([#619](https://github.com/alibaba/zvec/issues/619)); fixed in SDK by not destroying log config after `zvec_config_data_set_log_config`. Ensure factory `Shutdown` / DI host stop runs. Do not try/catch SIGSEGV. |
 | `PlatformNotSupportedException` (RaBitQ) | HNSW-RaBitQ needs x86_64 + AVX2; not available on Arm/Arm64 ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
 | `PlatformNotSupportedException` (DiskANN) | DiskANN is Linux + libaio only ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
 
