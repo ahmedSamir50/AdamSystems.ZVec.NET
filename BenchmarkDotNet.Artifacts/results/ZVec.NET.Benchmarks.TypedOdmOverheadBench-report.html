@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>ZVec.NET.Benchmarks.TypedOdmOverheadBench-20260717-234050</title>
+<title>ZVec.NET.Benchmarks.TypedOdmOverheadBench-20260728-212652</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -13,27 +13,36 @@
 </head>
 <body>
 <pre><code>
-BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8875)
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8894)
 Intel Core i7-8850H CPU 2.60GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
 .NET SDK 10.0.110
-  [Host]     : .NET 9.0.18 (9.0.1826.31522), X64 RyuJIT AVX2
-  Job-WUTLVJ : .NET 9.0.18 (9.0.1826.31522), X64 RyuJIT AVX2
+  [Host]     : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  Job-RCMXCL : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
+  MediumRun  : .NET 8.0.29 (8.0.2926.32403), X64 RyuJIT AVX2
 </code></pre>
-<pre><code>IterationCount=5  WarmupCount=1  
-</code></pre>
+<pre><code></code></pre>
 
 <table>
-<thead><tr><th>Method              </th><th>Mean  </th><th>Error  </th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Rank</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
+<thead><tr><th>Method              </th><th>Job </th><th>IterationCount</th><th>LaunchCount</th><th>WarmupCount</th><th>Mean  </th><th>Error  </th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Rank</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
 </tr>
-</thead><tbody><tr><td>Insert_Dynamic</td><td>66,593.3 ns</td><td>13,679.59 ns</td><td>3,552.55 ns</td><td>1.002</td><td>0.07</td><td>3</td><td>0.2441</td><td>1376 B</td><td>1.00</td>
-</tr><tr><td>Insert_Typed</td><td>55,883.5 ns</td><td>17,598.27 ns</td><td>2,723.35 ns</td><td>0.841</td><td>0.05</td><td>3</td><td>0.3662</td><td>2144 B</td><td>1.56</td>
-</tr><tr><td>Query_Dynamic</td><td>441,822.1 ns</td><td>67,193.27 ns</td><td>10,398.23 ns</td><td>6.650</td><td>0.35</td><td>4</td><td>0.9766</td><td>6505 B</td><td>4.73</td>
-</tr><tr><td>Query_Typed</td><td>381,269.2 ns</td><td>392,284.44 ns</td><td>60,706.45 ns</td><td>5.738</td><td>0.86</td><td>4</td><td>1.4648</td><td>8792 B</td><td>6.39</td>
-</tr><tr><td>QueryFilter_Dynamic</td><td>569,467.7 ns</td><td>117,894.27 ns</td><td>30,616.77 ns</td><td>8.571</td><td>0.59</td><td>4</td><td>0.9766</td><td>6505 B</td><td>4.73</td>
-</tr><tr><td>QueryFilter_Typed</td><td>540,043.7 ns</td><td>83,435.76 ns</td><td>21,668.00 ns</td><td>8.128</td><td>0.49</td><td>4</td><td>1.9531</td><td>9463 B</td><td>6.88</td>
-</tr><tr><td>Mapper_ToDoc</td><td>413.9 ns</td><td>124.27 ns</td><td>32.27 ns</td><td>0.006</td><td>0.00</td><td>2</td><td>0.2174</td><td>1024 B</td><td>0.74</td>
-</tr><tr><td>Mapper_FromDoc</td><td>193.9 ns</td><td>33.29 ns</td><td>8.65 ns</td><td>0.003</td><td>0.00</td><td>1</td><td>0.0339</td><td>160 B</td><td>0.12</td>
-</tr><tr><td>ExpressionFilter_Translate</td><td>371.5 ns</td><td>43.67 ns</td><td>6.76 ns</td><td>0.006</td><td>0.00</td><td>2</td><td>0.1254</td><td>592 B</td><td>0.43</td>
+</thead><tbody><tr><td>Insert_Dynamic</td><td>Job-RCMXCL</td><td>5</td><td>Default</td><td>1</td><td>59,204.6 ns</td><td>16,475.67 ns</td><td>2,549.63 ns</td><td>1.001</td><td>0.05</td><td>3</td><td>0.2441</td><td>1440 B</td><td>1.00</td>
+</tr><tr><td>Insert_Typed</td><td>Job-RCMXCL</td><td>5</td><td>Default</td><td>1</td><td>70,472.6 ns</td><td>9,279.66 ns</td><td>1,436.04 ns</td><td>1.192</td><td>0.05</td><td>3</td><td>0.3662</td><td>2208 B</td><td>1.53</td>
+</tr><tr><td>Query_Dynamic</td><td>Job-RCMXCL</td><td>5</td><td>Default</td><td>1</td><td>343,005.4 ns</td><td>110,344.88 ns</td><td>17,075.99 ns</td><td>5.801</td><td>0.34</td><td>4</td><td>0.9766</td><td>6568 B</td><td>4.56</td>
+</tr><tr><td>Query_Typed</td><td>Job-RCMXCL</td><td>5</td><td>Default</td><td>1</td><td>375,785.8 ns</td><td>127,134.23 ns</td><td>33,016.36 ns</td><td>6.356</td><td>0.57</td><td>4</td><td>1.4648</td><td>8856 B</td><td>6.15</td>
+</tr><tr><td>QueryFilter_Dynamic</td><td>Job-RCMXCL</td><td>5</td><td>Default</td><td>1</td><td>562,312.5 ns</td><td>49,772.11 ns</td><td>12,925.66 ns</td><td>9.511</td><td>0.41</td><td>5</td><td>0.9766</td><td>6569 B</td><td>4.56</td>
+</tr><tr><td>QueryFilter_Typed</td><td>Job-RCMXCL</td><td>5</td><td>Default</td><td>1</td><td>641,914.0 ns</td><td>197,673.07 ns</td><td>51,335.07 ns</td><td>10.857</td><td>0.90</td><td>5</td><td>1.9531</td><td>9657 B</td><td>6.71</td>
+</tr><tr><td>Mapper_ToDoc</td><td>Job-RCMXCL</td><td>5</td><td>Default</td><td>1</td><td>488.9 ns</td><td>164.21 ns</td><td>42.65 ns</td><td>0.008</td><td>0.00</td><td>2</td><td>0.2174</td><td>1024 B</td><td>0.71</td>
+</tr><tr><td>Mapper_FromDoc</td><td>Job-RCMXCL</td><td>5</td><td>Default</td><td>1</td><td>213.0 ns</td><td>29.85 ns</td><td>4.62 ns</td><td>0.004</td><td>0.00</td><td>1</td><td>0.0339</td><td>160 B</td><td>0.11</td>
+</tr><tr><td>ExpressionFilter_Translate</td><td>Job-RCMXCL</td><td>5</td><td>Default</td><td>1</td><td>453.7 ns</td><td>118.89 ns</td><td>30.87 ns</td><td>0.008</td><td>0.00</td><td>2</td><td>0.1698</td><td>800 B</td><td>0.56</td>
+</tr><tr><td>Insert_Dynamic</td><td>MediumRun</td><td>15</td><td>2</td><td>10</td><td>62,600.7 ns</td><td>2,790.36 ns</td><td>3,911.69 ns</td><td>1.004</td><td>0.09</td><td>3</td><td>0.2441</td><td>1440 B</td><td>1.00</td>
+</tr><tr><td>Insert_Typed</td><td>MediumRun</td><td>15</td><td>2</td><td>10</td><td>66,353.4 ns</td><td>4,426.18 ns</td><td>6,487.83 ns</td><td>1.064</td><td>0.12</td><td>3</td><td>0.4272</td><td>2208 B</td><td>1.53</td>
+</tr><tr><td>Query_Dynamic</td><td>MediumRun</td><td>15</td><td>2</td><td>10</td><td>354,038.3 ns</td><td>16,451.84 ns</td><td>24,624.34 ns</td><td>5.676</td><td>0.52</td><td>4</td><td>0.9766</td><td>6568 B</td><td>4.56</td>
+</tr><tr><td>Query_Typed</td><td>MediumRun</td><td>15</td><td>2</td><td>10</td><td>372,285.1 ns</td><td>14,483.13 ns</td><td>21,229.19 ns</td><td>5.969</td><td>0.49</td><td>4</td><td>1.4648</td><td>8856 B</td><td>6.15</td>
+</tr><tr><td>QueryFilter_Dynamic</td><td>MediumRun</td><td>15</td><td>2</td><td>10</td><td>583,090.2 ns</td><td>33,961.40 ns</td><td>48,706.43 ns</td><td>9.349</td><td>0.95</td><td>5</td><td>0.9766</td><td>6569 B</td><td>4.56</td>
+</tr><tr><td>QueryFilter_Typed</td><td>MediumRun</td><td>15</td><td>2</td><td>10</td><td>575,367.5 ns</td><td>16,596.34 ns</td><td>21,579.93 ns</td><td>9.225</td><td>0.65</td><td>5</td><td>1.9531</td><td>9657 B</td><td>6.71</td>
+</tr><tr><td>Mapper_ToDoc</td><td>MediumRun</td><td>15</td><td>2</td><td>10</td><td>499.6 ns</td><td>23.79 ns</td><td>33.35 ns</td><td>0.008</td><td>0.00</td><td>2</td><td>0.2174</td><td>1024 B</td><td>0.71</td>
+</tr><tr><td>Mapper_FromDoc</td><td>MediumRun</td><td>15</td><td>2</td><td>10</td><td>222.6 ns</td><td>13.33 ns</td><td>19.95 ns</td><td>0.004</td><td>0.00</td><td>1</td><td>0.0339</td><td>160 B</td><td>0.11</td>
+</tr><tr><td>ExpressionFilter_Translate</td><td>MediumRun</td><td>15</td><td>2</td><td>10</td><td>445.2 ns</td><td>23.68 ns</td><td>35.44 ns</td><td>0.007</td><td>0.00</td><td>2</td><td>0.1698</td><td>800 B</td><td>0.56</td>
 </tr></tbody></table>
 </body>
 </html>

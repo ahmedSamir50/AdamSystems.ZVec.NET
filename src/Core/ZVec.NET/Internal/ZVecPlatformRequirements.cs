@@ -12,8 +12,9 @@ internal static class ZVecPlatformRequirements
     /// is not supported on the current OS/architecture.
     /// </summary>
     /// <remarks>
-    /// HNSW-RaBitQ is supported only on x86_64 with AVX2 or higher (not ARM).
-    /// DiskANN is supported on Linux only and requires libaio.
+    /// HNSW-RaBitQ: reject ARM here. On x64 this method allows the type through so
+    /// <see cref="NativeIndexParamBuilder"/> can throw the C API gap (no AVX2 CPUID probe).
+    /// DiskANN is supported on Linux only (libaio is optional at runtime via dlopen).
     /// </remarks>
     public static void ThrowIfUnsupported(ZVecIndexParam param)
     {
@@ -33,7 +34,7 @@ internal static class ZVecPlatformRequirements
                 if (!OperatingSystem.IsLinux())
                 {
                     throw new PlatformNotSupportedException(
-                        ZVecDefaults.Errors.DiskAnnRequiresLinuxLibaio);
+                        ZVecDefaults.Errors.DiskAnnRequiresLinux);
                 }
                 break;
         }

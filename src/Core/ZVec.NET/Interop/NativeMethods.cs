@@ -479,7 +479,12 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial IntPtr zvec_query_params_fts_create([MarshalAs(UnmanagedType.LPUTF8Str)] string defaultOperator);
 
-    // Intentionally no zvec_query_params_fts_destroy: set_fts_params takes ownership (double-free if destroyed here).
+    /// <summary>
+    /// Destroy FTS query params when still owned by the caller.
+    /// Do not call after a successful <c>set_fts_params</c> (ownership transferred).
+    /// </summary>
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_fts_destroy(IntPtr paramsPtr);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_vector_query_set_fts_params(IntPtr query, IntPtr paramsPtr);
@@ -513,7 +518,162 @@ internal static partial class NativeMethods
     internal static partial int zvec_query_params_ivf_set_nprobe(IntPtr paramsPtr, int nprobe);
 
     [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_ivf_set_radius(IntPtr paramsPtr, float radius);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_ivf_set_is_linear(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isLinear);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_ivf_set_is_using_refiner(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_ivf_set_scale_factor(IntPtr paramsPtr, float scaleFactor);
+
+    [LibraryImport(LibraryName)]
     internal static partial int zvec_vector_query_set_ivf_params(IntPtr query, IntPtr ivfParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_hnsw_set_radius(IntPtr paramsPtr, float radius);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_hnsw_set_is_linear(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isLinear);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_hnsw_set_is_using_refiner(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_query_params_flat_create(
+        [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner,
+        float scaleFactor);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_flat_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_flat_set_radius(IntPtr paramsPtr, float radius);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_flat_set_is_linear(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isLinear);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_flat_set_is_using_refiner(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_flat_set_scale_factor(IntPtr paramsPtr, float scaleFactor);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_flat_params(IntPtr query, IntPtr flatParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_query_params_vamana_create(
+        int efSearch,
+        float radius,
+        [MarshalAs(UnmanagedType.U1)] bool isLinear,
+        [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_vamana_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_vamana_set_ef_search(IntPtr paramsPtr, int efSearch);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_vamana_set_radius(IntPtr paramsPtr, float radius);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_vamana_set_is_linear(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isLinear);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_vamana_set_is_using_refiner(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_vamana_params(IntPtr query, IntPtr vamanaParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_query_params_diskann_create(int listSize);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_diskann_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_diskann_set_list_size(IntPtr paramsPtr, int listSize);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_diskann_set_radius(IntPtr paramsPtr, float radius);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_diskann_set_is_linear(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isLinear);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_diskann_set_is_using_refiner(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_diskann_params(IntPtr query, IntPtr diskannParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_hnsw_params(IntPtr query, IntPtr hnswParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_ivf_params(IntPtr query, IntPtr ivfParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_flat_params(IntPtr query, IntPtr flatParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_vamana_params(IntPtr query, IntPtr vamanaParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_diskann_params(IntPtr query, IntPtr diskannParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_group_by_vector_query_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_group_by_vector_query_destroy(IntPtr query);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_field_name(
+        IntPtr query,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_group_by_field_name(
+        IntPtr query,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string fieldName);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_group_count(IntPtr query, uint groupCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_topk_per_group(IntPtr query, uint topkPerGroup);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_query_vector(IntPtr query, IntPtr data, nuint size);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_filter(
+        IntPtr query,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string filter);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_include_vector(
+        IntPtr query,
+        [MarshalAs(UnmanagedType.U1)] bool include);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_hnsw_params(IntPtr query, IntPtr hnswParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_ivf_params(IntPtr query, IntPtr ivfParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_flat_params(IntPtr query, IntPtr flatParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_vamana_params(IntPtr query, IntPtr vamanaParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_diskann_params(IntPtr query, IntPtr diskannParams);
 
     [LibraryImport(LibraryName)]
     internal static partial IntPtr zvec_doc_get_pk_copy(IntPtr doc);
@@ -552,6 +712,11 @@ internal static partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_index_params_set_quantize_type(IntPtr paramsPtr, int quantizeType);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_quantizer_enable_rotate(
+        IntPtr paramsPtr,
+        [MarshalAs(UnmanagedType.U1)] bool enableRotate);
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_index_params_set_hnsw_params(IntPtr paramsPtr, int m, int efConstruction);

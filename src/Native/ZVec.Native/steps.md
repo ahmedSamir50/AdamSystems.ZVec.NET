@@ -131,11 +131,20 @@ This does not change Apache Arrow sources and does not affect Android / iOS / Li
 This tweak lives inside the submodule, so a clean upgrade removes it.
 
 1. Update the submodule (see below).
-2. Try a Windows Release build.
-3. If Arrow builds fine → nothing to do.
-4. If `FTK1011` returns → re-apply the same MSVC/Ninja change in `external/zvec/thirdparty/arrow/CMakeLists.txt`.
+2. Prefer applying the CI patch (keeps the submodule pointer clean for commits):
 
-Keep the change local / uncommitted in the submodule unless you later fork/patch differently.
+```powershell
+# From repo root — mirrors GHA: version-fallback 0.6.0 + Windows Arrow/FastPFOR/pcg; never commit the dirt
+powershell -NoProfile -File build/ci/apply-native-patches.ps1 -Platform Windows
+# Or a single patch:
+git -C src/Native/ZVec.Native/external/zvec apply build/ci/patches/zvec-arrow-msvc-ninja.patch
+```
+
+3. Try a Windows Release build (`_configure_ninja.bat` then `_build_and_deploy.bat`).
+4. If Arrow builds fine → nothing to do (and drop the patch from CI when proven).
+5. If `FTK1011` returns and the CI patch was not applied → re-apply the same MSVC/Ninja change in `external/zvec/thirdparty/arrow/CMakeLists.txt` (local / uncommitted only).
+
+Keep the change local / uncommitted in the submodule unless you later fork/patch differently. Do **not** commit Arrow/FTK dirt into the submodule pointer.
 
 ### Reference MSVC CONFIGURE/BUILD/INSTALL shape
 
@@ -175,5 +184,5 @@ Then re-apply the Arrow MSVC/Ninja tweak if still required, and run `_configure_
 
 ## What not to edit day-to-day
 
-- Do not hand-edit vendored sources under `external/zvec\` except the documented Arrow MSVC ExternalProject workaround.
+- Do not hand-edit vendored sources under `external/zvec\` except via documented CI patches applied locally (prefer `build/ci/patches/` + `apply-native-patches.ps1`). Never commit that dirt into the submodule pointer.
 - Prefer changing our wrapper [`CMakeLists.txt`](CMakeLists.txt) or bumping the submodule commit.

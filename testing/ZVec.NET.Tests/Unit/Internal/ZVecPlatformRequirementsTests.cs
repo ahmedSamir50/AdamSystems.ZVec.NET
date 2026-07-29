@@ -39,6 +39,22 @@ public class ZVecPlatformRequirementsTests
     }
 
     [Fact]
+    public void NativeIndexParamBuilder_Rabitq_ThrowsCApiGap_OnX64()
+    {
+        if (RuntimeInformation.ProcessArchitecture is Architecture.Arm or Architecture.Arm64)
+        {
+            Assert.Skip("Current process is Arm/Arm64; RaBitQ C API gap is asserted on x64.");
+        }
+
+        var act = () =>
+        {
+            using var _ = new NativeIndexParamBuilder(new ZVecHnswRabitqIndexParam());
+        };
+        act.Should().Throw<NotSupportedException>()
+            .WithMessage("*HNSW_RABITQ*");
+    }
+
+    [Fact]
     public void ThrowIfUnsupported_DiskAnn_ThrowsOnNonLinux()
     {
         if (OperatingSystem.IsLinux())
@@ -48,7 +64,7 @@ public class ZVecPlatformRequirementsTests
 
         var act = () => ZVecPlatformRequirements.ThrowIfUnsupported(new ZVecDiskAnnIndexParam());
         act.Should().Throw<PlatformNotSupportedException>()
-            .WithMessage(ZVecDefaults.Errors.DiskAnnRequiresLinuxLibaio);
+            .WithMessage(ZVecDefaults.Errors.DiskAnnRequiresLinux);
     }
 
     [Fact]
@@ -76,6 +92,6 @@ public class ZVecPlatformRequirementsTests
             using var _ = new NativeIndexParamBuilder(new ZVecDiskAnnIndexParam());
         };
         act.Should().Throw<PlatformNotSupportedException>()
-            .WithMessage(ZVecDefaults.Errors.DiskAnnRequiresLinuxLibaio);
+            .WithMessage(ZVecDefaults.Errors.DiskAnnRequiresLinux);
     }
 }

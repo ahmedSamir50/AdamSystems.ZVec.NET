@@ -380,7 +380,7 @@ public class NativeCallerCoverageIntegrationTests : IClassFixture<ZVecRealNative
     {
         _fixture.SkipIfNotAvailable();
         if (!OperatingSystem.IsLinux())
-            Assert.Skip("DiskANN native path requires Linux + libaio");
+            Assert.Skip("DiskANN native path requires Linux");
 
         _factory = new ZVecFactory();
         _factory.Initialize();

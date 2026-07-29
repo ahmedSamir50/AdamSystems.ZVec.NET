@@ -2,7 +2,6 @@ namespace ZVec.NET;
 
 /// <summary>
 /// HNSW + RaBitQ. Maps to <c>IndexType::HNSW_RABITQ = 4</c> in <c>type.h</c>.
-/// <c>c_api.h</c> may omit the macro — pass value 4 until upstream adds it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -11,6 +10,12 @@ namespace ZVec.NET;
 /// </para>
 /// <para>
 /// The SDK throws <see cref="PlatformNotSupportedException"/> on Arm/Arm64 before calling native APIs.
+/// </para>
+/// <para>
+/// <b>C API gap:</b> official <c>zvec_index_params_create</c> does not construct
+/// <c>HnswRabitqIndexParams</c> (no <c>HNSW_RABITQ</c> case), and there are no
+/// <c>set_hnsw_rabitq_*</c> exports. Creating this index type via the managed SDK throws
+/// <see cref="NotSupportedException"/> until upstream fixes the C API. Python uses the C++ binding path.
 /// </para>
 /// </remarks>
 public sealed class ZVecHnswRabitqIndexParam : ZVecIndexParam

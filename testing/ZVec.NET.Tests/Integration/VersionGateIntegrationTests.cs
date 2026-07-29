@@ -94,7 +94,7 @@ public class VersionGateIntegrationTests : IClassFixture<ZVecRealNativeFixture>
         ZVecNativeAbi.IsCompatible(meetsMinimumVersion: true, foundMajor: 0, requiredMajor: 0)
             .Should().BeTrue();
 
-        var ex = new ZVecAbiMismatchException("9.0.0", 9, "0.5.1");
+        var ex = new ZVecAbiMismatchException("9.0.0", 9, "0.6.0");
         ex.Message.Should().Contain(">= '9.0.0'").And.Contain("major == 9");
     }
 }
