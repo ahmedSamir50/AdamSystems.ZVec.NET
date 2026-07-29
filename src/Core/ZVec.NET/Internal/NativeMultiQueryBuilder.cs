@@ -86,9 +86,10 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
                     nint ftsHandle = NativeMethods.zvec_fts_create();
                     if (ftsHandle == IntPtr.Zero)
                         throw new InvalidOperationException(ZVecDefaults.Errors.NativeFtsQueryCreateFailed);
-                    
-                    _unmanagedAllocations.Add(ftsHandle); // Will be freed on dispose
-                    
+
+                    // set_fts copies the clause; caller must destroy zvec_fts_t.
+                    _unmanagedAllocations.Add(ftsHandle);
+
                     if (!string.IsNullOrWhiteSpace(query.Fts.QueryString))
                     {
                         NativeMethods.zvec_fts_set_query_string(ftsHandle, query.Fts.QueryString);
@@ -105,10 +106,25 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
                     nint ftsParams = NativeMethods.zvec_query_params_fts_create(op);
                     if (ftsParams != IntPtr.Zero)
                     {
-                        // zvec_sub_query_set_fts_params takes ownership of ftsParams
-                        NativeMethods.zvec_sub_query_set_fts_params(subQuery, ftsParams);
+                        try
+                        {
+                            ZVecError.ThrowIfFailed(
+                                (ZVecErrorCode)NativeMethods.zvec_sub_query_set_fts_params(subQuery, ftsParams),
+                                nameof(NativeMethods.zvec_sub_query_set_fts_params));
+                            // Ownership transferred to the sub-query on success.
+                        }
+                        catch
+                        {
+                            NativeMethods.zvec_query_params_fts_destroy(ftsParams);
+                            throw;
+                        }
                     }
                 }
+
+                NativeQueryParamsApplicator.Apply(
+                    subQuery,
+                    query.QueryParams,
+                    NativeQueryParamsApplicator.QueryTarget.SubQuery);
 
                 // Add to multi query
                 NativeMethods.zvec_multi_query_add_sub_query(_handle, subQuery);
@@ -161,14 +177,11 @@ internal sealed class NativeMultiQueryBuilder : IDisposable
             NativeMethods.zvec_sub_query_destroy(sub);
         }
 
-        // Free FTS handles that were created for subqueries
-        // Note: zvec_sub_query_set_fts COPIES the fts struct. So we MUST free the fts handle!
-        // Wait! In c_api.h: `zvec_sub_query_set_fts(zvec_sub_query_t *query, const zvec_fts_t *fts);`
-        // It says "copies the FTS clause". So we definitely own ftsHandle.
-        // `zvec_sub_query_set_fts_params` says "(takes ownership)". So we DO NOT free ftsParams!
+        // Free zvec_fts_t handles: set_fts copies the clause; caller retains ownership and must destroy.
+        // FTS *query params* (zvec_query_params_fts_*) transfer on successful set_fts_params and are
+        // destroyed only on failed attach above — never destroy them here.
         foreach (var ptr in _unmanagedAllocations)
         {
-            // For now, I'll only add ftsHandle to _unmanagedAllocations because ftsParams is taken ownership of.
             NativeMethods.zvec_fts_destroy(ptr);
         }
 

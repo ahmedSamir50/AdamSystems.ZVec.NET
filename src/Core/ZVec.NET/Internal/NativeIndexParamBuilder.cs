@@ -14,10 +14,14 @@ internal sealed class NativeIndexParamBuilder : IDisposable
         ArgumentNullException.ThrowIfNull(param);
         ZVecPlatformRequirements.ThrowIfUnsupported(param);
 
+        if (param is ZVecHnswRabitqIndexParam)
+        {
+            throw new NotSupportedException(ZVecDefaults.Errors.NativeHnswRabitqParamsNotSupported);
+        }
+
         ZVecIndexType type = param switch
         {
             ZVecHnswIndexParam => ZVecIndexType.Hnsw,
-            ZVecHnswRabitqIndexParam => ZVecIndexType.HnswRabitq,
             ZVecIvfIndexParam => ZVecIndexType.Ivf,
             ZVecFlatIndexParam => ZVecIndexType.Flat,
             ZVecVamanaIndexParam => ZVecIndexType.Vamana,
@@ -53,17 +57,9 @@ internal sealed class NativeIndexParamBuilder : IDisposable
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_quantize_type(_handle, (int)hnsw.QuantizeType), 
                     nameof(NativeMethods.zvec_index_params_set_quantize_type));
+                ApplyEnableRotate(hnsw.QuantizeType, hnsw.EnableRotate);
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_hnsw_params(_handle, hnsw.M, hnsw.EfConstruction), 
-                    nameof(NativeMethods.zvec_index_params_set_hnsw_params));
-                break;
-
-            case ZVecHnswRabitqIndexParam rabitq:
-                ZVecError.ThrowIfFailed(
-                    (ZVecErrorCode)NativeMethods.zvec_index_params_set_metric_type(_handle, (int)rabitq.MetricType), 
-                    nameof(NativeMethods.zvec_index_params_set_metric_type));
-                ZVecError.ThrowIfFailed(
-                    (ZVecErrorCode)NativeMethods.zvec_index_params_set_hnsw_params(_handle, rabitq.M, rabitq.EfConstruction), 
                     nameof(NativeMethods.zvec_index_params_set_hnsw_params));
                 break;
 
@@ -74,6 +70,7 @@ internal sealed class NativeIndexParamBuilder : IDisposable
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_quantize_type(_handle, (int)ivf.QuantizeType), 
                     nameof(NativeMethods.zvec_index_params_set_quantize_type));
+                ApplyEnableRotate(ivf.QuantizeType, ivf.EnableRotate);
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_ivf_params(_handle, ivf.CentroidsNum, 0, false), 
                     nameof(NativeMethods.zvec_index_params_set_ivf_params));
@@ -86,6 +83,7 @@ internal sealed class NativeIndexParamBuilder : IDisposable
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_quantize_type(_handle, (int)flat.QuantizeType), 
                     nameof(NativeMethods.zvec_index_params_set_quantize_type));
+                ApplyEnableRotate(flat.QuantizeType, flat.EnableRotate);
                 break;
 
             case ZVecVamanaIndexParam vamana:
@@ -95,6 +93,7 @@ internal sealed class NativeIndexParamBuilder : IDisposable
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_quantize_type(_handle, (int)vamana.QuantizeType), 
                     nameof(NativeMethods.zvec_index_params_set_quantize_type));
+                ApplyEnableRotate(vamana.QuantizeType, vamana.EnableRotate);
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_vamana_params(
                         _handle, 
@@ -113,6 +112,7 @@ internal sealed class NativeIndexParamBuilder : IDisposable
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_quantize_type(_handle, (int)diskann.QuantizeType), 
                     nameof(NativeMethods.zvec_index_params_set_quantize_type));
+                ApplyEnableRotate(diskann.QuantizeType, diskann.EnableRotate);
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_diskann_params(_handle, diskann.MaxDegree, diskann.ListSize, diskann.PqChunkNum), 
                     nameof(NativeMethods.zvec_index_params_set_diskann_params));
@@ -131,14 +131,17 @@ internal sealed class NativeIndexParamBuilder : IDisposable
                     filtersArray = NativeMethods.zvec_string_array_create((nuint)fts.Filters.Count);
                     for (int i = 0; i < fts.Filters.Count; i++)
                     {
-                        NativeMethods.zvec_string_array_add(filtersArray, (nuint)i, fts.Filters[i].ToString().ToLowerInvariant());
+                        NativeMethods.zvec_string_array_add(
+                            filtersArray,
+                            (nuint)i,
+                            ZVecNativeStrings.ToNative(fts.Filters[i]));
                     }
 
                     string? extraJson = fts.ExtraParams?.ToNativeJson();
                     ZVecError.ThrowIfFailed(
                         (ZVecErrorCode)NativeMethods.zvec_index_params_set_fts_params(
                             _handle, 
-                            fts.Tokenizer.ToString().ToLowerInvariant(), 
+                            ZVecNativeStrings.ToNative(fts.Tokenizer),
                             filtersArray, 
                             extraJson), 
                         nameof(NativeMethods.zvec_index_params_set_fts_params));
@@ -152,6 +155,18 @@ internal sealed class NativeIndexParamBuilder : IDisposable
                 }
                 break;
         }
+    }
+
+    private void ApplyEnableRotate(ZVecQuantizeType quantizeType, bool enableRotate)
+    {
+        if (!enableRotate)
+            return;
+        if (quantizeType is not (ZVecQuantizeType.Int8 or ZVecQuantizeType.Int4))
+            return;
+
+        ZVecError.ThrowIfFailed(
+            (ZVecErrorCode)NativeMethods.zvec_index_params_set_quantizer_enable_rotate(_handle, true),
+            nameof(NativeMethods.zvec_index_params_set_quantizer_enable_rotate));
     }
 
     public void Dispose()

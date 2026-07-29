@@ -63,7 +63,7 @@ jobs:
           submodules: recursive
 
       # Shallow submodule checkouts often lack tags; git_version then becomes g<sha> and
-      # c_api CMake falls back to 0.2.1 — breaking ZVec.NET's 0.5.1 ABI gate.
+      # c_api CMake falls back to 0.2.1 — breaking ZVec.NET's 0.6.0 ABI gate.
       # Upstream: https://github.com/alibaba/zvec/issues/621
       - name: Fetch zvec tags for version header
         shell: bash
@@ -125,7 +125,7 @@ jobs:
         run: |
           set -euo pipefail
           zvec="src/Native/ZVec.Native/external/zvec"
-          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.5.1.patch"
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.6.0.patch"
           git -C "$zvec" apply --check "$patch"
           git -C "$zvec" apply "$patch"
 

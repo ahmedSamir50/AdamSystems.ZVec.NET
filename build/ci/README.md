@@ -8,8 +8,10 @@
 | `validate-consumer.sh` | Clean `dotnet new` app + restore local `.nupkg` + create collection smoke |
 | `simulate-pack.ps1` | **Mandatory local Pack-parity gate** before remote Pack/tag: reuse Pack native artifacts → Win+Docker Linux managed (`ZVEC_REQUIRE_NATIVE=1`) → pack → win+linux consumers (rc 0) |
 | `docker-linux-managed.sh` | Helper for `simulate-pack.ps1` Linux managed suite (`sdk:10.0-noble` + SDK 8/9 AppHost packs; tests **net8.0** only) |
+| `docker-linux-native.ps1` / `docker-linux-native.sh` | Local **linux-x64** `zvec_c_api` via `ubuntu:24.04` (GHA-equivalent cmake). On Windows use the `.ps1` (explicit `D:/…:/src` mount). Inner script strips `\r` from scripts/makefiles under `external/zvec` because host `core.autocrlf=true` otherwise breaks snowball (`perl\r`); GHA Linux checkouts are already LF and do not need that. Build dir is container `/tmp` (object writes off the Windows mount); source stays mounted so nested git submodules still work for zvec’s thirdparty patches. |
 | `verify-release-provenance.sh` | After a tag: assert Pack `head_sha` == tag commit, Pack `conclusion=success`, optional nuspec commit check (needs `gh` + git; no secrets) |
-| `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.5.1 ([#621](https://github.com/alibaba/zvec/issues/621)), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi + RocksDB `HAS_ARMV8_CRC` |
+| `patches/*.patch` | CI-only zvec workarounds (not pushed to Alibaba): version fallback 0.6.0 ([#621](https://github.com/alibaba/zvec/issues/621)), Arrow MSVC/Ninja/pcg, FastPFOR MSVC ARM64 SIMDe, iOS dual-STATIC OUTPUT_NAME, Catalyst Lz4/Arrow macabi + RocksDB `HAS_ARMV8_CRC`. Same set as last-green `development` + retargeted fallback. Apply with [`apply-native-patches.ps1`](apply-native-patches.ps1); never commit into the submodule. |
+| `apply-native-patches.ps1` | Local mirror of `build-native.yml` patch steps (version fallback all RIDs; Arrow/FastPFOR/pcg on Windows only). |
 
 ## Workflows
 
@@ -62,7 +64,7 @@ Samples live under `samples/ZVec.NET.Samples.slnx` and are never built by these 
 
 Consumer-facing matrix: [README.md — Native RIDs](../../README.md#native-rids-nuget-runtimes).
 
-| RID | Workflow matrix | Runner | Gate (beta.3.2) |
+| RID | Workflow matrix | Runner | Gate (beta.4) |
 |-----|-----------------|--------|-----------------|
 | `win-x64`, `linux-x64` | `build-native.yml` HARD | `windows-latest` / `ubuntu-latest` | Pack-required |
 | `osx-arm64` | HARD | Apple Silicon (`macos-latest`) | Pack-required |
@@ -79,7 +81,7 @@ Consumer-facing matrix: [README.md — Native RIDs](../../README.md#native-rids-
 
 | Patch / step | RID(s) |
 |--------------|--------|
-| `zvec-version-fallback-0.5.1.patch` | All ([#621](https://github.com/alibaba/zvec/issues/621)) |
+| `zvec-version-fallback-0.6.0.patch` | All ([#621](https://github.com/alibaba/zvec/issues/621)) |
 | `zvec-arrow-msvc-ninja.patch` | Windows |
 | `zvec-fastpfor-msvc-arm64-simde.patch` | `win-arm64` |
 | `zvec-arrow-pcg-msvc-arm64.patch` | `win-arm64` |
@@ -93,7 +95,7 @@ Consumer-facing matrix: [README.md — Native RIDs](../../README.md#native-rids-
 development  → daily PRs
 main         → stable trunk (cut releases from here)
 release/1.0  → 1.0.x maintenance (hotfixes + tags)
-tag v1.0.0-beta.3.2  → nuget.org + GitHub Packages (Version 1.0.0-beta.3.2+zvec.0.5.1; Publish requires same-SHA green Pack or Packs inline)
+tag v1.0.0-beta.4  → nuget.org + GitHub Packages (Version 1.0.0-beta.4+zvec.0.6.0; Publish requires same-SHA green Pack or Packs inline)
 ```
 
 **GitHub Packages:** Publish dual-pushes `.nupkg` (not `.snupkg`) to `nuget.pkg.github.com/{owner}`. Primary install remains nuget.org; optional consumers need a PAT with `read:packages` — see [CONTRIBUTING.md](../../CONTRIBUTING.md).
