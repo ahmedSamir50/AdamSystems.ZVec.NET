@@ -7,8 +7,10 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <!-- xunit.v3 ≥3.2 requires an app host for the test project output. -->
+    <!-- xunit.v3 is a self-running exe; disable Test.Sdk's injected Main (CS0017). -->
+    <OutputType>Exe</OutputType>
     <UseAppHost>true</UseAppHost>
+    <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
 
   <ItemGroup>
