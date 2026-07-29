@@ -7,6 +7,8 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- xunit.v3 ≥3.2 requires an app host for the test project output. -->
+    <UseAppHost>true</UseAppHost>
   </PropertyGroup>
 
   <ItemGroup>
