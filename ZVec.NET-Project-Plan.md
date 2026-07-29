@@ -58,7 +58,7 @@ Deliver the **definitive .NET SDK** for ZVec — the same raw performance as the
 
 > **G6 excludes AI Integration.** Coverage is the C++ DB wrap + Vector Database docs parity.
 >
-> **All DB index types are in scope for v1** (HNSW, Flat, IVF, HNSW-RaBitQ, DiskANN, Vamana, Invert, FTS). Platform caveats (RaBitQ = x86_64/AVX2; DiskANN = Linux + libaio per docs) are runtime warnings, not scope cuts.
+> **All DB index types are in scope for v1** (HNSW, Flat, IVF, HNSW-RaBitQ, DiskANN, Vamana, Invert, FTS). Platform caveats (RaBitQ = x86_64/AVX2; DiskANN = Linux-only, libaio optional via dlopen) are runtime warnings, not scope cuts. **C API caveat:** HNSW-RaBitQ create/setters are incomplete in `c_api` today — managed SDK throws until upstream fixes.
 
 ### 1.4 Constraints & Decisions
 
@@ -125,7 +125,7 @@ Audit basis: remote `https://zvec.org/llms-full.txt` saved as [`docs/llms-full.t
 | Fetch | `zvec_collection_fetch` | `Fetch` / `FetchAsync` (single → `ZVecDoc?`; batch → dictionary) | Covered |
 | Query single / multi / filter / hybrid | `zvec_collection_query`, multi-query APIs | `Query` / `QueryAsync` | Covered |
 | Full-text query | FTS query params + collection query | `ZVecFtsQuery` | Covered |
-| Group query | `zvec_group_by_vector_query_*` | `QueryGroupBy` / `QueryGroupByAsync` / `ZVecGroupByQuery` | Covered |
+| Group query | `zvec_group_by_vector_query_*` builders; **no** `zvec_collection_group_by_query` in C API | `QueryGroupBy` throws; builders bound; Python uses pybind → `Collection::GroupByQuery` | **C API gap (execution)** — awaiting C export mirroring pybind |
 | In-DB RRF / Weighted fusion | `zvec_multi_query_set_rerank_rrf` / `_weighted` | `ZVecRrfReranker` / `ZVecWeightedReranker` | Covered |
 | Indexes: HNSW, Flat, IVF, Invert, FTS | index type macros + params APIs | IndexParams + Appendix A | Covered |
 | Indexes: DiskANN, Vamana | types + query/index params in C API | `ZVecDiskAnnIndexParam` / `ZVecVamanaIndexParam` | Covered (DiskANN: Linux-only per docs) |

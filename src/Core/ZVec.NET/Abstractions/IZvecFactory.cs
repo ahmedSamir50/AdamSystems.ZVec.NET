@@ -80,7 +80,7 @@ public interface IZvecFactory : IAsyncDisposable, IDisposable
         CancellationToken ct = default);
 
     /// <summary>
-    /// Returns the native library version string (for example <c>0.5.1</c>).
+    /// Returns the native library version string (for example <c>v0.6.0</c>).
     /// Requires the factory to be initialized and the native library to be loaded.
     /// </summary>
     string GetNativeVersion();

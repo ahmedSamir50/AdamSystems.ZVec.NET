@@ -3,8 +3,8 @@ namespace ZVec.NET;
 /// <summary>DiskANN index parameters.</summary>
 /// <remarks>
 /// <para>
-/// <b>Platform requirement:</b> DiskANN is currently supported on Linux only and requires the
-/// libaio library (Linux asynchronous I/O) to be installed on the system.
+/// <b>Platform requirement:</b> DiskANN is currently supported on Linux only.
+/// Upstream may load libaio dynamically for async I/O and falls back to synchronous <c>pread</c> when it is absent.
 /// </para>
 /// <para>
 /// The SDK throws <see cref="PlatformNotSupportedException"/> on non-Linux platforms before calling native APIs.
@@ -26,4 +26,9 @@ public sealed class ZVecDiskAnnIndexParam : ZVecIndexParam
 
     /// <summary>Compression quantization type. Default is Undefined.</summary>
     public ZVecQuantizeType QuantizeType { get; init; } = ZVecDefaults.DiskAnn.QuantizeType;
+
+    /// <summary>
+    /// When true and <see cref="QuantizeType"/> is Int8 or Int4, apply random rotation before quantization.
+    /// </summary>
+    public bool EnableRotate { get; init; } = ZVecDefaults.Quantizer.EnableRotate;
 }

@@ -142,8 +142,9 @@ public class ZVecCollectionQueryTests : IDisposable
             GroupByField = "category"
         };
         var act = () => col.QueryGroupBy(gq);
-        act.Should().Throw<NotSupportedException>()
-            .WithMessage("*zvec_collection_group_by*");
+        var ex = act.Should().Throw<NotSupportedException>().Which;
+        ex.Message.Should().Contain("pybind");
+        ex.Message.Should().Contain("zvec_collection_group_by");
     }
 
     [Fact]

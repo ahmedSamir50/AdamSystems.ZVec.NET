@@ -14,4 +14,10 @@ public sealed class ZVecHnswIndexParam : ZVecIndexParam
 
     /// <summary>Compression quantization type. Default is Undefined.</summary>
     public ZVecQuantizeType QuantizeType { get; init; } = ZVecDefaults.Hnsw.QuantizeType;
+
+    /// <summary>
+    /// When true and <see cref="QuantizeType"/> is Int8 or Int4, apply random rotation before quantization
+    /// to reduce error (upstream <c>zvec_index_params_set_quantizer_enable_rotate</c>).
+    /// </summary>
+    public bool EnableRotate { get; init; } = ZVecDefaults.Quantizer.EnableRotate;
 }
