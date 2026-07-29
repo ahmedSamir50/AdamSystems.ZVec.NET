@@ -12,6 +12,7 @@ public class ZVecIndexParamDefaultsTests
         p.M.Should().Be(ZVecDefaults.Hnsw.M);
         p.EfConstruction.Should().Be(ZVecDefaults.Hnsw.EfConstruction);
         p.QuantizeType.Should().Be(ZVecQuantizeType.Undefined);
+        p.EnableRotate.Should().BeFalse();
     }
 
     [Fact]
@@ -35,6 +36,7 @@ public class ZVecIndexParamDefaultsTests
         p.Nlist.Should().Be(ZVecDefaults.Ivf.Nlist);
         p.Nprobe.Should().Be(ZVecDefaults.Ivf.Nprobe);
         p.QuantizeType.Should().Be(ZVecQuantizeType.Undefined);
+        p.EnableRotate.Should().BeFalse();
     }
 
     [Fact]
@@ -43,6 +45,7 @@ public class ZVecIndexParamDefaultsTests
         var p = new ZVecFlatIndexParam();
         p.MetricType.Should().Be(ZVecMetricType.L2);
         p.QuantizeType.Should().Be(ZVecQuantizeType.Undefined);
+        p.EnableRotate.Should().BeFalse();
     }
 
     [Fact]
@@ -54,6 +57,7 @@ public class ZVecIndexParamDefaultsTests
         p.ListSize.Should().Be(ZVecDefaults.DiskAnn.ListSize);
         p.PqChunkNum.Should().Be(ZVecDefaults.DiskAnn.PqChunkNum);
         p.QuantizeType.Should().Be(ZVecQuantizeType.Undefined);
+        p.EnableRotate.Should().BeFalse();
     }
 
     [Fact]
@@ -68,6 +72,7 @@ public class ZVecIndexParamDefaultsTests
         p.UseContiguousMemory.Should().BeFalse();
         p.UseIdMap.Should().BeFalse();
         p.QuantizeType.Should().Be(ZVecQuantizeType.Undefined);
+        p.EnableRotate.Should().BeFalse();
     }
 
     [Fact]

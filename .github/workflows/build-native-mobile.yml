@@ -73,7 +73,7 @@ jobs:
           zvec="src/Native/ZVec.Native/external/zvec"
           git -C "$zvec" fetch --tags --force origin || true
           git -C "$zvec" fetch --deepen=200 origin || true
-          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.5.1.patch"
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.6.0.patch"
           git -C "$zvec" apply --check "$patch"
           git -C "$zvec" apply "$patch"
 
@@ -125,7 +125,7 @@ jobs:
           zvec="src/Native/ZVec.Native/external/zvec"
           git -C "$zvec" fetch --tags --force origin || true
           git -C "$zvec" fetch --deepen=200 origin || true
-          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.5.1.patch"
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.6.0.patch"
           git -C "$zvec" apply --check "$patch"
           git -C "$zvec" apply "$patch"
 
@@ -167,7 +167,7 @@ jobs:
           zvec="src/Native/ZVec.Native/external/zvec"
           git -C "$zvec" fetch --tags --force origin || true
           git -C "$zvec" fetch --deepen=200 origin || true
-          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.5.1.patch"
+          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.6.0.patch"
           git -C "$zvec" apply --check "$patch"
           git -C "$zvec" apply "$patch"
 

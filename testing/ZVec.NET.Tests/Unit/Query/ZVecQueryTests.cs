@@ -40,6 +40,28 @@ public class ZVecQueryTests
     }
 
     [Fact]
+    public void ZVecFlatQueryParams_Defaults()
+    {
+        var p = new ZVecFlatQueryParams { IsLinear = true, ScaleFactor = 5f };
+        p.IsLinear.Should().BeTrue();
+        p.ScaleFactor.Should().Be(5f);
+    }
+
+    [Fact]
+    public void ZVecDiskAnnQueryParams_ListSize()
+    {
+        var p = new ZVecDiskAnnQueryParams { ListSize = 128 };
+        p.ListSize.Should().Be(128);
+    }
+
+    [Fact]
+    public void ZVecVamanaQueryParams_EfSearch()
+    {
+        var p = new ZVecVamanaQueryParams { EfSearch = 100 };
+        p.EfSearch.Should().Be(100);
+    }
+
+    [Fact]
     public void ZVecGroupByQuery_Defaults()
     {
         var g = new ZVecGroupByQuery

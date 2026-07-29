@@ -14,10 +14,10 @@ public static class ZVecNativeAbi
     public const int MinimumMajor = 0;
 
     /// <summary>Minimum accepted native minor version.</summary>
-    public const int MinimumMinor = 5;
+    public const int MinimumMinor = 6;
 
     /// <summary>Minimum accepted native patch version.</summary>
-    public const int MinimumPatch = 1;
+    public const int MinimumPatch = 0;
 
     /// <summary>Minimum accepted native version as <c>major.minor.patch</c>.</summary>
     public static string MinimumVersionString =>

@@ -9,6 +9,7 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
     private bool _disposed;
     private IntPtr _ftsHandle;
     private IntPtr _ftsParamsHandle;
+    private bool _ftsParamsOwnedByQuery;
     private readonly List<MemoryHandle> _pinnedHandles = [];
 
     public nint Handle => _handle;
@@ -86,6 +87,8 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
                     ZVecError.ThrowIfFailed(
                         (ZVecErrorCode)NativeMethods.zvec_vector_query_set_fts_params(_handle, _ftsParamsHandle),
                         nameof(NativeMethods.zvec_vector_query_set_fts_params));
+                    // Ownership transferred to the vector query on success.
+                    _ftsParamsOwnedByQuery = true;
                 }
             }
         }
@@ -98,54 +101,10 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
 
     private void ApplyQueryParams(ZVecQueryParams? queryParams)
     {
-        if (queryParams is null)
-            return;
-
-        switch (queryParams)
-        {
-            case ZVecHnswQueryParams hnsw:
-            {
-                int ef = hnsw.EfSearch ?? ZVecDefaults.Query.HnswEfSearch;
-                nint handle = NativeMethods.zvec_query_params_hnsw_create(ef, 0f, false, false);
-                if (handle == IntPtr.Zero)
-                    throw new InvalidOperationException(ZVecDefaults.Errors.NativeQueryCreateFailed);
-
-                if (hnsw.EfSearch.HasValue)
-                {
-                    ZVecError.ThrowIfFailed(
-                        (ZVecErrorCode)NativeMethods.zvec_query_params_hnsw_set_ef(handle, hnsw.EfSearch.Value),
-                        nameof(NativeMethods.zvec_query_params_hnsw_set_ef));
-                }
-
-                ZVecError.ThrowIfFailed(
-                    (ZVecErrorCode)NativeMethods.zvec_vector_query_set_hnsw_params(_handle, handle),
-                    nameof(NativeMethods.zvec_vector_query_set_hnsw_params));
-                break;
-            }
-            case ZVecIvfQueryParams ivf:
-            {
-                int nprobe = ivf.Nprobe ?? ZVecDefaults.Query.IvfNprobe;
-                nint handle = NativeMethods.zvec_query_params_ivf_create(
-                    nprobe, false, ZVecDefaults.Query.IvfScaleFactor);
-                if (handle == IntPtr.Zero)
-                    throw new InvalidOperationException(ZVecDefaults.Errors.NativeQueryCreateFailed);
-
-                if (ivf.Nprobe.HasValue)
-                {
-                    ZVecError.ThrowIfFailed(
-                        (ZVecErrorCode)NativeMethods.zvec_query_params_ivf_set_nprobe(handle, ivf.Nprobe.Value),
-                        nameof(NativeMethods.zvec_query_params_ivf_set_nprobe));
-                }
-
-                ZVecError.ThrowIfFailed(
-                    (ZVecErrorCode)NativeMethods.zvec_vector_query_set_ivf_params(_handle, handle),
-                    nameof(NativeMethods.zvec_vector_query_set_ivf_params));
-                break;
-            }
-            default:
-                throw new NotSupportedException(
-                    string.Format(ZVecDefaults.Errors.UnsupportedQueryParamsType, queryParams.GetType().Name));
-        }
+        NativeQueryParamsApplicator.Apply(
+            _handle,
+            queryParams,
+            NativeQueryParamsApplicator.QueryTarget.VectorQuery);
     }
 
     public void Dispose()
@@ -160,16 +119,17 @@ internal sealed unsafe class NativeQueryBuilder : IDisposable
         
         if (_ftsHandle != IntPtr.Zero)
         {
+            // set_fts copies the FTS clause; caller retains ownership of the zvec_fts_t.
             NativeMethods.zvec_fts_destroy(_ftsHandle);
             _ftsHandle = IntPtr.Zero;
         }
 
-        if (_ftsParamsHandle != IntPtr.Zero)
+        if (_ftsParamsHandle != IntPtr.Zero && !_ftsParamsOwnedByQuery)
         {
-            // zvec_vector_query_set_fts_params takes ownership of the ftsParams struct.
-            // Do NOT call zvec_query_params_fts_destroy on it, otherwise it causes a double free!
-            _ftsParamsHandle = IntPtr.Zero;
+            // Destroy only when set_fts_params did not transfer ownership (attach failed).
+            NativeMethods.zvec_query_params_fts_destroy(_ftsParamsHandle);
         }
+        _ftsParamsHandle = IntPtr.Zero;
 
         foreach (var pinned in _pinnedHandles)
         {

@@ -5,14 +5,14 @@
     <AssemblyName>ZVec.NET</AssemblyName>
     <RootNamespace>ZVec.NET</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- Version = our SemVer + pinned ZVec native: 1.0.0-beta.3.2+zvec.0.5.1. TFMs live in TargetFrameworks + lib/, NOT in the version string. -->
-    <Version>1.0.0-beta.3.2+zvec.0.5.1</Version>
+    <!-- Version = our SemVer + pinned ZVec native: 1.0.0-beta.4+zvec.0.6.0. TFMs live in TargetFrameworks + lib/, NOT in the version string. -->
+    <Version>1.0.0-beta.4+zvec.0.6.0</Version>
     <Authors>Ahmed Samir https://github.com/ahmedSamir50</Authors>
     <Company>Adam Systems EGY</Company>
     <Description>High-performance .NET SDK for Alibaba ZVec — the "SQLite of Vector DBs". Zero-allocation vector pipelines (ReadOnlyMemory&lt;float&gt;), sync + async APIs, DI-first design. Wraps the official zvec_c_api C++ core with idiomatic C#: SafeHandle guarantees, HNSW/IVF/Flat/DiskANN/Vamana/FTS indexes, hybrid search, schema evolution, and cross-platform native binaries.</Description>
     <PackageTags>zvec;vector-database;embeddings;HNSW;semantic-search;RAG;dotnet;alibaba;similarity-search;ann;maui</PackageTags>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <PackageReleaseNotes>1.0.0-beta.3.2 wrapping ZVec C++ 0.5.1. Linux teardown ownership fix (#619). Pack-required natives: win-x64, linux-x64, linux-arm64, osx-arm64, osx-x64, android-arm64/x64, ios-arm64, iossimulator-arm64. Soft: win-arm64 (#622), maccatalyst-arm64 (best-effort). See README Native RIDs and CHANGELOG.</PackageReleaseNotes>
+    <PackageReleaseNotes>1.0.0-beta.4 wrapping ZVec C++ 0.6.0. Upgrade from ≤1.0.0-beta.3.x required (ABI floor 0.6.0). New: EnableRotate, Flat/Vamana/DiskANN query params, extended HNSW/IVF search options. Group-by execution still blocked pending C API DQL. See README and CHANGELOG.</PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/ahmedSamir50/AdamSystems.ZVec.NET</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ahmedSamir50/AdamSystems.ZVec.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

@@ -26,4 +26,9 @@ public sealed class ZVecVamanaIndexParam : ZVecIndexParam
 
     /// <summary>Quantization compression type. Default is Undefined.</summary>
     public ZVecQuantizeType QuantizeType { get; init; } = ZVecDefaults.Vamana.QuantizeType;
+
+    /// <summary>
+    /// When true and <see cref="QuantizeType"/> is Int8 or Int4, apply random rotation before quantization.
+    /// </summary>
+    public bool EnableRotate { get; init; } = ZVecDefaults.Quantizer.EnableRotate;
 }

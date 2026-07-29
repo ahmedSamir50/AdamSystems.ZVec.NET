@@ -6,7 +6,47 @@ All notable changes to ZVec.NET are documented in this file.
 
 ### Planned
 
-- Promote `maccatalyst-arm64` from soft CI (best-effort in nupkg) to pack-required HARD after sustained full-matrix green
+- Promote `maccatalyst-arm64` from soft CI (included in Pack [30311588652](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/runs/30311588652)) to pack-required HARD
+
+### Changed
+
+- Managed tests (CI + `simulate-pack` / Docker) run on **net8.0** only; package still ships `net8.0` / `net9.0` / `net10.0`
+
+## [1.0.0-beta.4] - 2026-07-29
+
+Native pin: **zvec 0.6.0** (was 0.5.1).
+
+### Migration
+
+- **Upgrade required from ≤`1.0.0-beta.3.x`.** ABI floor is now `0.6.0`; packages with `+zvec.0.5.1` natives are incompatible with this managed assembly and vice versa.
+- Prefer `dotnet add package ZVec.NET --version 1.0.0-beta.4` (or latest beta.4+).
+
+### Added
+
+- `EnableRotate` on Flat/HNSW/IVF/Vamana/DiskANN index params (INT8/INT4 random rotation)
+- `ZVecFlatQueryParams`, `ZVecVamanaQueryParams`, `ZVecDiskAnnQueryParams`
+- Extended `ZVecHnswQueryParams` / `ZVecIvfQueryParams` (`Radius`, `IsLinear`, `IsUsingRefiner`, IVF `ScaleFactor`)
+- Multi-query sub-queries honor per-query `QueryParams`
+- Internal `NativeGroupByQueryBuilder` for `zvec_group_by_vector_query_*` parity (execution still blocked)
+- Honest `NotSupportedException` for HNSW-RaBitQ index create via C API (upstream `zvec_index_params_create` has no `HNSW_RABITQ` case)
+
+### Changed
+
+- Native submodule pin → official `v0.6.0`
+- `ZVecNativeAbi` minimum → `0.6.0`
+- DiskANN messaging: Linux-only; libaio optional (upstream dlopen + pread fallback)
+- FTS index builder uses `ZVecNativeStrings` for tokenizer/filter literals
+- CI version-fallback patch retargeted to `0.6.0`
+
+### Fixed / inherited from upstream 0.6.0
+
+- FTS, collection DDL, DiskANN I/O, IVF, and related native fixes ship with the rebuilt `zvec_c_api`
+- Group-by execution blocked: Python reaches C++ `Collection::GroupByQuery` via pybind; official `c_api.h` has builders only (no `zvec_collection_group_by_query`)
+
+### Known limitations
+
+- `QueryGroupBy` / `QueryGroupByAsync` remain `[Obsolete]` and throw `NotSupportedException`
+- HNSW-RaBitQ index create via official C API is unsupported until upstream adds a `HNSW_RABITQ` create/set path (managed SDK throws)
 
 ## [1.0.0-beta.3.2] - 2026-07-28
 
@@ -23,7 +63,7 @@ Native pin unchanged: **zvec 0.5.1**.
 ### Changed
 
 - Pack-required natives: add `linux-arm64`, `osx-x64`, `android-arm64`, `android-x64`, `ios-arm64`, `iossimulator-arm64` (HARD CI + Pack assert)
-- Soft CI only: `win-arm64` ([alibaba/zvec#622](https://github.com/alibaba/zvec/issues/622)); `maccatalyst-arm64` (ship in nupkg when job succeeds)
+- Soft CI only: `win-arm64` ([alibaba/zvec#622](https://github.com/alibaba/zvec/issues/622)); `maccatalyst-arm64` (included in Pack [30311588652](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/runs/30311588652); soft until next HARD promote)
 - Desktop optional RIDs build on native runners (`ubuntu-24.04-arm`, `macos-15-intel`)
 - Pack requires desktop + hard-mobile workflow success; asserts HARD RID folders
 

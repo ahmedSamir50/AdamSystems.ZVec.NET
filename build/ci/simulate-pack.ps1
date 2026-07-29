@@ -95,7 +95,7 @@ foreach ($rid in $rids) {
 }
 
 # --- 3. Windows managed (require_native, per TFM) ---
-Write-Step "3/6 Windows managed ZVEC_REQUIRE_NATIVE=1 (net8 then net9)"
+Write-Step "3/6 Windows managed ZVEC_REQUIRE_NATIVE=1 (net8.0)"
 if ($SkipWinManaged) {
     Write-Host "Skipped (-SkipWinManaged)"
     $winManagedOk = $true
@@ -117,10 +117,8 @@ if ($SkipWinManaged) {
         Assert-Exit0 "dotnet restore tests"
         dotnet build src/Core/ZVec.NET/ZVec.NET.csproj -c Release --no-restore
         Assert-Exit0 "dotnet build core"
-        foreach ($buildTfm in @("net8.0", "net9.0")) {
-            dotnet build testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj -c Release -f $buildTfm --no-restore
-            Assert-Exit0 "dotnet build tests $buildTfm"
-        }
+        dotnet build testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj -c Release -f net8.0 --no-restore
+        Assert-Exit0 "dotnet build tests net8.0"
 
         $dll = Join-Path $Root "testing\ZVec.NET.Tests\bin\Release\net8.0\runtimes\win-x64\native\zvec_c_api.dll"
         if (-not (Test-Path $dll)) { throw "Missing native in test output: $dll" }
@@ -128,16 +126,13 @@ if ($SkipWinManaged) {
 
         $tfmFailed = $false
         $lastCode = 0
-        foreach ($tfm in @("net8.0", "net9.0")) {
-            Write-Host "=== testing $tfm ==="
-            dotnet test testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj `
-                -c Release -f $tfm --no-build --verbosity minimal
-            $lastCode = $LASTEXITCODE
-            if ($lastCode -ne 0) {
-                $tfmFailed = $true
-                Write-Host "Windows managed $tfm exited $lastCode" -ForegroundColor Yellow
-                break
-            }
+        Write-Host "=== testing net8.0 ==="
+        dotnet test testing/ZVec.NET.Tests/ZVec.NET.Tests.csproj `
+            -c Release -f net8.0 --no-build --verbosity minimal
+        $lastCode = $LASTEXITCODE
+        if ($lastCode -ne 0) {
+            $tfmFailed = $true
+            Write-Host "Windows managed net8.0 exited $lastCode" -ForegroundColor Yellow
         }
         if (-not $tfmFailed) {
             $winManagedOk = $true

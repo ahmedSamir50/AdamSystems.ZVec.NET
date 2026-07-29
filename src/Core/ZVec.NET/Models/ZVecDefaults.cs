@@ -199,6 +199,22 @@ public static class ZVecDefaults
 
         /// <summary>Default FTS operator: Or.</summary>
         public const ZVecFtsDefaultOperator DefaultOperator = ZVecFtsDefaultOperator.Or;
+
+        /// <summary>Default Flat query scale factor.</summary>
+        public const float FlatScaleFactor = 10.0f;
+
+        /// <summary>Default Vamana ef_search when not specified on <see cref="ZVecVamanaQueryParams"/>.</summary>
+        public const int VamanaEfSearch = 200;
+
+        /// <summary>Default DiskANN search list size when not specified on <see cref="ZVecDiskAnnQueryParams"/>.</summary>
+        public const int DiskAnnListSize = 300;
+    }
+
+    /// <summary>Default parameters for INT8/INT4 quantizer options on index params.</summary>
+    public static class Quantizer
+    {
+        /// <summary>Default quantizer random rotation (INT8/INT4): disabled.</summary>
+        public const bool EnableRotate = false;
     }
 
     /// <summary>Filter expression tokens and formatting characters for <c>ZVecFilterBuilder</c>.</summary>
@@ -373,9 +389,25 @@ public static class ZVecDefaults
         /// <summary>Message shown when the native library fails to allocate an FTS query handle.</summary>
         public const string NativeFtsQueryCreateFailed = "Failed to create native FTS query handle.";
 
-        /// <summary>Message shown when group-by query execution is unavailable in the native C API.</summary>
+        /// <summary>
+        /// Official <c>c_api</c> does not construct <c>HnswRabitqIndexParams</c>
+        /// (<c>zvec_index_params_create(HNSW_RABITQ)</c> falls through to Flat) and has no
+        /// RaBitQ setter exports. Python uses the C++ binding path.
+        /// </summary>
+        public const string NativeHnswRabitqParamsNotSupported =
+            "HNSW-RaBitQ index params are not supported via the official C API: zvec_index_params_create has no HNSW_RABITQ case (would create Flat) and there are no set_hnsw_rabitq_* exports. Use HNSW/Flat/IVF until upstream fixes c_api, or use Python's C++ bindings.";
+
+        /// <summary>
+        /// Group-by works in Python via pybind → C++ <c>Collection::GroupByQuery</c>
+        /// (<c>python_collection.cc</c>), not via <c>c_api.h</c>. The C API exposes
+        /// <c>zvec_group_by_vector_query_*</c> builders but no collection DQL sibling of
+        /// <c>zvec_collection_query</c> / <c>zvec_collection_multi_query</c>.
+        /// </summary>
         public const string NativeGroupByQueryNotSupported =
-            "Group-by vector queries are not supported: c_api.h exposes zvec_group_by_vector_query_* builders but no zvec_collection_group_by_query execution entry point.";
+            "Group-by cannot execute through the official C API: Python uses pybind Collection.GroupByQuery → C++ Collection::GroupByQuery; c_api.h has zvec_group_by_vector_query_* builders but no zvec_collection_group_by_query alongside zvec_collection_query / zvec_collection_multi_query.";
+
+        /// <summary>Message shown when the native library fails to allocate a group-by vector query.</summary>
+        public const string NativeGroupByQueryCreateFailed = "Failed to create native group-by vector query.";
 
         /// <summary>Message shown when <see cref="ZVecQuery.DocumentId"/> conflicts with other query inputs. Arg: parameter name.</summary>
         public const string QueryDocumentIdConflict =
@@ -441,16 +473,18 @@ public static class ZVecDefaults
             "See CONTRIBUTING.md and README (Native RIDs). Ensure runtimes/{rid}/native has zvec_c_api for your platform, or restore the ZVec.NET NuGet with matching native assets.";
 
         /// <summary>
-        /// Platform gate: HNSW-RaBitQ requires x86_64 with AVX2 or higher (not available on ARM).
+        /// Platform gate: HNSW-RaBitQ is not available on ARM.
+        /// On x64 the managed builder rejects RaBitQ for the C API gap before any AVX2 probe.
         /// </summary>
         public const string RabitqRequiresX64Avx2 =
-            "HNSW-RaBitQ is currently supported only on x86_64 with AVX2 or higher instruction set support. It is not available on ARM architectures.";
+            "HNSW-RaBitQ is not available on ARM architectures. On x86_64, upstream expects AVX2 or higher; the managed SDK currently rejects RaBitQ earlier because the official C API cannot create HNSW_RABITQ index params.";
 
         /// <summary>
-        /// Platform gate: DiskANN requires Linux and libaio.
+        /// Platform gate: DiskANN is supported on Linux only.
+        /// Upstream may <c>dlopen</c> libaio for async I/O and falls back to synchronous <c>pread</c> when absent.
         /// </summary>
-        public const string DiskAnnRequiresLinuxLibaio =
-            "DiskANN is currently supported on Linux only and requires the libaio library (Linux asynchronous I/O) to be installed on the system.";
+        public const string DiskAnnRequiresLinux =
+            "DiskANN is currently supported on Linux only. Optional libaio improves async I/O; without it the engine falls back to synchronous pread.";
 
         /// <summary>ABI mismatch message format: requires &gt;= min with major == requiredMajor. Args: minVersion, requiredMajor, foundVersion.</summary>
         public const string AbiMismatchRequiresMinSameMajor =

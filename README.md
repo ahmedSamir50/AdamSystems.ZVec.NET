@@ -4,7 +4,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512bd4.svg)](https://dotnet.microsoft.com/)
 
-> **Beta** — `1.0.0-beta.3.2+zvec.0.5.1`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.3.2`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
+> **Beta** — `1.0.0-beta.4+zvec.0.6.0`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.4`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
 
 **Production .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)** — DI, typed ODM, async, SafeHandles, full indexes/FTS, and mobile RIDs. Not a thin P/Invoke wrapper.
 
@@ -51,7 +51,7 @@ Both wrap Alibaba ZVec. Prefer **`ZVec.NET`** for ASP.NET / MAUI / app code; the
 | Surface | Sync P/Invoke helpers | DI + typed ODM + sync/async |
 | Vectors | `float[]` | `ReadOnlyMemory<float>` pin path |
 | Indexes | HNSW / IVF / Flat / Invert | + RaBitQ, DiskANN, Vamana, FTS |
-| Platforms | Desktop + Android + iOS RIDs (Catalyst optional); net8 / net9 / net10 |
+| Platforms | Desktop + Android + iOS HARD RIDs; Catalyst in Pack (soft CI); net8 / net9 / net10 |
 | Lifecycle | Dispose each document | SafeHandle collections; factory shutdown |
 
 Install this SDK as **`ZVec.NET`** — not `Zvec`.
@@ -87,7 +87,7 @@ Managed TFMs are `net8.0` / `net9.0` / `net10.0` (samples need .NET 10). Natives
 
 Shipped before the Linux teardown ownership fix ([alibaba/zvec#619](https://github.com/alibaba/zvec/issues/619) binding side).
 
-#### Supported in `1.0.0-beta.3.2` (pack-required)
+#### Supported in `1.0.0-beta.4` (pack-required; same set since beta.3.2)
 
 | RID | Native file | Status |
 |-----|-------------|--------|
@@ -99,7 +99,7 @@ Shipped before the Linux teardown ownership fix ([alibaba/zvec#619](https://gith
 | `android-arm64`, `android-x64` | `libzvec_c_api.so` | Mobile HARD |
 | `ios-arm64`, `iossimulator-arm64` | `libzvec_c_api.dylib` | Mobile HARD |
 
-**Best-effort (soft CI; included in nupkg when the job succeeds):** `maccatalyst-arm64` — Mac Catalyst / MAUI (`macabi`); soft-fail this release; promote to pack-required in a later release after sustained full-matrix green.
+**Included in Pack from beta.3.2** ([run 30311588652](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/runs/30311588652)); CI remains **soft** until a later release promotes it to pack-required HARD: `maccatalyst-arm64` — Mac Catalyst / MAUI (`macabi`).
 
 #### Not yet shipped — cause and unblock
 
@@ -113,7 +113,7 @@ Shipped before the Linux teardown ownership fix ([alibaba/zvec#619](https://gith
 |------|-----|
 | **Blazor WebAssembly** | No native `zvec_c_api` RID |
 | **HNSW-RaBitQ on ARM** | Upstream ISA (x86_64 + AVX2 only); SDK throws `PlatformNotSupportedException` before native call — see [Index Types](#index-types) |
-| **DiskANN on non-Linux** | Upstream Linux + **libaio** only; same SDK gate — see [Index Types](#index-types) |
+| **DiskANN on non-Linux** | Upstream Linux-only (libaio optional via dlopen); same SDK gate — see [Index Types](#index-types) |
 
 Package size grows with each RID. There is **no** fixed 50 MB gate — see pack workflow / release notes for measured size.
 
@@ -124,10 +124,10 @@ Package size grows with each RID. There is **no** fixed 50 MB gate — see pack 
 ### Install
 
 ```bash
-dotnet add package ZVec.NET --version 1.0.0-beta.3.2
+dotnet add package ZVec.NET --version 1.0.0-beta.4
 ```
 
-Version scheme: `1.0.0-beta.3.2+zvec.0.5.1` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires pack-required RID natives.
+Version scheme: `1.0.0-beta.4+zvec.0.6.0` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires pack-required RID natives. Managed CI / `simulate-pack` run tests on **net8.0** only (LTS floor); the package still ships net8/net9/net10.
 
 ### Two APIs
 
@@ -415,7 +415,7 @@ ZVec.NET is built for thread-safe use against the native engine:
 | **Flat** | Exact search (small datasets) | `ZVecFlatIndexParam` | All supported RIDs |
 | **IVF** | Clustered ANN | `ZVecIvfIndexParam` | All supported RIDs |
 | **HNSW-RaBitQ** | Quantized HNSW | `ZVecHnswRabitqIndexParam` | **x86_64 with AVX2 or higher only** — not available on ARM. SDK throws `PlatformNotSupportedException` on Arm/Arm64. |
-| **DiskANN** | Disk-based ANN | `ZVecDiskAnnIndexParam` | **Linux only**, requires **libaio**. SDK throws `PlatformNotSupportedException` on non-Linux. |
+| **DiskANN** | Disk-based ANN | `ZVecDiskAnnIndexParam` | **Linux only**; libaio optional (async I/O via dlopen, else synchronous pread). SDK throws `PlatformNotSupportedException` on non-Linux. |
 | **Vamana** | Graph-based ANN | `ZVecVamanaIndexParam` | All supported RIDs |
 | **Invert** | Scalar field index | `ZVecInvertIndexParam` | All supported RIDs |
 | **FTS** | Full-text search | `ZVecFtsIndexParam` | All supported RIDs |
@@ -509,7 +509,7 @@ var hits = col.Query(
 
 **Query-by-id** — set `ZVecQuery.DocumentId` to load that document’s embedding (extra managed `Fetch`), then search. Result docs already include IDs from native.
 
-**Group-by** — `QueryGroupBy` / `QueryGroupByAsync` are **not supported** in this SDK release (`[Obsolete]`; throw `NotSupportedException`). Use filter + client-side grouping, or track upstream native group-by support.
+**Group-by** — `QueryGroupBy` / `QueryGroupByAsync` remain **not executable** (`[Obsolete]`; throw `NotSupportedException`). Python’s `group_by_query` works through **pybind11 → C++** `Collection::GroupByQuery` (not `c_api.h`). The C API has `zvec_group_by_vector_query_*` builders (bound internally) but no `zvec_collection_group_by_query` next to `zvec_collection_query` / `zvec_collection_multi_query`.
 
 ### CRUD (typed)
 
@@ -588,7 +588,7 @@ Prerequisites (LM Studio, natives, datasets): [samples/README.md](https://github
 
 ## Performance
 
-Workload for primary numbers: **768-dim Flat**, `win-x64`, native ZVec `v0.5.1-35-g1afdea8`, .NET 8.0.29, Intel Core i7-8850H, BenchmarkDotNet **medium** job (2026-07-17). Query/memory benches seed **10_000** docs; insert batch size **1000**. Primary latency / alloc benches use **`includeVector: false`**.
+Workload for primary numbers: **768-dim Flat**, `win-x64`, native ZVec `v0.6.0`, .NET 8.0.29, Intel Core i7-8850H, BenchmarkDotNet **medium** job (2026-07-28, clean re-run). Query/memory benches seed **10_000** docs; insert batch size **1000**. Primary latency / alloc benches use **`includeVector: false`**.
 
 Official engine scale (VectorDBBench, Cohere 1M/10M): [zvec.org benchmarks](https://zvec.org/en/docs/db/benchmarks/) — not apples-to-apples with the 10k Flat binding suite.
 
@@ -596,22 +596,22 @@ Official engine scale (VectorDBBench, Cohere 1M/10M): [zvec.org benchmarks](http
 
 | Metric | .NET (ours) | Python | Node.js |
 |--------|-------------|--------|---------|
-| Warm query (128 docs, topk=10, no result vectors) | **0.512 ms** (median 0.390 ms) | 0.414 ms | 1.594 ms |
-| Query (10k docs, topk=10, no result vectors) | **2.88 ms** | 4.33 ms | 4.103 ms |
-| Batch insert (1000 docs) | **~16.8k docs/sec** | ~7.1k docs/sec | ~5.8k docs/sec |
-| GC alloc / query (no result vectors) | **6.8 KB** | n/a | n/a |
-| GC alloc / query (with topk vectors) | **40.5 KB** | n/a | n/a |
+| Warm query (128 docs, topk=10, no result vectors) | **0.369 ms** (median 0.368 ms) | 0.414 ms | 1.594 ms |
+| Query (10k docs, topk=10, no result vectors) | **3.63 ms** | 4.33 ms | 4.103 ms |
+| Batch insert (1000 docs) | **~16.4k docs/sec** | ~7.1k docs/sec | ~5.8k docs/sec |
+| GC alloc / query (no result vectors) | **6.9 KB** | n/a | n/a |
+| GC alloc / query (with topk vectors) | **40.6 KB** | n/a | n/a |
 
 ### Measured suite (primary, .NET BDN medium)
 
 | Method | Mean | Allocated |
 |--------|------|----------:|
-| `Query_Sync` (10k, no vectors) | 2.88 ms | 6.8 KB |
-| `Query_Sync_WithVectors` (10k) | 2.57 ms | 40.5 KB |
-| `Query_WithFilter` (10k, no vectors) | 1.43 ms | 1.7 KB |
-| `Query_WarmTinyCorpus` (128, no vectors) | 512 µs | 6.7 KB |
-| `Insert_Batch` (1000 docs) | 59.4 ms | 446 KB |
-| `Fetch_ScalarOnly` | 193 µs | 904 B |
+| `Query_Sync` (10k, no vectors) | 3.63 ms | 6.9 KB |
+| `Query_Sync_WithVectors` (10k) | 3.66 ms | 40.6 KB |
+| `Query_WithFilter` (10k, no vectors) | 1.87 ms | 1.8 KB |
+| `Query_WarmTinyCorpus` (128, no vectors) | 369 µs | 6.8 KB |
+| `Insert_Batch` (1000 docs) | 61.0 ms | 446 KB |
+| `Fetch_ScalarOnly` | 256 µs | 968 B |
 
 **Typed ODM:** wall time ≈ dynamic `ZVecDoc` on insert/query (native dominates); expect **more managed allocations** per op (`TypedOdmOverheadBench`).
 
@@ -639,9 +639,9 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 | `DllNotFoundException` / native load failure | Host RID not in the nupkg, or local `runtimes/{rid}/native/` is empty. Check [supported vs not-yet RIDs](#native-rids-nuget-runtimes). Use a shipped RID, or build/deploy natives (see [CONTRIBUTING.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/CONTRIBUTING.md)). |
 | `ZVecAbiMismatchException` | Native ABI below floor or major mismatch. Use a package whose `+zvec.*` pin matches the shipped `zvec_c_api`. |
 | Create fails: path already exists | Use `factory.Open` / `OpenMode = OpenOnly`, or `factory.OpenOrCreate` / default DI `OpenOrCreate`. |
-| Linux process exit 139 on stop | Fixed in **`1.0.0-beta.3.2`**: was often log-config double-free after ownership transfer ([#619](https://github.com/alibaba/zvec/issues/619)); SDK no longer destroys log config after `zvec_config_data_set_log_config`. Upgrade to ≥3.2; ensure factory `Shutdown` / DI host stop. Do not try/catch SIGSEGV. |
+| Linux process exit 139 on stop | Fixed in **`1.0.0-beta.3.2`**: was often log-config double-free after ownership transfer ([#619](https://github.com/alibaba/zvec/issues/619)); SDK no longer destroys log config after `zvec_config_data_set_log_config`. Upgrade to ≥3.2 (or ≥beta.4); ensure factory `Shutdown` / DI host stop. Do not try/catch SIGSEGV. |
 | `PlatformNotSupportedException` (RaBitQ) | HNSW-RaBitQ needs x86_64 + AVX2; not available on Arm/Arm64 ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
-| `PlatformNotSupportedException` (DiskANN) | DiskANN is Linux + libaio only ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
+| `PlatformNotSupportedException` (DiskANN) | DiskANN is Linux-only (libaio optional) ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
 
 | Expression filter throws | Method calls / unsupported shapes — use `ZVecFilterBuilder` or `products.Untyped`. |
 | Empty scalars after Open | Schema should load from on-disk metadata; if an old broken folder remains, delete the collection path once and recreate. |
@@ -653,14 +653,14 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 
 | What | Format | Example |
 |------|--------|---------|
-| **SDK version** | SemVer | `1.0.0-beta.3.2` |
-| **ZVec native pin** | Build metadata after `+` | `+zvec.0.5.1` |
+| **SDK version** | SemVer | `1.0.0-beta.4` |
+| **ZVec native pin** | Build metadata after `+` | `+zvec.0.6.0` |
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
-| **ABI floor** | `ZVecNativeAbi` | Minimum `0.5.1`, same major |
-| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.3.2` |
+| **ABI floor** | `ZVecNativeAbi` | Minimum `0.6.0`, same major |
+| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.4` |
 | **Git branch (train)** | `release/1.0` | Long-lived 1.0.x line |
 
-NuGet version example: `1.0.0-beta.3.2+zvec.0.5.1`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.3.2+zvec.0.5.1`.
+NuGet version example: `1.0.0-beta.4+zvec.0.6.0`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.4+zvec.0.6.0`.
 
 At startup the ABI gate requires:
 1. `zvec_check_version(MinimumMajor, MinimumMinor, MinimumPatch)` (native ≥ minimum), **and**
