@@ -213,6 +213,29 @@ Emergency `workflow_dispatch` with `source_run_id` still requires the **same SHA
 
 Secrets already on the repo (`NUGET_USER`, optional `NUGET_API_KEY`) and the nuget.org Trusted Publishing policy are **private maintainer credentials**. Do not document or rotate them in PRs. If Publish 401s again, the maintainer fixes secrets/policy outside of contributor docs.
 
+## Documentation wiki (MkDocs + mike)
+
+Public site: https://ahmedSamir50.github.io/AdamSystems.ZVec.NET/ (project Pages; does not replace a user profile site). Versioned with **mike** (`latest` from `v*` tags, `dev` from `main`).
+
+```powershell
+# Prefer python -m on Windows (avoids broken pip.exe launchers after Python moves)
+python -m pip install -r requirements-docs.txt
+python -m mkdocs serve          # http://127.0.0.1:8000
+python -m mkdocs build --strict # local parity (unversioned)
+```
+
+Sources live under `docs/` (`mkdocs.yml`, logo at `docs/assets/zvec-net-logo.png`). Agent map: `docs/llms.txt` and root `AGENTS.md`. Examples cover in-repo `samples/` and link out to [ZVec.Net-DemosAndPOCs](https://github.com/ahmedSamir50/ZVec.Net-DemosAndPOCs).
+
+**Versioned deploy (CI / maintainers):** workflow `docs.yml` runs `mike deploy --push` to the **`gh-pages`** branch. Version id = git tag without leading `v` (never include `+zvec.*`). One-time: Repo Settings → Pages → **Deploy from branch `gh-pages` / root**.
+
+**After every native submodule bump** (same PR / release checklist):
+
+1. Re-fetch `docs/llms-full.txt` from https://zvec.org/llms-full.txt
+2. Update `docs/llms-full.meta.md` (fetch date + pin)
+3. Regenerate `docs/reference/native-api-coverage.md` against `c_api.h` + `NativeMethods.cs`
+
+Do not commit `docs/llms-full.txt` or the MkDocs `site/` output.
+
 ## How to Contribute
 
 1. **Branching:** See [Branching & releases](#branching--releases) above (`feature/*` / `bugfix/*` off **`development`**).
@@ -221,7 +244,7 @@ Secrets already on the repo (`NUGET_USER`, optional `NUGET_API_KEY`) and the nug
    - **Typed (preferred for app code):** `IZvecCollection<T>`, `ZVec.NET.Mapping` attributes, `ZVecCollectionSchemaBuilder.From<T>()`, expression filters, `AddZVecCollection<T>`. `EnsureSchema` is **additive only** (never auto-drop).
    - **Dynamic (advanced):** `IZvecCollection`, `ZVecDoc`, string field names, fluent `ZVecFilterBuilder`, `AddZVecCollection(string key, …)`.
    - Implement **complete** `type.h` enums and **all** index-param types (Hnsw, HnswRabitq, Ivf, Flat, DiskAnn, Vamana, Invert, Fts) — do not defer indexes.
-4. **Coverage target:** Wrap the **Vector Database** C++ / `zvec_c_api` surface and match DB sections of [llms-full](https://zvec.org/llms-full.txt) (see plan §2.0). Do **not** implement AI Integration (embeddings, MCP, skills, model rerankers) in this package. Snapshot used for audits: `docs/llms-full.txt`.
+4. **Coverage target:** Wrap the **Vector Database** C++ / `zvec_c_api` surface and match DB sections of [llms-full](https://zvec.org/llms-full.txt) (see plan §2.0). Do **not** implement AI Integration (embeddings, MCP, skills, model rerankers) in this package. Snapshot used for audits: `docs/llms-full.txt` (gitignored; see `docs/llms-full.meta.md`).
 5. **Async & concurrency:** Public surface is async-first. P/Invoke is sync — always go through collection read/write gates. **Never** add unbounded `Task.Run` around native calls: it does not make native work non-blocking, only moves the block onto another thread-pool worker and can **worsen ASP.NET thread-pool starvation** under load. Async APIs are cancellation-aware sync wrappers; when optional gates are enabled (`MaxConcurrentNativeCalls` / `MaxConcurrentReads` > 0), honor the operation `CancellationToken` via `WaitAsync` while waiting on gates. Mid-P/Invoke cancel remains best-effort.
 6. **Zero allocation:** On hot paths (`Query` / `Insert`), use `ReadOnlySpan<float>` / `ReadOnlyMemory<float>` and `MemoryHandle`. Do not introduce `new float[]` copies on vector passing paths. Typed ODM mapping is a managed edge cost — keep heavy work on the existing `ZVecDoc` native path.
 7. **Enums / ABI:** Match numeric values to upstream `zvec/db/type.h` and `c_api.h`. If the C header omits a define (e.g. `HNSW_RABITQ = 4`), use the `type.h` value — do not invent new numbers. Document every enum in the project plan Appendix A.

@@ -1,0 +1,139 @@
+site_name: ZVec.NET
+site_description: Production .NET SDK for Alibaba ZVec — DI, typed ODM, indexes, and mobile RIDs
+site_url: https://ahmedSamir50.github.io/AdamSystems.ZVec.NET/
+repo_url: https://github.com/ahmedSamir50/AdamSystems.ZVec.NET
+repo_name: ahmedSamir50/AdamSystems.ZVec.NET
+edit_uri: edit/main/docs/
+docs_dir: docs
+site_dir: site
+copyright: Copyright &copy; Adam Systems EGY — Apache 2.0
+
+theme:
+  name: material
+  logo: assets/zvec-net-logo.png
+  favicon: assets/zvec-net-logo.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+
+plugins:
+  - search
+  - mike
+
+hooks:
+  - docs_hooks.py
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra_javascript:
+  - javascripts/katex.js
+  - https://unpkg.com/katex@0.16.22/dist/katex.min.js
+  - https://unpkg.com/katex@0.16.22/dist/contrib/auto-render.min.js
+
+extra_css:
+  - https://unpkg.com/katex@0.16.22/dist/katex.min.css
+
+extra:
+  version:
+    provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ahmedSamir50/AdamSystems.ZVec.NET
+    - icon: fontawesome/brands/markdown
+      link: https://www.nuget.org/packages/ZVec.NET/
+
+exclude_docs: |
+  README.md
+  llms-full.txt
+  llms-full.meta.md
+  llms.txt
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install: getting-started/install.md
+      - Quick start: getting-started/quick-start.md
+  - Guides:
+      - DI hosts: guides/di.md
+      - Typed ODM: guides/odm.md
+      - Native RIDs: guides/rids.md
+      - Hybrid search and FTS: guides/hybrid-fts.md
+      - Troubleshooting: guides/troubleshooting.md
+  - Examples:
+      - Overview: examples/index.md
+      - Host apps (in-repo): examples/hosts.md
+      - RAG Search Recommend: examples/scenarios.md
+      - Demos and POCs (external): examples/demos-and-pocs.md
+      - Inline snippets: examples/snippets.md
+  - Concepts:
+      - Overview: concepts/index.md
+      - HNSW: concepts/hnsw.md
+      - Flat: concepts/flat.md
+      - IVF: concepts/ivf.md
+      - DiskANN: concepts/diskann.md
+      - Vamana: concepts/vamana.md
+      - FTS: concepts/fts.md
+      - RRF and weighted rerank: concepts/rrf.md
+  - Theory:
+      - Overview: theory/index.md
+      - Distance metrics: theory/metrics.md
+      - HNSW: theory/hnsw.md
+      - IVF: theory/ivf.md
+      - Vamana: theory/vamana.md
+      - DiskANN: theory/diskann.md
+      - Quantization: theory/quantization.md
+      - RRF and fusion: theory/rrf.md
+  - Reference:
+      - Package identity: reference/package-identity.md
+      - Versioning: reference/versioning.md
+      - Native API coverage: reference/native-api-coverage.md
+      - API docs track: reference/api-docs.md
+  - Contributing: contributing.md

@@ -1,0 +1,80 @@
+name: Docs
+
+# Deploys versioned docs with mike → gh-pages branch.
+# Repo Settings → Pages → Source: Deploy from branch → gh-pages / (root).
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "mike version id (empty = infer from tag or 'dev')"
+        required: false
+        default: ""
+      update_latest:
+        description: "Also set 'latest' alias (for release publishes)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-gh-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install docs dependencies
+        run: pip install -r requirements-docs.txt
+
+      - name: Configure git for mike
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve mike version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          INPUT="${{ github.event.inputs.version }}"
+          if [[ -n "${INPUT}" ]]; then
+            VERSION="${INPUT}"
+            UPDATE_LATEST="${{ github.event.inputs.update_latest }}"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            UPDATE_LATEST="true"
+          else
+            VERSION="dev"
+            UPDATE_LATEST="false"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "update_latest=${UPDATE_LATEST}" >> "$GITHUB_OUTPUT"
+          echo "Deploying mike version=${VERSION} update_latest=${UPDATE_LATEST}"
+
+      - name: mike deploy
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          if [[ "${{ steps.ver.outputs.update_latest }}" == "true" ]]; then
+            mike deploy --push --update-aliases "${VERSION}" latest
+            mike set-default --push latest
+          else
+            mike deploy --push --update-aliases "${VERSION}"
+          fi

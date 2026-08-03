@@ -1,6 +1,7 @@
 # ZVec.NET
 
 [![NuGet](https://img.shields.io/nuget/v/ZVec.NET.svg)](https://www.nuget.org/packages/ZVec.NET/)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://ahmedSamir50.github.io/AdamSystems.ZVec.NET/)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512bd4.svg)](https://dotnet.microsoft.com/)
 
@@ -9,6 +10,8 @@
 **Production .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)** — DI, typed ODM, async, SafeHandles, full indexes/FTS, and mobile RIDs. Not a thin P/Invoke wrapper.
 
 **Host demos:** [samples/](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/tree/main/samples) — ASP.NET Minimal API, **MAUI Blazor Hybrid** (offline/edge RAG), and Console. See [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md).
+
+**Docs:** [GitHub Pages wiki](https://ahmedSamir50.github.io/AdamSystems.ZVec.NET/) ([local preview](docs/README.md) via `mkdocs serve`).
 
 ## Contents
 
@@ -713,9 +716,11 @@ We welcome contributions! Please read [CONTRIBUTING.md](https://github.com/ahmed
 
 ## Links
 
+- **ZVec.NET docs (GitHub Pages):** [ahmedSamir50.github.io/AdamSystems.ZVec.NET](https://ahmedSamir50.github.io/AdamSystems.ZVec.NET/)
 - **ZVec (upstream):** [github.com/alibaba/zvec](https://github.com/alibaba/zvec)
 - **ZVec docs:** [zvec.org](https://zvec.org)
-- **Samples:** [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md)
+- **Samples (in-repo hosts):** [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md) · [wiki Examples](https://ahmedSamir50.github.io/AdamSystems.ZVec.NET/examples/)
+- **Demos & POCs (external):** [ZVec.Net-DemosAndPOCs](https://github.com/ahmedSamir50/ZVec.Net-DemosAndPOCs)
 - **Contributing:** [CONTRIBUTING.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/CONTRIBUTING.md)
 - **Project Plan:** [ZVec.NET-Project-Plan.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/ZVec.NET-Project-Plan.md)
 - **Implementation Epics:** [ZVec.NET-Implementation-Plan.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/ZVec.NET-Implementation-Plan.md)
