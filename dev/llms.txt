@@ -1,0 +1,43 @@
+# ZVec.NET — LLM / agent documentation map
+
+> PackageId: ZVec.NET (not NuGet "Zvec"). Native pin: zvec 0.6.0. SDK: 1.0.0-beta.4+zvec.0.6.0.
+> Human site: https://ahmedSamir50.github.io/AdamSystems.ZVec.NET/
+> Source: https://github.com/ahmedSamir50/AdamSystems.ZVec.NET
+> Extra demos: https://github.com/ahmedSamir50/ZVec.Net-DemosAndPOCs
+
+## Scope
+
+- IN SCOPE: .NET SDK for Alibaba ZVec C API — DI, typed ODM, indexes, FTS, hybrid query, RIDs, binding gaps.
+- OUT OF SCOPE: embeddings, MCP, skills, model rerankers, chat hosts (sample/demo apps may use them).
+
+## Start here
+
+- Home: https://ahmedSamir50.github.io/AdamSystems.ZVec.NET/
+- Install / Quick start: …/getting-started/
+- Guides: DI, ODM, RIDs, hybrid-fts, troubleshooting under …/guides/
+- Examples (in-repo samples): …/examples/
+- External demos/POCs: …/examples/demos-and-pocs/ → github.com/ahmedSamir50/ZVec.Net-DemosAndPOCs
+- Concepts: …/concepts/
+- Theory: …/theory/ (metrics, HNSW, IVF, Vamana, DiskANN, quantization, RRF)
+- Native API coverage: …/reference/native-api-coverage/
+- Package identity / versioning: …/reference/
+
+## Upstream (product / theory)
+
+- https://zvec.org
+- Audit dump (local, gitignored): docs/llms-full.txt — metadata in docs/llms-full.meta.md
+
+## Repo orientation for agents
+
+- Managed SDK: src/Core/ZVec.NET/
+- Native wrapper: src/Native/ZVec.Native/ (submodule external/zvec)
+- Official hosts: samples/ (.NET 10; not in NuGet)
+- External POCs: ZVec.Net-DemosAndPOCs (separate repo — do not vendor)
+- Tests: testing/ZVec.NET.Tests/
+- Contributor rules: CONTRIBUTING.md, AGENTS.md
+
+## Known C API gaps (binding)
+
+- HNSW-RaBitQ index create blocked; managed throws NotSupportedException.
+- Group-by execution blocked (no zvec_collection_group_by_query in c_api.h).
+- See docs/reference/native-api-coverage.md
