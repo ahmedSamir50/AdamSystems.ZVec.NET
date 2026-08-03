@@ -21,9 +21,9 @@ Random rotation (`EnableRotate`) can reduce axis-aligned quantization error for 
 ```mermaid
 flowchart LR
   fp32[FP32 vectors]
-  train[Codebook / bits]
+  train["Codebook and bits"]
   codes[Compact codes]
-  search[ANN on codes + refine]
+  search["ANN on codes then refine"]
   fp32 --> train --> codes --> search
 ```
 

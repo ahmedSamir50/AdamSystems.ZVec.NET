@@ -16,17 +16,17 @@ Exact layer probability and neighbor-selection rules follow the HNSW paper; ZVec
 
 ```mermaid
 flowchart TB
-  L2[Layer 2 sparse]
-  L1[Layer 1]
-  L0[Layer 0 dense]
+  L2["Layer 2 sparse"]
+  L1["Layer 1"]
+  L0["Layer 0 dense"]
   q[Query entry]
   q --> L2 --> L1 --> L0
-  L0 --> topk[Top-K neighbors]
+  L0 --> topk["Top-K neighbors"]
 ```
 
 ```mermaid
 flowchart LR
-  build["Build M + ef_construction"]
+  build["Build M and ef_construction"]
   mem[RAM-resident graph]
   search["Search ef_search"]
   build --> mem --> search

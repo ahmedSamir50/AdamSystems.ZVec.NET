@@ -25,21 +25,21 @@ flowchart TB
   pool[Candidate pool SearchListSize]
   prune["Alpha prune to MaxDegree"]
   entry --> greedy --> pool --> prune
-  prune --> graph[Vamana graph]
+  prune --> graphNodes[Vamana graph]
 ```
 
 ```mermaid
 flowchart LR
-  subgraph layout [Layout options]
+  subgraph layoutOpts ["Layout options"]
     contig[UseContiguousMemory]
     idmap[UseIdMap]
     sat[SaturateGraph]
   end
-  graph[Graph nodes]
+  graphNodes[Graph nodes]
   mmap[Collection EnableMmap]
-  layout --> graph
-  mmap --> graph
-  q[Query EfSearch] --> graph --> hits[Top-K]
+  layoutOpts --> graphNodes
+  mmap --> graphNodes
+  q[Query EfSearch] --> graphNodes --> hits["Top-K"]
 ```
 
 ## Citations

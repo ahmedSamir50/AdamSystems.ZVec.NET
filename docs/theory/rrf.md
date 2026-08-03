@@ -20,12 +20,12 @@ Weighted fusion (schematic): each sub-query score \(s_q(d)\) is multiplied by we
 
 ```mermaid
 flowchart TB
-  q1[Sub-query 1]
-  q2[Sub-query 2]
-  l1[Ranked list 1]
-  l2[Ranked list 2]
-  fuse[RRF or Weighted]
-  out[Top-N fused hits]
+  q1["Sub-query 1"]
+  q2["Sub-query 2"]
+  l1["Ranked list 1"]
+  l2["Ranked list 2"]
+  fuse["RRF or Weighted"]
+  out["Top-N fused hits"]
   q1 --> l1 --> fuse
   q2 --> l2 --> fuse
   fuse --> out

@@ -22,32 +22,32 @@ Query cost scales with SSD bandwidth and \(L\); larger \(L\) usually improves re
 
 ```mermaid
 flowchart TB
-  subgraph build [Build]
+  subgraph buildPhase ["Build"]
     corpus[Large corpus]
-    graph[Proximity graph MaxDegree]
+    graphBuild[Proximity graph MaxDegree]
     pq[Optional PQ codes]
-    corpus --> graph
+    corpus --> graphBuild
     corpus --> pq
   end
-  subgraph search [Search on Linux]
+  subgraph searchPhase ["Search on Linux"]
     q[Query]
-    ram[Hot graph / caches]
-    ssd[SSD pages via aio or pread]
+    ram["Hot graph and caches"]
+    ssd["SSD pages via aio or pread"]
     q --> ram
     ram --> ssd
     ssd --> cand[Candidate list ListSize]
-    cand --> topk[Top-K]
+    cand --> topk["Top-K"]
   end
-  graph --> ram
+  graphBuild --> ram
   pq --> ssd
 ```
 
 ```mermaid
 flowchart LR
-  win[Windows / macOS / mobile]
+  win["Windows macOS mobile"]
   linux[Linux RID]
-  win -->|SDK gate| pns[PlatformNotSupportedException]
-  linux --> native[zvec_c_api DiskANN]
+  win -->|"SDK gate"| pns[PlatformNotSupportedException]
+  linux --> native["zvec_c_api DiskANN"]
 ```
 
 ## Citations

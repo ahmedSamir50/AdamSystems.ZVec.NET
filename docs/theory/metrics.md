@@ -34,11 +34,11 @@ When vectors are \(\ell_2\)-normalized, maximizing IP is equivalent to maximizin
 flowchart LR
   emb[Embedding model]
   metric[Metric at index build]
-  index[HNSW / IVF / Flat]
+  indexNode["HNSW IVF or Flat"]
   query[Query vector]
-  emb --> metric --> index
-  query --> index
-  index --> hits[Ranked hits]
+  emb --> metric --> indexNode
+  query --> indexNode
+  indexNode --> hits[Ranked hits]
 ```
 
 ## Citations
