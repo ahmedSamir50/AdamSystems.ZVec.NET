@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -80,10 +81,14 @@ public static class ZVecServiceCollectionExtensions
     /// Schema defaults to <see cref="ZVecCollectionSchemaBuilder.From{T}"/> when not supplied.
     /// </summary>
     /// <typeparam name="T">Mapped document type.</typeparam>
-    public static IServiceCollection AddZVecCollection<T>(
+    public static IServiceCollection AddZVecCollection<
+        [DynamicallyAccessedMembers(
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T
+    >(
         this IServiceCollection services,
         Action<ZVecCollectionRegistrationOptions> configure)
-        where T : class
+        where T : class, new()
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);

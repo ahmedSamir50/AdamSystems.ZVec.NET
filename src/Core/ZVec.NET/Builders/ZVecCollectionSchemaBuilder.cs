@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using ZVec.NET.Mapping;
 
 namespace ZVec.NET;
@@ -27,7 +28,9 @@ public sealed class ZVecCollectionSchemaBuilder
     /// Field and vector names come from conventions and <c>ZVec.NET.Mapping</c> attributes.
     /// </summary>
     /// <typeparam name="T">Concrete document type with an identity property.</typeparam>
-    public static ZVecCollectionSchemaBuilder From<T>() where T : class
+    public static ZVecCollectionSchemaBuilder From<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T
+    >() where T : class
     {
         var model = ZVecTypeModel.Get<T>();
         var builder = new ZVecCollectionSchemaBuilder(model.CollectionName);

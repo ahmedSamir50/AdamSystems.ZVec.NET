@@ -53,12 +53,16 @@ build.ninja
 # =========================
 .DS_Store
 Thumbs.db
+# Upstream ZVec doc dump (large; re-fetch locally — see docs/llms-full.meta.md)
 /docs/llms-full.txt
+# MkDocs build output
+/site/
+__pycache__/
+*.pyc
 /ZVec.NET-ProjectImplementation-Plan.md
 /ZVec.NET-Implementation-Plan.md
 /src/Mock/ZVec.Native.Mock/build_mock
 /.vscode
-/docs
 /tools
 /githubActions.pipline.log
 githubActions.pipline.log

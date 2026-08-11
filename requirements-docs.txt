@@ -1,0 +1,6 @@
+mkdocs==1.6.1
+mkdocs-material==9.6.22
+pymdown-extensions==10.16.1
+mike==2.1.3
+# Pygments 2.20+ breaks pymdownx highlight when filename is None
+Pygments>=2.16,<2.20
