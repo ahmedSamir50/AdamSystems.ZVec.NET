@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 
 namespace ZVec.NET;
@@ -6,7 +7,11 @@ namespace ZVec.NET;
 /// Typed façade over <see cref="IZvecCollection"/> for a mapped document type <typeparamref name="T"/>.
 /// </summary>
 /// <typeparam name="T">Concrete document class mapped via <c>ZVec.NET.Mapping</c>.</typeparam>
-public interface IZvecCollection<T> : IDisposable, IAsyncDisposable where T : class
+public interface IZvecCollection<
+    [DynamicallyAccessedMembers(
+        DynamicallyAccessedMemberTypes.PublicProperties |
+        DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T
+> : IDisposable, IAsyncDisposable where T : class, new()
 {
     /// <summary>Underlying untyped collection (escape hatch).</summary>
     IZvecCollection Untyped { get; }

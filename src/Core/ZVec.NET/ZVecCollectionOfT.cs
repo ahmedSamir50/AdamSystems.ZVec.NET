@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq.Expressions;
 using ZVec.NET.Exceptions;
@@ -9,7 +10,11 @@ namespace ZVec.NET;
 /// Typed collection façade over <see cref="IZvecCollection"/> for document type <typeparamref name="T"/>.
 /// </summary>
 /// <typeparam name="T">Mapped document class.</typeparam>
-public sealed class ZVecCollection<T> : IZvecCollection<T> where T : class
+public sealed class ZVecCollection<
+    [DynamicallyAccessedMembers(
+        DynamicallyAccessedMemberTypes.PublicProperties |
+        DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T
+> : IZvecCollection<T> where T : class, new()
 {
     private readonly ZVecTypeModel _model;
 

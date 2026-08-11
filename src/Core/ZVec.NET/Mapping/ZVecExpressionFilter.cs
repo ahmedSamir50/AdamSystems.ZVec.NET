@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq.Expressions;
 using ZVec.NET.Exceptions;
@@ -28,7 +29,9 @@ public static class ZVecExpressionFilter
     /// <typeparam name="T">Mapped document type.</typeparam>
     /// <param name="filter">Boolean expression over <typeparamref name="T"/> properties.</param>
     /// <returns>Native ZVec filter string.</returns>
-    public static string Translate<T>(Expression<Func<T, bool>> filter) where T : class
+    public static string Translate<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T
+    >(Expression<Func<T, bool>> filter) where T : class
     {
         ArgumentNullException.ThrowIfNull(filter);
         var model = ZVecTypeModel.Get<T>();

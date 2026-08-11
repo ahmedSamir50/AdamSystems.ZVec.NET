@@ -12,6 +12,22 @@ All notable changes to ZVec.NET are documented in this file.
 
 - Managed tests (CI + `simulate-pack` / Docker) run on **net8.0** only; package still ships `net8.0` / `net9.0` / `net10.0`
 
+## [1.0.0-beta.5] - 2026-08-11
+
+Native pin unchanged: **zvec 0.6.0**.
+
+### Added
+
+- **Native AOT / IL Trimming compatible**: all typed ODM public APIs (`IZvecCollection<T>`, `ZVecCollection<T>`, `ZVecMapper`, `ZVecTypeModel`, `ZVecCollectionSchemaBuilder.From<T>()`, `ZVecExpressionFilter.Translate<T>()`, `AddZVecCollection<T>()`) annotated with `[DynamicallyAccessedMembers]`
+- `<IsAotCompatible>true</IsAotCompatible>` and `<EnableTrimAnalyzer>true</EnableTrimAnalyzer>` in csproj for build-time verification
+
+### Impact
+
+- **Zero breaking changes**: annotations are additive metadata
+- **Typed ODM constraint**: `IZvecCollection<T>` / `ZVecCollection<T>` now require `where T : class, new()` (already required at runtime for `Fetch` / `Query` deserialization)
+- **Consumer POCOs do not need annotations** — the SDK preserves required members
+- Consumers can now `dotnet publish -c Release /p:PublishAot=true` with **zero IL2070/IL2091 warnings**
+
 ## [1.0.0-beta.4] - 2026-07-29
 
 Native pin: **zvec 0.6.0** (was 0.5.1).
