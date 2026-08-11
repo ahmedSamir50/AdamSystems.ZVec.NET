@@ -109,23 +109,7 @@ jobs:
             exit 0
           fi
 
-          # If release/* push already started Pack for this SHA, wait instead of duplicating natives.
-          IN_PROGRESS_ID="$(gh api \
-            -H 'Accept: application/vnd.github+json' \
-            "/repos/${GITHUB_REPOSITORY}/actions/workflows/pack.yml/runs?per_page=30" \
-            --jq ".workflow_runs[] | select(.head_sha==\"${SHA}\" and .status==\"in_progress\") | .id" \
-            | head -n1 || true)"
-
-          if [ -n "${IN_PROGRESS_ID:-}" ]; then
-            echo "Waiting for in-progress Pack run ${IN_PROGRESS_ID} for ${SHA} (avoid duplicate natives rebuild)"
-            gh run watch "${IN_PROGRESS_ID}" --exit-status
-            assert_pack_run "${IN_PROGRESS_ID}"
-            echo "pack_run_id=${IN_PROGRESS_ID}" >> "$GITHUB_OUTPUT"
-            echo "need_pack=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "No green or in-progress Pack run for ${SHA}; will rebuild via pack.yml"
+          echo "No green Pack run for ${SHA}; will rebuild via pack.yml"
           echo "pack_run_id=" >> "$GITHUB_OUTPUT"
           echo "need_pack=true" >> "$GITHUB_OUTPUT"
 
