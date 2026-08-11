@@ -11,4 +11,5 @@
 | Expression filter throws | Method calls / unsupported shapes — use `ZVecFilterBuilder` or `products.Untyped`. |
 | Empty scalars after Open | Schema should load from on-disk metadata; if an old broken folder remains, delete the collection path once and recreate. |
 | Samples won’t run | Need .NET 10 SDK + local native for your RID; see [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md). |
+| IL2070/IL2091 warnings during AOT publish | Fixed in **`1.0.0-beta.5`** — SDK now uses `[DynamicallyAccessedMembers]`. Upgrade package. Consumer POCOs need no annotations. |
 | `NotSupportedException` (group-by / RaBitQ create) | C API gaps — [Native API coverage](../reference/native-api-coverage.md). |

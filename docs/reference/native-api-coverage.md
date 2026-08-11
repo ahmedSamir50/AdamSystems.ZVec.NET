@@ -1,6 +1,6 @@
 # ZVec.NET Native API Coverage Report
 
-Generated against `c_api.h` @ **alibaba/zvec v0.6.0** and `NativeMethods.cs` (ZVec.NET `1.0.0-beta.4`).
+Generated against `c_api.h` @ **alibaba/zvec v0.6.0** and `NativeMethods.cs` (ZVec.NET `1.0.0-beta.5`).
 
 Regenerate after each submodule bump by comparing `ZVEC_EXPORT` / `ZVEC_CALL` names in `c_api.h` to `[LibraryImport]` methods in `NativeMethods.cs`.
 
