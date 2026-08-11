@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
 using ZVec.NET.Exceptions;
@@ -57,10 +58,13 @@ public sealed class ZVecTypeModel
     public IReadOnlyList<ZVecMappedProperty> Properties { get; }
 
     /// <summary>Gets or builds the cached model for <typeparamref name="T"/>.</summary>
-    public static ZVecTypeModel Get<T>() where T : class => Get(typeof(T));
+    public static ZVecTypeModel Get<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T
+    >() where T : class => Get(typeof(T));
 
     /// <summary>Gets or builds the cached model for <paramref name="clrType"/>.</summary>
-    public static ZVecTypeModel Get(Type clrType)
+    public static ZVecTypeModel Get(
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] Type clrType)
     {
         ArgumentNullException.ThrowIfNull(clrType);
         if (!clrType.IsClass || clrType.IsAbstract)
@@ -91,7 +95,8 @@ public sealed class ZVecTypeModel
                 propertyName));
     }
 
-    private static ZVecTypeModel Build(Type clrType)
+    private static ZVecTypeModel Build(
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] Type clrType)
     {
         var collectionAttr = clrType.GetCustomAttribute<ZVecCollectionAttribute>();
         var collectionName = collectionAttr?.Name ?? clrType.Name;

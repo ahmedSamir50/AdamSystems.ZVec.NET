@@ -6,7 +6,7 @@ Advanced and alternate demos live in a **separate repository** — not inside `A
 
 ## Requirements
 
-- **ZVec.NET 1.0.0-beta.4** (`+zvec.0.6.0`) from NuGet
+- **ZVec.NET 1.0.0-beta.5** (`+zvec.0.6.0`) from NuGet
 - Collections use SDK **`OpenOrCreate`** / DI `OpenMode = OpenOrCreate` (restart-safe)
 - Dense-vector **FP32 HNSW** focus in those demos; group-by remains blocked in the .NET C API; INT8/INT4 `EnableRotate` exists in the SDK but is unused there
 

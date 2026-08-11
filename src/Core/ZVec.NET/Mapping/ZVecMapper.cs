@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using ZVec.NET.Exceptions;
 
@@ -9,7 +10,9 @@ namespace ZVec.NET.Mapping;
 public static class ZVecMapper
 {
     /// <summary>Converts a typed record to a <see cref="ZVecDoc"/>.</summary>
-    public static ZVecDoc ToDoc<T>(T record) where T : class
+    public static ZVecDoc ToDoc<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T
+    >(T record) where T : class
     {
         ArgumentNullException.ThrowIfNull(record);
         var model = ZVecTypeModel.Get<T>();
@@ -87,7 +90,11 @@ public static class ZVecMapper
     }
 
     /// <summary>Converts a <see cref="ZVecDoc"/> to a typed record. Unknown native fields are ignored.</summary>
-    public static T FromDoc<T>(ZVecDoc doc) where T : class
+    public static T FromDoc<
+        [DynamicallyAccessedMembers(
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T
+    >(ZVecDoc doc) where T : class, new()
     {
         ArgumentNullException.ThrowIfNull(doc);
         var model = ZVecTypeModel.Get<T>();
@@ -95,7 +102,11 @@ public static class ZVecMapper
     }
 
     /// <summary>Converts a <see cref="ZVecDoc"/> using a precomputed model.</summary>
-    public static T FromDoc<T>(ZVecDoc doc, ZVecTypeModel model) where T : class
+    public static T FromDoc<
+        [DynamicallyAccessedMembers(
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T
+    >(ZVecDoc doc, ZVecTypeModel model) where T : class, new()
     {
         ArgumentNullException.ThrowIfNull(doc);
         ArgumentNullException.ThrowIfNull(model);
@@ -135,7 +146,9 @@ public static class ZVecMapper
     /// Validates that every mapped scalar/vector on <typeparamref name="T"/> exists on <paramref name="schema"/>.
     /// Unknown native columns are allowed (leftover after Drop from a previous type shape).
     /// </summary>
-    public static void EnsureModelMatchesSchema<T>(ZVecCollectionSchema? schema) where T : class
+    public static void EnsureModelMatchesSchema<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T
+    >(ZVecCollectionSchema? schema) where T : class
     {
         var model = ZVecTypeModel.Get<T>();
         EnsureModelMatchesSchema(model, schema);

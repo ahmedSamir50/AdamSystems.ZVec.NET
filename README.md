@@ -5,7 +5,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512bd4.svg)](https://dotnet.microsoft.com/)
 
-> **Beta** — `1.0.0-beta.4+zvec.0.6.0`. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.4`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
+> **Beta** — `1.0.0-beta.5+zvec.0.6.0`. Native AOT compatible. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.5`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
 
 **Production .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)** — DI, typed ODM, async, SafeHandles, full indexes/FTS, and mobile RIDs. Not a thin P/Invoke wrapper.
 
@@ -42,6 +42,7 @@
 | **Pin-based vector pipelines** | `ReadOnlyMemory<float>` on hot paths — no intermediate `float[]` copies on the query pin path |
 | **Safe native lifecycle** | Collection handles owned by `SafeZvecHandle` (close-only); `Dispose` closes, `Destroy` deletes then closes; `Shutdown` disposes all tracked open collections before `zvec_shutdown` |
 | **Cross-platform natives** | Single NuGet `ZVec.NET` with `runtimes/{rid}/native/` for **win-x64**, **linux-x64**, **osx-arm64**, **android-arm64/x64** in beta |
+| **Native AOT ready** | `<IsAotCompatible>true</IsAotCompatible>` — publish AOT without IL warnings; consumer POCOs need no annotations |
 | **Full ZVec DB coverage** | HNSW, Flat, IVF, HNSW-RaBitQ, DiskANN, Vamana, Invert, FTS indexes; hybrid search; schema evolution; in-DB RRF/Weighted rerankers |
 | **Idiomatic C#** | .NET naming guidelines, `ValueTask`, `CancellationToken`, fluent builders |
 
@@ -127,10 +128,10 @@ Package size grows with each RID. There is **no** fixed 50 MB gate — see pack 
 ### Install
 
 ```bash
-dotnet add package ZVec.NET --version 1.0.0-beta.4
+dotnet add package ZVec.NET --version 1.0.0-beta.5
 ```
 
-Version scheme: `1.0.0-beta.4+zvec.0.6.0` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires pack-required RID natives. Managed CI / `simulate-pack` run tests on **net8.0** only (LTS floor); the package still ships net8/net9/net10.
+Version scheme: `1.0.0-beta.5+zvec.0.6.0` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires pack-required RID natives. Managed CI / `simulate-pack` run tests on **net8.0** only (LTS floor); the package still ships net8/net9/net10.
 
 ### Two APIs
 
@@ -646,6 +647,7 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 | `PlatformNotSupportedException` (RaBitQ) | HNSW-RaBitQ needs x86_64 + AVX2; not available on Arm/Arm64 ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
 | `PlatformNotSupportedException` (DiskANN) | DiskANN is Linux-only (libaio optional) ([feature limits](#never-supported--feature-limits-not-a-rid-packaging-issue)). |
 
+| IL2070/IL2091 warnings during AOT publish | Fixed in **`1.0.0-beta.5`** — SDK now uses `[DynamicallyAccessedMembers]`. Upgrade package. Consumer POCOs need no annotations. |
 | Expression filter throws | Method calls / unsupported shapes — use `ZVecFilterBuilder` or `products.Untyped`. |
 | Empty scalars after Open | Schema should load from on-disk metadata; if an old broken folder remains, delete the collection path once and recreate. |
 | Samples won’t run | Need .NET 10 SDK + local native for your RID; see [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md). |
@@ -656,14 +658,14 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 
 | What | Format | Example |
 |------|--------|---------|
-| **SDK version** | SemVer | `1.0.0-beta.4` |
+| **SDK version** | SemVer | `1.0.0-beta.5` |
 | **ZVec native pin** | Build metadata after `+` | `+zvec.0.6.0` |
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
 | **ABI floor** | `ZVecNativeAbi` | Minimum `0.6.0`, same major |
-| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.4` |
+| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.5` |
 | **Git branch (train)** | `release/1.0` | Long-lived 1.0.x line |
 
-NuGet version example: `1.0.0-beta.4+zvec.0.6.0`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.4+zvec.0.6.0`.
+NuGet version example: `1.0.0-beta.5+zvec.0.6.0`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.5+zvec.0.6.0`.
 
 At startup the ABI gate requires:
 1. `zvec_check_version(MinimumMajor, MinimumMinor, MinimumPatch)` (native ≥ minimum), **and**
