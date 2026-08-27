@@ -86,8 +86,8 @@ Consumer-facing matrix: [README.md — Native RIDs](../../README.md#native-rids-
 | `zvec-fastpfor-msvc-arm64-simde.patch` | `win-arm64` |
 | `zvec-arrow-pcg-msvc-arm64.patch` | `win-arm64` |
 | Host win64 / osx `protoc` download | `win-arm64`, Android, iOS/Catalyst |
-| `zvec-ios-static-output-name.patch` | iOS / simulator |
-| `zvec-lz4-maccatalyst.patch`, `zvec-arrow-maccatalyst.patch`, `zvec-rocksdb-maccatalyst-crc.patch` | `maccatalyst-arm64` |
+| `zvec-ios-static-output-name.patch` | iOS / simulator (obsolete on zvec ≥0.7.0 — upstream fixed STATIC naming) |
+| `zvec-lz4-maccatalyst.patch`, `zvec-arrow-maccatalyst.patch`, `zvec-rocksdb-maccatalyst-crc.patch` | `maccatalyst-arm64` only (`build-ios.sh`) |
 
 ## Branch / tag cheat sheet
 
