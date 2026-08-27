@@ -17,5 +17,5 @@ where cl
 where gcc
 where perl
 where ninja
-cmake -S "%~dp0." -B "%~dp0build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DSNOWBALL_HOST_CC=gcc.exe
+cmake -S "%~dp0." -B "%~dp0build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DSNOWBALL_HOST_CC=gcc.exe -DOVERRIDE_GIT_DESCRIBE=v0.7.0
 exit /b %ERRORLEVEL%

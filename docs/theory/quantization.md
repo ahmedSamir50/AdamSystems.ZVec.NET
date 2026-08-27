@@ -41,10 +41,9 @@ flowchart LR
 | Default | `ZVecDefaults.Hnsw.QuantizeType` / IVF / Flat / … = **Undefined** (no quantization) |
 | INT8/INT4 rotate | `EnableRotate` default **false** (`ZVecDefaults.Quantizer.EnableRotate`) |
 | HNSW-RaBitQ type | `ZVecHnswRabitqIndexParam` — defaults `M=16`, `EfConstruction=200`, `TotalBits=7`, `NumClusters=16` |
-| Platform gate | RaBitQ: **x86_64 + AVX2 only** — SDK throws `PlatformNotSupportedException` on Arm |
-| C API create gap | Managed create throws `NotSupportedException` until upstream exports create path — see [Native API coverage](../reference/native-api-coverage.md) |
-
-Do not rely on RaBitQ create in production until the coverage report clears the blocker.
+| IVF-RaBitQ type | `ZVecIvfRabitqIndexParam` — defaults `Nlist=1024`, `TotalBits=7`, query `Nprobe=10` (zvec 0.7.0+) |
+| Platform gate | RaBitQ (HNSW + IVF): **x86_64 + AVX2 only** on managed SDK — throws on Arm. Upstream builds RaBitQ runtime on **Linux x86_64** only. |
+| HNSW-RaBitQ C API create gap | Managed create throws `NotSupportedException` — see [Native API coverage](../reference/native-api-coverage.md) |
 
 ## See also
 

@@ -149,6 +149,8 @@ public sealed class ZVecCollection : IZvecCollection
     public ValueTask<IReadOnlyList<ZVecDoc>> FetchAsync(IReadOnlyList<string> pks, bool includeVector = false, CancellationToken ct = default) =>
         _reads.FetchAsync(pks, includeVector, ct);
 
+    public ZVecDocIterator Iterate(ZVecIterateOptions? options = null) => _reads.Iterate(options);
+
     public IReadOnlyList<ZVecDoc> Query(ZVecQuery query, int topk = 10, string? filter = null, bool includeVector = true) =>
         _reads.Query(query, topk, filter, includeVector);
 

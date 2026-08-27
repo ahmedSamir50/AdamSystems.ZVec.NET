@@ -7,7 +7,7 @@
 | Create fails: path already exists | Use `factory.Open` / `OpenMode = OpenOnly`, or `factory.OpenOrCreate` / default DI `OpenOrCreate`. |
 | Linux process exit 139 on stop | Fixed in **`1.0.0-beta.3.2`** (log-config ownership). Upgrade to ≥beta.4; ensure factory `Shutdown` / DI host stop. |
 | `PlatformNotSupportedException` (RaBitQ) | Needs x86_64 + AVX2; not on Arm/Arm64. |
-| `PlatformNotSupportedException` (DiskANN) | Linux-only. |
+| `PlatformNotSupportedException` (DiskANN) | Linux or macOS ARM64 only; Windows blocked. |
 | Expression filter throws | Method calls / unsupported shapes — use `ZVecFilterBuilder` or `products.Untyped`. |
 | Empty scalars after Open | Schema should load from on-disk metadata; if an old broken folder remains, delete the collection path once and recreate. |
 | Samples won’t run | Need .NET 10 SDK + local native for your RID; see [samples/README.md](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/blob/main/samples/README.md). |

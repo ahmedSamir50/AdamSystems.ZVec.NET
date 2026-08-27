@@ -12,6 +12,32 @@ All notable changes to ZVec.NET are documented in this file.
 
 - Managed tests (CI + `simulate-pack` / Docker) run on **net8.0** only; package still ships `net8.0` / `net9.0` / `net10.0`
 
+## [1.0.0-beta.6] - 2026-08-27
+
+Native pin: **zvec 0.7.0** (was 0.6.0).
+
+### Added
+
+- **IVF-RaBitQ**: `ZVecIvfRabitqIndexParam`, `ZVecIvfRabitqQueryParams`, ODM mapping for `[ZVecVector(Index = ZVecIndexType.IvfRabitq)]`
+- **DocIterator**: `IZvecCollectionQueries.Iterate` / `IZvecCollection<T>.Iterate` returning disposable `ZVecDocIterator` (snapshot semantics)
+- **FTS ngram**: `ZVecFtsTokenizer.Ngram`, `ZVecFtsExtraParams` keys `ngram_min`, `ngram_max`, `token_chars`
+- **Vamana two-pass build**: `ZVecVamanaIndexParam.TwoPassBuild`
+
+### Changed
+
+- `ZVecNativeAbi` minimum → **0.7.0**
+- DiskANN platform gate: Linux (any arch) + macOS ARM64 (Windows still blocked)
+- CI/version: `-DOVERRIDE_GIT_DESCRIBE=v0.7.0` replaces the 0.6.0 version-fallback patch
+
+### Upgrade
+
+- **Required from ≤`1.0.0-beta.5.x`.** ABI floor is now `0.7.0`; packages with `+zvec.0.6.0` natives are incompatible with this managed assembly and vice versa.
+
+### Known limitations (unchanged)
+
+- HNSW-RaBitQ index **create** still throws `NotSupportedException` (C API gap)
+- `QueryGroupBy` / `QueryGroupByAsync` execute still throws (no `zvec_collection_group_by_query` export)
+
 ## [1.0.0-beta.5] - 2026-08-11
 
 Native pin unchanged: **zvec 0.6.0**.

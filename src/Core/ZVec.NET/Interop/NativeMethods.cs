@@ -32,6 +32,12 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial int zvec_get_version_major();
 
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_get_version_minor();
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_get_version_patch();
+
     // =========================================================================
     // Init & Error Retrieval
     // =========================================================================
@@ -533,6 +539,28 @@ internal static partial class NativeMethods
     internal static partial int zvec_vector_query_set_ivf_params(IntPtr query, IntPtr ivfParams);
 
     [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_query_params_ivf_rabitq_create(
+        int nprobe,
+        float radius,
+        [MarshalAs(UnmanagedType.U1)] bool isLinear,
+        [MarshalAs(UnmanagedType.U1)] bool isUsingRefiner);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_query_params_ivf_rabitq_destroy(IntPtr paramsPtr);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_query_params_ivf_rabitq_set_scale_factor(IntPtr paramsPtr, float scaleFactor);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_vector_query_set_ivf_rabitq_params(IntPtr query, IntPtr ivfRabitqParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_sub_query_set_ivf_rabitq_params(IntPtr query, IntPtr ivfRabitqParams);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_group_by_vector_query_set_ivf_rabitq_params(IntPtr query, IntPtr ivfRabitqParams);
+
+    [LibraryImport(LibraryName)]
     internal static partial int zvec_query_params_hnsw_set_radius(IntPtr paramsPtr, float radius);
 
     [LibraryImport(LibraryName)]
@@ -737,6 +765,18 @@ internal static partial class NativeMethods
     internal static partial int zvec_index_params_set_ivf_params(IntPtr paramsPtr, int nList, int nIters, [MarshalAs(UnmanagedType.U1)] bool useSoar);
 
     [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_ivf_rabitq_params(
+        IntPtr paramsPtr,
+        int nlist,
+        int totalBits,
+        int sampleCount);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_index_params_set_vamana_two_pass_build(
+        IntPtr paramsPtr,
+        [MarshalAs(UnmanagedType.U1)] bool twoPassBuild);
+
+    [LibraryImport(LibraryName)]
     internal static partial int zvec_index_params_set_invert_params(IntPtr paramsPtr, [MarshalAs(UnmanagedType.U1)] bool enableRangeOpt, [MarshalAs(UnmanagedType.U1)] bool enableWildcard);
 
     [LibraryImport(LibraryName)]
@@ -762,5 +802,38 @@ internal static partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial int zvec_field_schema_set_index_params(IntPtr schemaPtr, IntPtr indexParamsPtr);
+
+    // =========================================================================
+    // Document Iterator (full collection traversal)
+    // =========================================================================
+
+    [LibraryImport(LibraryName)]
+    internal static partial IntPtr zvec_iterator_options_create();
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_iterator_options_destroy(IntPtr options);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_iterator_options_set_output_fields(
+        IntPtr options,
+        IntPtr outputFields,
+        nuint count);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_iterator_options_set_include_vector(
+        IntPtr options,
+        [MarshalAs(UnmanagedType.U1)] bool include);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_collection_create_iterator(
+        IntPtr collection,
+        IntPtr options,
+        out IntPtr outIter);
+
+    [LibraryImport(LibraryName)]
+    internal static partial int zvec_doc_iterator_next(IntPtr iter, out IntPtr outDoc);
+
+    [LibraryImport(LibraryName)]
+    internal static partial void zvec_doc_iterator_close(IntPtr iter);
 
 }

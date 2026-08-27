@@ -5,7 +5,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8%20%7C%209%20%7C%2010-512bd4.svg)](https://dotnet.microsoft.com/)
 
-> **Beta** — `1.0.0-beta.5+zvec.0.6.0`. Native AOT compatible. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.5`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
+> **Beta** — `1.0.0-beta.6+zvec.0.7.0`. Native AOT compatible. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (tag `v1.0.0-beta.6`). Distinct from the unrelated NuGet package named [`Zvec`](https://www.nuget.org/packages/Zvec).
 
 **Production .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)** — DI, typed ODM, async, SafeHandles, full indexes/FTS, and mobile RIDs. Not a thin P/Invoke wrapper.
 
@@ -128,10 +128,10 @@ Package size grows with each RID. There is **no** fixed 50 MB gate — see pack 
 ### Install
 
 ```bash
-dotnet add package ZVec.NET --version 1.0.0-beta.5
+dotnet add package ZVec.NET --version 1.0.0-beta.6
 ```
 
-Version scheme: `1.0.0-beta.5+zvec.0.6.0` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires pack-required RID natives. Managed CI / `simulate-pack` run tests on **net8.0** only (LTS floor); the package still ships net8/net9/net10.
+Version scheme: `1.0.0-beta.6+zvec.0.7.0` (SDK SemVer + pinned native). TFMs are `lib/net8.0` … `lib/net10.0` — **not** encoded in the version string. Local tests Skip if the native for your RID is missing; Pack CI requires pack-required RID natives. Managed CI / `simulate-pack` run tests on **net8.0** only (LTS floor); the package still ships net8/net9/net10.
 
 ### Two APIs
 
@@ -658,14 +658,14 @@ Job names are lowercase (`medium` / `short`). Classes: `QueryThroughputBench`, `
 
 | What | Format | Example |
 |------|--------|---------|
-| **SDK version** | SemVer | `1.0.0-beta.5` |
-| **ZVec native pin** | Build metadata after `+` | `+zvec.0.6.0` |
+| **SDK version** | SemVer | `1.0.0-beta.6` |
+| **ZVec native pin** | Build metadata after `+` | `+zvec.0.7.0` |
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
-| **ABI floor** | `ZVecNativeAbi` | Minimum `0.6.0`, same major |
-| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.5` |
+| **ABI floor** | `ZVecNativeAbi` | Minimum `0.7.0`, same major |
+| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.6` |
 | **Git branch (train)** | `release/1.0` | Long-lived 1.0.x line |
 
-NuGet version example: `1.0.0-beta.5+zvec.0.6.0`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.5+zvec.0.6.0`.
+NuGet version example: `1.0.0-beta.6+zvec.0.7.0`. Do **not** put TFM or branch names into the version string. There is **no** branch named `release/1.0.0-beta.6+zvec.0.7.0`.
 
 At startup the ABI gate requires:
 1. `zvec_check_version(MinimumMajor, MinimumMinor, MinimumPatch)` (native ≥ minimum), **and**

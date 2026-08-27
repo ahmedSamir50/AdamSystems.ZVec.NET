@@ -63,6 +63,22 @@ public static class ZVecDefaults
         public const int SampleCount = 0;
     }
 
+    /// <summary>Default parameters for IVF + RaBitQ index.</summary>
+    public static class IvfRabitq
+    {
+        /// <summary>Default metric type: L2.</summary>
+        public const ZVecMetricType MetricType = ZVecMetricType.L2;
+
+        /// <summary>Default nlist (cluster count). Matches upstream <c>kDefaultIvfRabitqNlist</c>.</summary>
+        public const int Nlist = 1024;
+
+        /// <summary>Default RaBitQ total bits: 7.</summary>
+        public const int TotalBits = 7;
+
+        /// <summary>Default sample count: 0 (use all vectors).</summary>
+        public const int SampleCount = 0;
+    }
+
     /// <summary>Default parameters for IVF (Inverted File) index.</summary>
     public static class Ivf
     {
@@ -127,6 +143,9 @@ public static class ZVecDefaults
 
         /// <summary>Default whether to use ID map: false.</summary>
         public const bool UseIdMap = false;
+
+        /// <summary>Default Vamana two-pass graph build: disabled.</summary>
+        public const bool TwoPassBuild = false;
     }
 
     /// <summary>Default parameters for Flat (brute-force) index.</summary>
@@ -193,6 +212,12 @@ public static class ZVecDefaults
 
         /// <summary>Default IVF nprobe when not specified on <see cref="ZVecIvfQueryParams"/>.</summary>
         public const int IvfNprobe = Ivf.Nprobe;
+
+        /// <summary>Default IVF-RaBitQ nprobe when not specified on <see cref="ZVecIvfRabitqQueryParams"/>.</summary>
+        public const int IvfRabitqNprobe = 10;
+
+        /// <summary>Default IVF-RaBitQ query scale factor.</summary>
+        public const float IvfRabitqScaleFactor = 10.0f;
 
         /// <summary>Default IVF scale factor passed to native query params.</summary>
         public const float IvfScaleFactor = 10.0f;
@@ -406,6 +431,12 @@ public static class ZVecDefaults
         public const string NativeGroupByQueryNotSupported =
             "Group-by cannot execute through the official C API: Python uses pybind Collection.GroupByQuery → C++ Collection::GroupByQuery; c_api.h has zvec_group_by_vector_query_* builders but no zvec_collection_group_by_query alongside zvec_collection_query / zvec_collection_multi_query.";
 
+        /// <summary>Message shown when the native library fails to allocate iterator options.</summary>
+        public const string NativeIteratorOptionsCreateFailed = "Failed to create native iterator options.";
+
+        /// <summary>Message shown when the native library fails to allocate a document iterator.</summary>
+        public const string NativeIteratorCreateFailed = "Failed to create native document iterator.";
+
         /// <summary>Message shown when the native library fails to allocate a group-by vector query.</summary>
         public const string NativeGroupByQueryCreateFailed = "Failed to create native group-by vector query.";
 
@@ -473,18 +504,18 @@ public static class ZVecDefaults
             "See CONTRIBUTING.md and README (Native RIDs). Ensure runtimes/{rid}/native has zvec_c_api for your platform, or restore the ZVec.NET NuGet with matching native assets.";
 
         /// <summary>
-        /// Platform gate: HNSW-RaBitQ is not available on ARM.
-        /// On x64 the managed builder rejects RaBitQ for the C API gap before any AVX2 probe.
+        /// Platform gate: HNSW-RaBitQ and IVF-RaBitQ are not available on ARM.
+        /// On x64, HNSW-RaBitQ is still rejected by the C API gap; IVF-RaBitQ is supported via C API on x64.
         /// </summary>
         public const string RabitqRequiresX64Avx2 =
-            "HNSW-RaBitQ is not available on ARM architectures. On x86_64, upstream expects AVX2 or higher; the managed SDK currently rejects RaBitQ earlier because the official C API cannot create HNSW_RABITQ index params.";
+            "RaBitQ indexes (HNSW-RaBitQ and IVF-RaBitQ) are not available on ARM architectures. On x86_64, HNSW-RaBitQ create is still blocked by the official C API; IVF-RaBitQ is supported when the native library is x86_64 with AVX2 or higher.";
 
         /// <summary>
-        /// Platform gate: DiskANN is supported on Linux only.
-        /// Upstream may <c>dlopen</c> libaio for async I/O and falls back to synchronous <c>pread</c> when absent.
+        /// Platform gate: DiskANN is supported on Linux (any arch) and macOS ARM64 only.
+        /// Windows and macOS x64 are blocked. libaio is optional at runtime via dlopen.
         /// </summary>
-        public const string DiskAnnRequiresLinux =
-            "DiskANN is currently supported on Linux only. Optional libaio improves async I/O; without it the engine falls back to synchronous pread.";
+        public const string DiskAnnRequiresSupportedPlatform =
+            "DiskANN is supported on Linux and on macOS ARM64 (Apple Silicon) only. Optional libaio improves async I/O; without it the engine falls back to synchronous pread.";
 
         /// <summary>ABI mismatch message format: requires &gt;= min with major == requiredMajor. Args: minVersion, requiredMajor, foundVersion.</summary>
         public const string AbiMismatchRequiresMinSameMajor =
