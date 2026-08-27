@@ -3,8 +3,8 @@
 | Field | Value |
 |-------|--------|
 | **Source** | https://zvec.org/llms-full.txt |
-| **Fetched (UTC)** | 2026-08-03 |
-| **Intended native pin** | alibaba/zvec **v0.6.0** (ZVec.NET `1.0.0-beta.5`) |
+| **Fetched (UTC)** | 2026-08-27 |
+| **Intended native pin** | alibaba/zvec **v0.7.0** (ZVec.NET `1.0.0-beta.6`) |
 | **Local path** | `docs/llms-full.txt` (gitignored — re-fetch locally) |
 | **Site nav** | Not published (audit artifact only) |
 

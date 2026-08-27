@@ -134,7 +134,7 @@ This tweak lives inside the submodule, so a clean upgrade removes it.
 2. Prefer applying the CI patch (keeps the submodule pointer clean for commits):
 
 ```powershell
-# From repo root — mirrors GHA: version-fallback 0.6.0 + Windows Arrow/FastPFOR/pcg; never commit the dirt
+# From repo root — mirrors GHA: Windows Arrow/FastPFOR/pcg; version via -DOVERRIDE_GIT_DESCRIBE=v0.7.0 in CMakeLists.txt
 powershell -NoProfile -File build/ci/apply-native-patches.ps1 -Platform Windows
 # Or a single patch:
 git -C src/Native/ZVec.Native/external/zvec apply build/ci/patches/zvec-arrow-msvc-ninja.patch

@@ -1,6 +1,6 @@
 # ZVec.NET — LLM / agent documentation map
 
-> PackageId: ZVec.NET (not NuGet "Zvec"). Native pin: zvec 0.6.0. SDK: 1.0.0-beta.4+zvec.0.6.0.
+> PackageId: ZVec.NET (not NuGet "Zvec"). Native pin: zvec 0.7.0. SDK: 1.0.0-beta.6+zvec.0.7.0.
 > Human site: https://ahmedSamir50.github.io/AdamSystems.ZVec.NET/
 > Source: https://github.com/ahmedSamir50/AdamSystems.ZVec.NET
 > Extra demos: https://github.com/ahmedSamir50/ZVec.Net-DemosAndPOCs

@@ -32,6 +32,9 @@ internal static class NativeQueryParamsApplicator
             case ZVecIvfQueryParams ivf:
                 ApplyIvf(queryHandle, ivf, target);
                 break;
+            case ZVecIvfRabitqQueryParams ivfRabitq:
+                ApplyIvfRabitq(queryHandle, ivfRabitq, target);
+                break;
             case ZVecFlatQueryParams flat:
                 ApplyFlat(queryHandle, flat, target);
                 break;
@@ -109,6 +112,43 @@ internal static class NativeQueryParamsApplicator
             NativeMethods.zvec_sub_query_set_ivf_params,
             NativeMethods.zvec_group_by_vector_query_set_ivf_params,
             nameof(NativeMethods.zvec_vector_query_set_ivf_params));
+    }
+
+    private static void ApplyIvfRabitq(nint queryHandle, ZVecIvfRabitqQueryParams ivfRabitq, QueryTarget target)
+    {
+        nint handle = NativeMethods.zvec_query_params_ivf_rabitq_create(
+            ivfRabitq.Nprobe ?? ZVecDefaults.Query.IvfRabitqNprobe,
+            ivfRabitq.Radius ?? 0f,
+            ivfRabitq.IsLinear ?? false,
+            ivfRabitq.IsUsingRefiner ?? false);
+        if (handle == IntPtr.Zero)
+            throw new InvalidOperationException(ZVecDefaults.Errors.NativeQueryCreateFailed);
+
+        try
+        {
+            if (ivfRabitq.ScaleFactor.HasValue)
+            {
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_query_params_ivf_rabitq_set_scale_factor(
+                        handle, ivfRabitq.ScaleFactor.Value),
+                    nameof(NativeMethods.zvec_query_params_ivf_rabitq_set_scale_factor));
+            }
+        }
+        catch
+        {
+            NativeMethods.zvec_query_params_ivf_rabitq_destroy(handle);
+            throw;
+        }
+
+        AttachOrDestroy(
+            handle,
+            NativeMethods.zvec_query_params_ivf_rabitq_destroy,
+            queryHandle,
+            target,
+            NativeMethods.zvec_vector_query_set_ivf_rabitq_params,
+            NativeMethods.zvec_sub_query_set_ivf_rabitq_params,
+            NativeMethods.zvec_group_by_vector_query_set_ivf_rabitq_params,
+            nameof(NativeMethods.zvec_vector_query_set_ivf_rabitq_params));
     }
 
     private static void ApplyFlat(nint queryHandle, ZVecFlatQueryParams flat, QueryTarget target)

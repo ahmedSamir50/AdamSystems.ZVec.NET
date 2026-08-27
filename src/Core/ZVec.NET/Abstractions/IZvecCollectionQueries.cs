@@ -30,6 +30,11 @@ public interface IZvecCollectionQueries
     ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(IReadOnlyList<ZVecQuery> queries, int topk = 10, ZVecReranker? reranker = null, string? filter = null, bool includeVector = true, CancellationToken ct = default);
     ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(IReadOnlyList<ZVecQuery> queries, int topk, ZVecReranker? reranker, ZVecFilterBuilder filter, bool includeVector = true, CancellationToken ct = default);
 
+    /// <summary>
+    /// Streams all documents using a snapshot iterator. Dispose the returned iterator before closing the collection.
+    /// </summary>
+    ZVecDocIterator Iterate(ZVecIterateOptions? options = null);
+
     /// <summary>Not supported until upstream exposes a collection-level group-by DQL entry point.</summary>
     [Obsolete(ZVecDefaults.Errors.NativeGroupByQueryNotSupported)]
     IReadOnlyList<ZVecDoc> QueryGroupBy(ZVecGroupByQuery groupQuery);

@@ -14,7 +14,7 @@ public static class ZVecNativeAbi
     public const int MinimumMajor = 0;
 
     /// <summary>Minimum accepted native minor version.</summary>
-    public const int MinimumMinor = 6;
+    public const int MinimumMinor = 7;
 
     /// <summary>Minimum accepted native patch version.</summary>
     public const int MinimumPatch = 0;

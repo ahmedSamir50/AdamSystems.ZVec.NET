@@ -2,8 +2,8 @@
 # thirdparty git trees). Patches live under build/ci/patches/ — never commit
 # the resulting dirt into external/zvec or its nested repos.
 #
-# Mirrors .github/workflows/build-native.yml (last-green development recipe +
-# version-fallback 0.6.0 only). Do not add antlr/gflags/glog unless GHA fails.
+# Mirrors .github/workflows/build-native.yml (Windows Arrow/FastPFOR/pcg only).
+# Version is forced via -DOVERRIDE_GIT_DESCRIBE=v0.7.0 in CMakeLists.txt / configure steps.
 #
 # Usage (repo root):
 #   powershell -NoProfile -File build/ci/apply-native-patches.ps1
@@ -47,9 +47,6 @@ function Apply-Patch {
 
 Write-Host "Applying native CI patches (Platform=$Platform) under $zvec"
 Write-Host "Remember: wipe with submodule reset before committing the zvec pointer."
-
-# All RIDs (same as GHA "Patch zvec version fallback")
-Apply-Patch -Repo $zvec -PatchFile "zvec-version-fallback-0.6.0.patch"
 
 # Windows only (same as GHA "Patch zvec CI workarounds (Windows)")
 if ($Platform -eq "Windows" -or $Platform -eq "All") {

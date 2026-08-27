@@ -35,16 +35,22 @@ BUILD_DIR="$NATIVE/build-$RID"
 SYSROOT="$(xcrun --sdk "$SDK" --show-sdk-path)"
 ZVEC="$NATIVE/external/zvec"
 
-# CI-only patches (not pushed to alibaba/zvec).
+# CI-only patches (not pushed to alibaba/zvec). Idempotent: skip when N/A on tag.
 apply_zvec_patch() {
   local patch="$ROOT/build/ci/patches/$1"
-  git -C "$ZVEC" apply --check "$patch"
-  git -C "$ZVEC" apply "$patch"
+  if git -C "$ZVEC" apply --check "$patch" 2>/dev/null; then
+    git -C "$ZVEC" apply "$patch"
+    echo "APPLIED $1"
+  else
+    echo "SKIP $1 (already applied or N/A on this zvec tag)"
+  fi
 }
-apply_zvec_patch "zvec-ios-static-output-name.patch"
-apply_zvec_patch "zvec-lz4-maccatalyst.patch"
-apply_zvec_patch "zvec-arrow-maccatalyst.patch"
-apply_zvec_patch "zvec-rocksdb-maccatalyst-crc.patch"
+
+if [[ "$TARGET" == "maccatalyst-arm64" ]]; then
+  apply_zvec_patch "zvec-lz4-maccatalyst.patch"
+  apply_zvec_patch "zvec-arrow-maccatalyst.patch"
+  apply_zvec_patch "zvec-rocksdb-maccatalyst-crc.patch"
+fi
 
 # Host protoc: iOS-built protoc is killed (SIGKILL) when run on the Mac host.
 # Same pattern as Android GLOBAL_CC_PROTOBUF_PROTOC / win-arm64 host protoc.
@@ -90,6 +96,7 @@ CMAKE_ARGS=(
   -DBUILD_EXAMPLES=OFF
   -DBUILD_PYTHON_BINDINGS=OFF
   -DBUILD_C_BINDINGS=ON
+  -DOVERRIDE_GIT_DESCRIBE=v0.7.0
   -DGLOBAL_CC_PROTOBUF_PROTOC="$HOST_PROTOC"
 )
 
