@@ -7,15 +7,21 @@ namespace ZVec.NET.Internal;
 /// </summary>
 internal static class ZVecPlatformRequirements
 {
+    private static bool IsDiskAnnSupportedPlatform()
+    {
+        if (OperatingSystem.IsLinux())
+            return true;
+
+        if (OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+            return true;
+
+        return false;
+    }
+
     /// <summary>
     /// Throws <see cref="PlatformNotSupportedException"/> when <paramref name="param"/>
     /// is not supported on the current OS/architecture.
     /// </summary>
-    /// <remarks>
-    /// HNSW-RaBitQ: reject ARM here. On x64 this method allows the type through so
-    /// <see cref="NativeIndexParamBuilder"/> can throw the C API gap (no AVX2 CPUID probe).
-    /// DiskANN is supported on Linux only (libaio is optional at runtime via dlopen).
-    /// </remarks>
     public static void ThrowIfUnsupported(ZVecIndexParam param)
     {
         ArgumentNullException.ThrowIfNull(param);
@@ -23,6 +29,7 @@ internal static class ZVecPlatformRequirements
         switch (param)
         {
             case ZVecHnswRabitqIndexParam:
+            case ZVecIvfRabitqIndexParam:
                 if (RuntimeInformation.ProcessArchitecture is Architecture.Arm or Architecture.Arm64)
                 {
                     throw new PlatformNotSupportedException(
@@ -31,10 +38,10 @@ internal static class ZVecPlatformRequirements
                 break;
 
             case ZVecDiskAnnIndexParam:
-                if (!OperatingSystem.IsLinux())
+                if (!IsDiskAnnSupportedPlatform())
                 {
                     throw new PlatformNotSupportedException(
-                        ZVecDefaults.Errors.DiskAnnRequiresLinux);
+                        ZVecDefaults.Errors.DiskAnnRequiresSupportedPlatform);
                 }
                 break;
         }

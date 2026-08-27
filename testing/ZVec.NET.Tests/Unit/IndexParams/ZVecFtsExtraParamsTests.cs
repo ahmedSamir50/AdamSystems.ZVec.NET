@@ -39,6 +39,19 @@ public class ZVecFtsExtraParamsTests
     }
 
     [Fact]
+    public void ToNativeJson_NgramKeys()
+    {
+        var extra = new ZVecFtsExtraParams
+        {
+            NgramMin = 2,
+            NgramMax = 3,
+            TokenChars = ["letter", "digit"]
+        };
+        extra.ToNativeJson().Should().Be(
+            "{\"ngram_min\":2,\"ngram_max\":3,\"token_chars\":[\"letter\",\"digit\"]}");
+    }
+
+    [Fact]
     public void ToNativeJson_EscapesQuotes()
     {
         var extra = new ZVecFtsExtraParams { UserDictPath = "path\"with\"quotes" };

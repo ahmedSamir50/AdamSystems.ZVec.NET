@@ -44,12 +44,11 @@ apply_one() {
     echo "SKIP $patch (already applied or N/A)"
   fi
 }
-apply_one "$ZVEC" /src/build/ci/patches/zvec-version-fallback-0.6.0.patch
-
 rm -rf "$BUILD"
 echo "CMAKE_CONFIGURE_START $(date -u +%H:%M:%S) build=$BUILD"
 cmake -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+  -DOVERRIDE_GIT_DESCRIBE=v0.7.0 \
   -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF \
   -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON \
   -S "$NATIVE"

@@ -1,6 +1,6 @@
-# ZVec.NET Native API Coverage Report
+﻿# ZVec.NET Native API Coverage Report
 
-Generated against `c_api.h` @ **alibaba/zvec v0.6.0** and `NativeMethods.cs` (ZVec.NET `1.0.0-beta.5`).
+Generated against `c_api.h` @ **alibaba/zvec v0.7.0** and `NativeMethods.cs` (ZVec.NET `1.0.0-beta.6`).
 
 Regenerate after each submodule bump by comparing `ZVEC_EXPORT` / `ZVEC_CALL` names in `c_api.h` to `[LibraryImport]` methods in `NativeMethods.cs`.
 
@@ -8,12 +8,12 @@ Regenerate after each submodule bump by comparing `ZVEC_EXPORT` / `ZVEC_CALL` na
 
 | Metric | Count |
 |--------|------:|
-| `c_api.h` `ZVEC_EXPORT zvec_*` | 354 |
-| `NativeMethods` `[LibraryImport]` | 173 |
-| Name overlap | 173 |
-| Coverage (overlap / c_api) | **~48.9%** |
+| `c_api.h` `ZVEC_EXPORT zvec_*` | 380 |
+| `NativeMethods` `[LibraryImport]` | 190 |
+| Name overlap | 190 |
+| Coverage (overlap / c_api) | **~50%** |
 | Orphans (in C#, not in header) | **0** |
-| Missing (in header, not in C#) | 181 |
+| Missing (in header, not in C#) | 190 |
 
 **Open schema binding:** `ZVecFactory.Open` / `OpenAsync` call `zvec_collection_get_schema` and marshal via `NativeSchemaMarshaller`. Covered by **OpenSchemaBindingIntegrationTests**.
 
@@ -21,24 +21,17 @@ Regenerate after each submodule bump by comparing `ZVEC_EXPORT` / `ZVEC_CALL` na
 
 `ZVEC_INDEX_TYPE_HNSW_RABITQ` is defined, but `zvec_index_params_create` has **no** matching case (falls through to Flat). There are no `set_hnsw_rabitq_*` exports; `set_hnsw_params` only accepts `HnswIndexParams`. Managed `ZVecHnswRabitqIndexParam` throws `NotSupportedException` before calling create. Python uses the C++ binding path.
 
+## Bound in 0.7.0 — IVF-RaBitQ, DocIterator, Vamana two-pass
+
+- **IVF-RaBitQ** index/query params and attach helpers are bound. Native RaBitQ runtime is built on **Linux x86_64** only upstream; Windows/macOS/mobile builds set `RABITQ_SUPPORTED=OFF` but C API symbols remain in the DLL.
+- **DocIterator** — `zvec_iterator_options_*`, `zvec_collection_create_iterator`, `zvec_doc_iterator_next`, `zvec_doc_iterator_close` bound; managed `ZVecDocIterator` / `Iterate()`.
+- **Vamana two-pass** — `zvec_index_params_set_vamana_two_pass_build` bound.
+
 ## Blocker — group-by execution (C API gap, not “Python-only mystery”)
 
-Upstream **does** execute group-by end-to-end in Python:
+Upstream **does** execute group-by end-to-end in Python via pybind `Collection.GroupByQuery`. ZVec.NET loads the **official C API** (`zvec_c_api`). That surface has group-by query builders but **no** `zvec_collection_group_by_query` (or equivalent collection DQL export).
 
-1. `python/zvec/model/collection.py` → `group_by_query(...)`
-2. Builds a C++ `GroupByVectorQuery` (`_GroupByVectorQuery`)
-3. Calls pybind `Collection.GroupByQuery` in `python_collection.cc`
-4. That releases the GIL and invokes C++ `zvec::Collection::GroupByQuery` / `CollectionImpl::GroupByQuery`
-
-ZVec.NET loads the **official C API** (`zvec_c_api`). That surface has:
-
-| Layer | Status |
-|-------|--------|
-| `zvec_group_by_vector_query_*` builders | Present; bound via `NativeGroupByQueryBuilder` |
-| `zvec_collection_query` / `zvec_collection_multi_query` | Present; used for vector / multi |
-| `zvec_collection_group_by_query` (or any collection DQL taking a group-by query) | **Absent from `c_api.h`** |
-
-So `QueryGroupBy` stays `NotSupportedException` until upstream exports a C entry point mirroring the pybind path (or we add a non-official C++ bridge — out of scope for the official-DLL binding).
+So `QueryGroupBy` stays `NotSupportedException` until upstream exports a C entry point mirroring the pybind path.
 
 ## Orphans (must be empty after fixes)
 
@@ -48,7 +41,7 @@ None.
 
 Every remaining `[LibraryImport]` must match `c_api.h` (name + parameter shape). No critical/non-critical tiers.
 
-## Bound symbols (173)
+## Bound symbols (190)
 
 - `zvec_check_version`
 - `zvec_collection_add_column`
@@ -56,6 +49,7 @@ Every remaining `[LibraryImport]` must match `c_api.h` (name + parameter shape).
 - `zvec_collection_close`
 - `zvec_collection_create_and_open`
 - `zvec_collection_create_index`
+- `zvec_collection_create_iterator`
 - `zvec_collection_delete`
 - `zvec_collection_delete_by_filter`
 - `zvec_collection_delete_with_results`
@@ -106,6 +100,8 @@ Every remaining `[LibraryImport]` must match `c_api.h` (name + parameter shape).
 - `zvec_doc_get_field_value_pointer`
 - `zvec_doc_get_pk_copy`
 - `zvec_doc_get_score`
+- `zvec_doc_iterator_close`
+- `zvec_doc_iterator_next`
 - `zvec_doc_set_pk`
 - `zvec_doc_set_score`
 - `zvec_docs_free`
@@ -126,6 +122,8 @@ Every remaining `[LibraryImport]` must match `c_api.h` (name + parameter shape).
 - `zvec_get_last_error_details`
 - `zvec_get_version`
 - `zvec_get_version_major`
+- `zvec_get_version_minor`
+- `zvec_get_version_patch`
 - `zvec_group_by_vector_query_create`
 - `zvec_group_by_vector_query_destroy`
 - `zvec_group_by_vector_query_set_diskann_params`
@@ -137,6 +135,7 @@ Every remaining `[LibraryImport]` must match `c_api.h` (name + parameter shape).
 - `zvec_group_by_vector_query_set_hnsw_params`
 - `zvec_group_by_vector_query_set_include_vector`
 - `zvec_group_by_vector_query_set_ivf_params`
+- `zvec_group_by_vector_query_set_ivf_rabitq_params`
 - `zvec_group_by_vector_query_set_query_vector`
 - `zvec_group_by_vector_query_set_topk_per_group`
 - `zvec_group_by_vector_query_set_vamana_params`
@@ -147,11 +146,17 @@ Every remaining `[LibraryImport]` must match `c_api.h` (name + parameter shape).
 - `zvec_index_params_set_hnsw_params`
 - `zvec_index_params_set_invert_params`
 - `zvec_index_params_set_ivf_params`
+- `zvec_index_params_set_ivf_rabitq_params`
 - `zvec_index_params_set_metric_type`
 - `zvec_index_params_set_quantize_type`
 - `zvec_index_params_set_quantizer_enable_rotate`
 - `zvec_index_params_set_vamana_params`
+- `zvec_index_params_set_vamana_two_pass_build`
 - `zvec_initialize`
+- `zvec_iterator_options_create`
+- `zvec_iterator_options_destroy`
+- `zvec_iterator_options_set_include_vector`
+- `zvec_iterator_options_set_output_fields`
 - `zvec_multi_query_add_sub_query`
 - `zvec_multi_query_create`
 - `zvec_multi_query_destroy`
@@ -181,6 +186,9 @@ Every remaining `[LibraryImport]` must match `c_api.h` (name + parameter shape).
 - `zvec_query_params_hnsw_set_radius`
 - `zvec_query_params_ivf_create`
 - `zvec_query_params_ivf_destroy`
+- `zvec_query_params_ivf_rabitq_create`
+- `zvec_query_params_ivf_rabitq_destroy`
+- `zvec_query_params_ivf_rabitq_set_scale_factor`
 - `zvec_query_params_ivf_set_is_linear`
 - `zvec_query_params_ivf_set_is_using_refiner`
 - `zvec_query_params_ivf_set_nprobe`
@@ -205,6 +213,7 @@ Every remaining `[LibraryImport]` must match `c_api.h` (name + parameter shape).
 - `zvec_sub_query_set_fts_params`
 - `zvec_sub_query_set_hnsw_params`
 - `zvec_sub_query_set_ivf_params`
+- `zvec_sub_query_set_ivf_rabitq_params`
 - `zvec_sub_query_set_query_vector`
 - `zvec_sub_query_set_sparse_vector`
 - `zvec_sub_query_set_vamana_params`
@@ -219,222 +228,201 @@ Every remaining `[LibraryImport]` must match `c_api.h` (name + parameter shape).
 - `zvec_vector_query_set_hnsw_params`
 - `zvec_vector_query_set_include_vector`
 - `zvec_vector_query_set_ivf_params`
+- `zvec_vector_query_set_ivf_rabitq_params`
 - `zvec_vector_query_set_query_vector`
 - `zvec_vector_query_set_topk`
 - `zvec_vector_query_set_vamana_params`
 - `zvec_write_results_free`
 
-## Missing symbols by category (181)
+## Missing symbols (190)
 
-### collection (3)
-- zvec_collection_flush
-- zvec_collection_options_destroy
-- zvec_collection_options_set_max_buffer_size
-
-### config (11)
-- zvec_config_data_set_brute_force_by_keys_ratio
-- zvec_config_data_set_fts_brute_force_by_keys_ratio
-- zvec_config_data_set_invert_to_forward_scan_ratio
-- zvec_config_data_set_jieba_dict_dir
-- zvec_config_data_set_optimize_thread_count
-- zvec_config_log_is_file_type
-- zvec_config_log_set_basename
-- zvec_config_log_set_dir
-- zvec_config_log_set_file_size
-- zvec_config_log_set_level
-- zvec_config_log_set_overdue_days
-
-### getters (68)
-- zvec_collection_get_options
-- zvec_collection_options_get_enable_mmap
-- zvec_collection_options_get_max_buffer_size
-- zvec_collection_options_get_read_only
-- zvec_collection_schema_get_all_field_names
-- zvec_collection_schema_get_field
-- zvec_collection_schema_get_forward_field
-- zvec_collection_schema_get_forward_field_names
-- zvec_collection_schema_get_forward_field_names_with_index
-- zvec_collection_schema_get_forward_fields_with_index
-- zvec_collection_schema_get_vector_field
-- zvec_config_data_get_brute_force_by_keys_ratio
-- zvec_config_data_get_fts_brute_force_by_keys_ratio
-- zvec_config_data_get_invert_to_forward_scan_ratio
-- zvec_config_data_get_jieba_dict_dir
-- zvec_config_data_get_log_type
-- zvec_config_data_get_memory_limit
-- zvec_config_data_get_optimize_thread_count
-- zvec_config_data_get_query_thread_count
-- zvec_config_log_get_basename
-- zvec_config_log_get_dir
-- zvec_config_log_get_file_size
-- zvec_config_log_get_level
-- zvec_config_log_get_overdue_days
-- zvec_doc_get_doc_id
-- zvec_doc_get_field_count
-- zvec_doc_get_field_value_basic
-- zvec_doc_get_operator
-- zvec_doc_get_pk_pointer
-- zvec_field_schema_get_element_data_size
-- zvec_field_schema_get_element_data_type
-- zvec_field_schema_get_index_params
-- zvec_field_schema_get_index_type
-- zvec_fts_get_match_string
-- zvec_fts_get_query_string
-- zvec_get_default_jieba_dict_dir
-- zvec_get_io_backend_description
-- zvec_get_io_backend_type
-- zvec_get_io_backend_type_name
-- zvec_get_version_minor
-- zvec_get_version_patch
-- zvec_index_params_get_diskann_list_size
-- zvec_index_params_get_diskann_max_degree
-- zvec_index_params_get_diskann_pq_chunk_num
-- zvec_index_params_get_fts_params
-- zvec_index_params_get_hnsw_ef_construction
-- zvec_index_params_get_hnsw_m
-- zvec_index_params_get_invert_params
-- zvec_index_params_get_ivf_params
-- zvec_index_params_get_metric_type
-- zvec_index_params_get_quantize_type
-- zvec_index_params_get_quantizer_enable_rotate
-- zvec_index_params_get_type
-- zvec_index_params_get_vamana_params
-- zvec_multi_query_get_filter
-- zvec_multi_query_get_include_vector
-- zvec_multi_query_get_output_fields
-- zvec_multi_query_get_sub_query_count
-- zvec_multi_query_get_topk
-- zvec_sub_query_get_field_name
-- zvec_sub_query_get_num_candidates
-- zvec_vector_query_get_field_name
-- zvec_vector_query_get_filter
-- zvec_vector_query_get_fts
-- zvec_vector_query_get_include_doc_id
-- zvec_vector_query_get_include_vector
-- zvec_vector_query_get_output_fields
-- zvec_vector_query_get_topk
-
-### group_by (9)
-- zvec_group_by_vector_query_get_field_name
-- zvec_group_by_vector_query_get_filter
-- zvec_group_by_vector_query_get_group_by_field_name
-- zvec_group_by_vector_query_get_group_count
-- zvec_group_by_vector_query_get_include_vector
-- zvec_group_by_vector_query_get_output_fields
-- zvec_group_by_vector_query_get_topk_per_group
-- zvec_group_by_vector_query_set_output_fields
-- zvec_group_by_vector_query_set_query_params
-
-### helpers (20)
-- zvec_bin_create
-- zvec_byte_array_create
-- zvec_byte_array_destroy
-- zvec_data_type_to_string
-- zvec_doc_to_detail_string
-- zvec_error_code_to_string
-- zvec_float_array_create
-- zvec_float_array_destroy
-- zvec_free_string
-- zvec_free_uint8_array
-- zvec_index_type_to_string
-- zvec_int64_array_create
-- zvec_int64_array_destroy
-- zvec_metric_type_to_string
-- zvec_string_c_str
-- zvec_string_compare
-- zvec_string_copy
-- zvec_string_create
-- zvec_string_create_from_view
-- zvec_string_length
-
-### other (25)
-- zvec_clear_error
-- zvec_doc_add_field_by_struct
-- zvec_doc_clear
-- zvec_doc_deserialize
-- zvec_doc_has_field
-- zvec_doc_has_field_value
-- zvec_doc_is_empty
-- zvec_doc_is_field_null
-- zvec_doc_memory_usage
-- zvec_doc_merge
-- zvec_doc_remove_field
-- zvec_doc_serialize
-- zvec_doc_set_doc_id
-- zvec_doc_set_field_null
-- zvec_doc_set_operator
-- zvec_is_initialized
-- zvec_malloc
-- zvec_multi_query_set_include_vector
-- zvec_multi_query_set_output_fields
-- zvec_set_default_jieba_dict_dir
-- zvec_sub_query_set_num_candidates
-- zvec_sub_query_set_sparse_indices
-- zvec_sub_query_set_sparse_values
-- zvec_vector_query_set_include_doc_id
-- zvec_vector_query_set_output_fields
-
-### query_params (24)
-- zvec_query_params_diskann_get_is_linear
-- zvec_query_params_diskann_get_is_using_refiner
-- zvec_query_params_diskann_get_list_size
-- zvec_query_params_diskann_get_radius
-- zvec_query_params_flat_get_is_linear
-- zvec_query_params_flat_get_is_using_refiner
-- zvec_query_params_flat_get_radius
-- zvec_query_params_flat_get_scale_factor
-- zvec_query_params_fts_get_default_operator
-- zvec_query_params_fts_set_default_operator
-- zvec_query_params_hnsw_get_ef
-- zvec_query_params_hnsw_get_is_linear
-- zvec_query_params_hnsw_get_is_using_refiner
-- zvec_query_params_hnsw_get_radius
-- zvec_query_params_ivf_get_is_linear
-- zvec_query_params_ivf_get_is_using_refiner
-- zvec_query_params_ivf_get_nprobe
-- zvec_query_params_ivf_get_radius
-- zvec_query_params_ivf_get_scale_factor
-- zvec_query_params_vamana_get_ef_search
-- zvec_query_params_vamana_get_is_linear
-- zvec_query_params_vamana_get_is_using_refiner
-- zvec_query_params_vamana_get_radius
-- zvec_vector_query_set_query_params
-
-### schema (21)
-- zvec_collection_schema_add_index
-- zvec_collection_schema_alter_field
-- zvec_collection_schema_drop_field
-- zvec_collection_schema_drop_index
-- zvec_collection_schema_has_field
-- zvec_collection_schema_has_index
-- zvec_collection_schema_set_max_doc_count_per_segment
-- zvec_collection_schema_set_name
-- zvec_collection_schema_validate
-- zvec_field_schema_has_index
-- zvec_field_schema_has_invert_index
-- zvec_field_schema_is_array_type
-- zvec_field_schema_is_dense_vector
-- zvec_field_schema_is_sparse_vector
-- zvec_field_schema_is_vector_field
-- zvec_field_schema_set_data_type
-- zvec_field_schema_set_dimension
-- zvec_field_schema_set_name
-- zvec_field_schema_set_nullable
-- zvec_field_schema_validate
-- zvec_free_field_schema
-
-
-## Caller → test matrix
-
-| Production path | Native symbols (representative) | Test coverage |
-|-----------------|-----------------------------------|---------------|
-| Version gate | `zvec_check_version`, `zvec_get_version*` | VersionGate + V060ApiIntegrationTests |
-| Index params + EnableRotate | Flat/Hnsw/Ivf/Vamana/DiskANN + rotate | NativeBuildersIntegrationTests / V060ApiIntegrationTests |
-| Query params applicator (all types × Vector/Sub/GroupBy) | `zvec_query_params_*` + set_*_params | NativeBuildersIntegrationTests |
-| NativeQueryBuilder | vector query + FTS + params | NativeBuildersIntegrationTests + query suites |
-| NativeMultiQueryBuilder | multi + per-sub QueryParams | NativeBuildersIntegrationTests |
-| NativeGroupByQueryBuilder | `zvec_group_by_vector_query_*` | NativeBuildersIntegrationTests (create/wire; no execute) |
-| FTS stemmer/ascii_folding + reopen | FTS params + query | V060ApiIntegrationTests / FtsIntegrationTests |
-| DiskANN index | Linux-only | NativeCallerCoverage (Skip off-Linux) |
-
-**Functional native coverage:** production-called symbols hit by ≥1 real-DLL path on win-x64 where applicable; DiskANN remains Linux-gated.
+- `zvec_bin_create`
+- `zvec_byte_array_create`
+- `zvec_byte_array_destroy`
+- `zvec_clear_error`
+- `zvec_collection_flush`
+- `zvec_collection_get_options`
+- `zvec_collection_options_destroy`
+- `zvec_collection_options_get_enable_mmap`
+- `zvec_collection_options_get_max_buffer_size`
+- `zvec_collection_options_get_read_only`
+- `zvec_collection_options_set_max_buffer_size`
+- `zvec_collection_schema_add_index`
+- `zvec_collection_schema_alter_field`
+- `zvec_collection_schema_drop_field`
+- `zvec_collection_schema_drop_index`
+- `zvec_collection_schema_get_all_field_names`
+- `zvec_collection_schema_get_field`
+- `zvec_collection_schema_get_forward_field`
+- `zvec_collection_schema_get_forward_field_names`
+- `zvec_collection_schema_get_forward_field_names_with_index`
+- `zvec_collection_schema_get_forward_fields_with_index`
+- `zvec_collection_schema_get_vector_field`
+- `zvec_collection_schema_has_field`
+- `zvec_collection_schema_has_index`
+- `zvec_collection_schema_set_max_doc_count_per_segment`
+- `zvec_collection_schema_set_name`
+- `zvec_collection_schema_validate`
+- `zvec_config_data_get_brute_force_by_keys_ratio`
+- `zvec_config_data_get_fts_brute_force_by_keys_ratio`
+- `zvec_config_data_get_invert_to_forward_scan_ratio`
+- `zvec_config_data_get_jieba_dict_dir`
+- `zvec_config_data_get_log_type`
+- `zvec_config_data_get_memory_limit`
+- `zvec_config_data_get_optimize_thread_count`
+- `zvec_config_data_get_query_thread_count`
+- `zvec_config_data_set_brute_force_by_keys_ratio`
+- `zvec_config_data_set_fts_brute_force_by_keys_ratio`
+- `zvec_config_data_set_invert_to_forward_scan_ratio`
+- `zvec_config_data_set_jieba_dict_dir`
+- `zvec_config_data_set_optimize_thread_count`
+- `zvec_config_log_get_basename`
+- `zvec_config_log_get_dir`
+- `zvec_config_log_get_file_size`
+- `zvec_config_log_get_level`
+- `zvec_config_log_get_overdue_days`
+- `zvec_config_log_is_file_type`
+- `zvec_config_log_set_basename`
+- `zvec_config_log_set_dir`
+- `zvec_config_log_set_file_size`
+- `zvec_config_log_set_level`
+- `zvec_config_log_set_overdue_days`
+- `zvec_data_type_to_string`
+- `zvec_doc_add_field_by_struct`
+- `zvec_doc_clear`
+- `zvec_doc_deserialize`
+- `zvec_doc_get_doc_id`
+- `zvec_doc_get_field_count`
+- `zvec_doc_get_field_value_basic`
+- `zvec_doc_get_operator`
+- `zvec_doc_get_pk_pointer`
+- `zvec_doc_has_field`
+- `zvec_doc_has_field_value`
+- `zvec_doc_is_empty`
+- `zvec_doc_is_field_null`
+- `zvec_doc_memory_usage`
+- `zvec_doc_merge`
+- `zvec_doc_remove_field`
+- `zvec_doc_serialize`
+- `zvec_doc_set_doc_id`
+- `zvec_doc_set_field_null`
+- `zvec_doc_set_operator`
+- `zvec_doc_to_detail_string`
+- `zvec_error_code_to_string`
+- `zvec_field_schema_get_element_data_size`
+- `zvec_field_schema_get_element_data_type`
+- `zvec_field_schema_get_index_params`
+- `zvec_field_schema_get_index_type`
+- `zvec_field_schema_has_index`
+- `zvec_field_schema_has_invert_index`
+- `zvec_field_schema_is_array_type`
+- `zvec_field_schema_is_dense_vector`
+- `zvec_field_schema_is_sparse_vector`
+- `zvec_field_schema_is_vector_field`
+- `zvec_field_schema_set_data_type`
+- `zvec_field_schema_set_dimension`
+- `zvec_field_schema_set_name`
+- `zvec_field_schema_set_nullable`
+- `zvec_field_schema_validate`
+- `zvec_float_array_create`
+- `zvec_float_array_destroy`
+- `zvec_free_field_schema`
+- `zvec_free_string`
+- `zvec_free_uint8_array`
+- `zvec_fts_get_match_string`
+- `zvec_fts_get_query_string`
+- `zvec_get_default_jieba_dict_dir`
+- `zvec_get_io_backend_description`
+- `zvec_get_io_backend_type`
+- `zvec_get_io_backend_type_name`
+- `zvec_group_by_vector_query_get_field_name`
+- `zvec_group_by_vector_query_get_filter`
+- `zvec_group_by_vector_query_get_group_by_field_name`
+- `zvec_group_by_vector_query_get_group_count`
+- `zvec_group_by_vector_query_get_include_vector`
+- `zvec_group_by_vector_query_get_output_fields`
+- `zvec_group_by_vector_query_get_topk_per_group`
+- `zvec_group_by_vector_query_set_output_fields`
+- `zvec_group_by_vector_query_set_query_params`
+- `zvec_index_params_get_diskann_list_size`
+- `zvec_index_params_get_diskann_max_degree`
+- `zvec_index_params_get_diskann_pq_chunk_num`
+- `zvec_index_params_get_fts_params`
+- `zvec_index_params_get_hnsw_ef_construction`
+- `zvec_index_params_get_hnsw_m`
+- `zvec_index_params_get_invert_params`
+- `zvec_index_params_get_ivf_params`
+- `zvec_index_params_get_ivf_rabitq_params`
+- `zvec_index_params_get_metric_type`
+- `zvec_index_params_get_quantize_type`
+- `zvec_index_params_get_quantizer_enable_rotate`
+- `zvec_index_params_get_type`
+- `zvec_index_params_get_vamana_params`
+- `zvec_index_params_get_vamana_two_pass_build`
+- `zvec_index_type_to_string`
+- `zvec_int64_array_create`
+- `zvec_int64_array_destroy`
+- `zvec_is_initialized`
+- `zvec_malloc`
+- `zvec_metric_type_to_string`
+- `zvec_multi_query_get_filter`
+- `zvec_multi_query_get_include_vector`
+- `zvec_multi_query_get_output_fields`
+- `zvec_multi_query_get_sub_query_count`
+- `zvec_multi_query_get_topk`
+- `zvec_multi_query_set_include_vector`
+- `zvec_multi_query_set_output_fields`
+- `zvec_query_params_diskann_get_is_linear`
+- `zvec_query_params_diskann_get_is_using_refiner`
+- `zvec_query_params_diskann_get_list_size`
+- `zvec_query_params_diskann_get_radius`
+- `zvec_query_params_flat_get_is_linear`
+- `zvec_query_params_flat_get_is_using_refiner`
+- `zvec_query_params_flat_get_radius`
+- `zvec_query_params_flat_get_scale_factor`
+- `zvec_query_params_fts_get_default_operator`
+- `zvec_query_params_fts_set_default_operator`
+- `zvec_query_params_hnsw_get_ef`
+- `zvec_query_params_hnsw_get_is_linear`
+- `zvec_query_params_hnsw_get_is_using_refiner`
+- `zvec_query_params_hnsw_get_radius`
+- `zvec_query_params_ivf_get_is_linear`
+- `zvec_query_params_ivf_get_is_using_refiner`
+- `zvec_query_params_ivf_get_nprobe`
+- `zvec_query_params_ivf_get_radius`
+- `zvec_query_params_ivf_get_scale_factor`
+- `zvec_query_params_ivf_rabitq_get_is_linear`
+- `zvec_query_params_ivf_rabitq_get_is_using_refiner`
+- `zvec_query_params_ivf_rabitq_get_nprobe`
+- `zvec_query_params_ivf_rabitq_get_radius`
+- `zvec_query_params_ivf_rabitq_get_scale_factor`
+- `zvec_query_params_ivf_rabitq_set_is_linear`
+- `zvec_query_params_ivf_rabitq_set_is_using_refiner`
+- `zvec_query_params_ivf_rabitq_set_nprobe`
+- `zvec_query_params_ivf_rabitq_set_radius`
+- `zvec_query_params_vamana_get_ef_search`
+- `zvec_query_params_vamana_get_is_linear`
+- `zvec_query_params_vamana_get_is_using_refiner`
+- `zvec_query_params_vamana_get_radius`
+- `zvec_set_default_jieba_dict_dir`
+- `zvec_string_c_str`
+- `zvec_string_compare`
+- `zvec_string_copy`
+- `zvec_string_create`
+- `zvec_string_create_from_view`
+- `zvec_string_length`
+- `zvec_sub_query_get_field_name`
+- `zvec_sub_query_get_num_candidates`
+- `zvec_sub_query_set_num_candidates`
+- `zvec_sub_query_set_sparse_indices`
+- `zvec_sub_query_set_sparse_values`
+- `zvec_vector_query_get_field_name`
+- `zvec_vector_query_get_filter`
+- `zvec_vector_query_get_fts`
+- `zvec_vector_query_get_include_doc_id`
+- `zvec_vector_query_get_include_vector`
+- `zvec_vector_query_get_output_fields`
+- `zvec_vector_query_get_topk`
+- `zvec_vector_query_set_include_doc_id`
+- `zvec_vector_query_set_output_fields`
+- `zvec_vector_query_set_query_params`

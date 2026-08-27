@@ -221,6 +221,9 @@ internal sealed class RecordingCollection : IZvecCollection
     public ValueTask<IReadOnlyList<ZVecDoc>> QueryAsync(IReadOnlyList<ZVecQuery> queries, int topk, ZVecReranker? reranker, ZVecFilterBuilder filter, bool includeVector = true, CancellationToken ct = default)
         => QueryAsync(queries, topk, reranker, filter.Build(), includeVector, ct);
 
+    public ZVecDocIterator Iterate(ZVecIterateOptions? options = null) =>
+        throw new NotSupportedException("RecordingCollection does not simulate iteration.");
+
 #pragma warning disable CS0618
     public IReadOnlyList<ZVecDoc> QueryGroupBy(ZVecGroupByQuery groupQuery) => throw new NotSupportedException();
     public ValueTask<IReadOnlyList<ZVecDoc>> QueryGroupByAsync(ZVecGroupByQuery groupQuery, CancellationToken ct = default)

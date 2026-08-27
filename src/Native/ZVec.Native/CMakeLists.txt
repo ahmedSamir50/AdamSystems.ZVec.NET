@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Consume upstream Alibaba zvec; build its official fat C API DLL (zvec_c_api).
+set(OVERRIDE_GIT_DESCRIBE "v0.7.0" CACHE STRING "Force zvec ABI version (shallow clones have no tags)" FORCE)
+
 set(BUILD_TESTING OFF CACHE BOOL "Disable Zvec tests" FORCE)
 set(BUILD_TOOLS OFF CACHE BOOL "Disable Zvec tools" FORCE)
 set(BUILD_EXAMPLES OFF CACHE BOOL "Disable Zvec examples" FORCE)

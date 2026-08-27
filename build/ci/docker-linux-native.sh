@@ -16,7 +16,7 @@ docker run --rm \
   bash /src/build/ci/docker-linux-native-inner.sh
 
 ls -la "${ROOT}/_sim_natives/zvec-native-linux-x64"
-git -C "${ROOT}/src/Native/ZVec.Native/external/zvec" reset --hard v0.6.0
+git -C "${ROOT}/src/Native/ZVec.Native/external/zvec" reset --hard v0.7.0
 git -C "${ROOT}/src/Native/ZVec.Native/external/zvec" clean -ffdx
 git -C "${ROOT}/src/Native/ZVec.Native/external/zvec" submodule foreach --recursive 'git reset --hard; git clean -ffdx' || true
 echo DOCKER_LINUX_NATIVE_DONE

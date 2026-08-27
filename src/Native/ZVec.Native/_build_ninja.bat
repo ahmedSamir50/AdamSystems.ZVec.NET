@@ -18,7 +18,7 @@ set CMAKE_POLICY_VERSION_MINIMUM=3.5
 set "PATH=%PATH%;%ProgramFiles%\Git\usr\bin;%USERPROFILE%\scoop\shims;%USERPROFILE%\scoop\apps\mingw\current\bin"
 
 set "CMAKE=cmake"
-set "ROOT=D:\A_S\ZVec.Net_SLN\ZVec.Net\src\Native\ZVec.Native"
+set "ROOT=%~dp0."
 
 "%CMAKE%" --build "%ROOT%\build" --target zvec_c_api --parallel
 exit /b %ERRORLEVEL%

@@ -2,14 +2,14 @@
 
 | What | Format | Example |
 |------|--------|---------|
-| **SDK version** | SemVer | `1.0.0-beta.5` |
-| **ZVec native pin** | Build metadata after `+` | `+zvec.0.6.0` |
+| **SDK version** | SemVer | `1.0.0-beta.6` |
+| **ZVec native pin** | Build metadata after `+` | `+zvec.0.7.0` |
 | **.NET target** | TFM + `lib/` folder | `net8.0` (LTS) |
-| **ABI floor** | `ZVecNativeAbi` | Minimum `0.6.0`, same major |
-| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.5` |
+| **ABI floor** | `ZVecNativeAbi` | Minimum `0.7.0`, same major |
+| **Git tag** | `v` + SemVer (no `+`) | `v1.0.0-beta.6` |
 | **Git branch (train)** | `release/1.0` | Long-lived 1.0.x line |
 
-NuGet version example: `1.0.0-beta.5+zvec.0.6.0`. Do **not** put TFM or branch names into the version string.
+NuGet version example: `1.0.0-beta.6+zvec.0.7.0`. Do **not** put TFM or branch names into the version string.
 
 ## ABI gate
 

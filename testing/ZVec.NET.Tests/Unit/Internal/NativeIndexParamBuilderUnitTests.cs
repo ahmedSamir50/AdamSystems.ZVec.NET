@@ -22,6 +22,14 @@ public class NativeIndexParamBuilderUnitTests
     }
 
     [Fact]
+    public void NativeIndexParamBuilder_IvfRabitqIndexParam_Type_IsSupported()
+    {
+        var param = new ZVecIvfRabitqIndexParam { Nlist = 8, TotalBits = 7 };
+        param.MetricType.Should().Be(ZVecMetricType.L2);
+        ((int)ZVecIndexType.IvfRabitq).Should().Be(7);
+    }
+
+    [Fact]
     public void NativeIndexParamBuilder_Rabitq_Throws_CApiGap_OnX64()
     {
         if (RuntimeInformation.ProcessArchitecture is Architecture.Arm or Architecture.Arm64)

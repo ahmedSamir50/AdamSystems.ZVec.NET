@@ -44,6 +44,25 @@ public sealed class ZVecIvfQueryParams : ZVecQueryParams
     public float? ScaleFactor { get; init; }
 }
 
+/// <summary>IVF + RaBitQ index search parameters.</summary>
+public sealed class ZVecIvfRabitqQueryParams : ZVecQueryParams
+{
+    /// <summary>Number of cluster lists to probe during search.</summary>
+    public int? Nprobe { get; init; }
+
+    /// <summary>Optional search radius.</summary>
+    public float? Radius { get; init; }
+
+    /// <summary>When true, use linear search within probed lists.</summary>
+    public bool? IsLinear { get; init; }
+
+    /// <summary>When true, apply the index refiner during search.</summary>
+    public bool? IsUsingRefiner { get; init; }
+
+    /// <summary>Scale factor for IVF-RaBitQ query params. Default is <see cref="ZVecDefaults.Query.IvfRabitqScaleFactor"/>.</summary>
+    public float? ScaleFactor { get; init; }
+}
+
 /// <summary>Flat (brute-force) index search parameters.</summary>
 public sealed class ZVecFlatQueryParams : ZVecQueryParams
 {
@@ -77,7 +96,7 @@ public sealed class ZVecVamanaQueryParams : ZVecQueryParams
 }
 
 /// <summary>DiskANN index search parameters.</summary>
-/// <remarks>DiskANN indexes are Linux-only. Prefer setting these when querying a DiskANN field.</remarks>
+/// <remarks>DiskANN indexes are supported on Linux and macOS ARM64 only.</remarks>
 public sealed class ZVecDiskAnnQueryParams : ZVecQueryParams
 {
     /// <summary>Search frontier / list size. Default is <see cref="ZVecDefaults.Query.DiskAnnListSize"/>.</summary>

@@ -11,6 +11,8 @@ public enum ZVecIndexType
     HnswRabitq = 4,
     DiskAnn = 5,
     Vamana = 6,
+    /// <summary>IVF + RaBitQ. Maps to <c>IndexType::IVF_RABITQ = 7</c> in <c>type.h</c>.</summary>
+    IvfRabitq = 7,
     Invert = 10,
     Fts = 11
 }

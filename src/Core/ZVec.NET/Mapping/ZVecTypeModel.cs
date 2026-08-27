@@ -226,6 +226,7 @@ public sealed class ZVecTypeModel
     {
         ZVecIndexType.Flat => new ZVecFlatIndexParam { MetricType = attr.Metric },
         ZVecIndexType.Ivf => new ZVecIvfIndexParam { MetricType = attr.Metric },
+        ZVecIndexType.IvfRabitq => new ZVecIvfRabitqIndexParam { MetricType = attr.Metric },
         ZVecIndexType.HnswRabitq => new ZVecHnswRabitqIndexParam { MetricType = attr.Metric, M = attr.M, EfConstruction = attr.EfConstruction },
         ZVecIndexType.DiskAnn => new ZVecDiskAnnIndexParam { MetricType = attr.Metric },
         ZVecIndexType.Vamana => new ZVecVamanaIndexParam { MetricType = attr.Metric },
