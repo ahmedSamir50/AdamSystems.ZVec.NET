@@ -170,7 +170,7 @@ There is **no** merge of “different development branches into different `relea
 | `build-native.yml` / `build-native-mobile.yml` | **PRs** with path filters (+ manual) | No |
 | `pack.yml` | **Manual** `workflow_dispatch` only (also called by Publish if needed) | No — natives → managed with RID artifacts → pack → consumer smoke |
 | `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
-| `validate-consumer-rerun.yml` | Manual only | No |
+| `docs.yml` | push to `main` / `release/*` (+ manual) | No |
 
 **Ship flow:** PR (CI) → maintainer merge → **local `simulate-pack.ps1` green** → maintainer tags `v*` on `release/*` → **Publish NuGet** reuses a **same-SHA** Pack with `conclusion=success`, or calls Pack inline. Optional manual Pack before tag is fine but not required. No Pack on every push to `release/**`.
 

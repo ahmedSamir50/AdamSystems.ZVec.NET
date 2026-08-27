@@ -6,7 +6,6 @@ on:
       - "src/Native/**"
       - "build/ci/**"
       - ".github/workflows/build-native.yml"
-      - ".github/workflows/build-native-try-optional.yml"
   workflow_dispatch:
     inputs:
       try_optional_only:

@@ -18,12 +18,10 @@
 | Workflow | Typical triggers | Publishes to nuget.org? |
 |----------|------------------|-------------------------|
 | `build-managed.yml` | PRs (+ manual) | No — core + tests only (not samples) |
-| `build-native.yml` / `build-native-mobile.yml` | PRs with path filters (+ manual) | No |
-| `build-native-try-optional.yml` | Manual only — **win-arm64** soft RID | No |
-| `build-native-try-catalyst.yml` | Manual only — **maccatalyst-arm64** (hard on try path) | No |
+| `build-native.yml` / `build-native-mobile.yml` | PRs with path filters (+ manual; optional RIDs via dispatch inputs) | No |
 | `pack.yml` | Manual `workflow_dispatch` only (+ `workflow_call`) | No (pack + smoke only) |
 | `publish-nuget.yml` | tags `v*` + manual | **Yes** — nuget.org then GitHub Packages; commit must be on `release/*` |
-| `validate-consumer-rerun.yml` | Manual only | No |
+| `docs.yml` | push to `main` / `release/*` (+ manual) | No |
 
 **Linux teardown fix branch:** after changing init/teardown, run the full local matrix before opening a PR:
 
