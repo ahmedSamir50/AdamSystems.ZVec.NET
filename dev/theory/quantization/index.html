@@ -1598,16 +1598,19 @@
 <td><code>ZVecHnswRabitqIndexParam</code> — defaults <code>M=16</code>, <code>EfConstruction=200</code>, <code>TotalBits=7</code>, <code>NumClusters=16</code></td>
 </tr>
 <tr>
-<td>Platform gate</td>
-<td>RaBitQ: <strong>x86_64 + AVX2 only</strong> — SDK throws <code>PlatformNotSupportedException</code> on Arm</td>
+<td>IVF-RaBitQ type</td>
+<td><code>ZVecIvfRabitqIndexParam</code> — defaults <code>Nlist=1024</code>, <code>TotalBits=7</code>, query <code>Nprobe=10</code> (zvec 0.7.0+)</td>
 </tr>
 <tr>
-<td>C API create gap</td>
-<td>Managed create throws <code>NotSupportedException</code> until upstream exports create path — see <a href="../../reference/native-api-coverage/">Native API coverage</a></td>
+<td>Platform gate</td>
+<td>RaBitQ (HNSW + IVF): <strong>x86_64 + AVX2 only</strong> on managed SDK — throws on Arm. Upstream builds RaBitQ runtime on <strong>Linux x86_64</strong> only.</td>
+</tr>
+<tr>
+<td>HNSW-RaBitQ C API create gap</td>
+<td>Managed create throws <code>NotSupportedException</code> — see <a href="../../reference/native-api-coverage/">Native API coverage</a></td>
 </tr>
 </tbody>
 </table>
-<p>Do not rely on RaBitQ create in production until the coverage report clears the blocker.</p>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../../concepts/hnsw/">Concepts: HNSW</a> (RaBitQ row)</li>
