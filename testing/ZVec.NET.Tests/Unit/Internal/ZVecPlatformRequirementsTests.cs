@@ -55,16 +55,21 @@ public class ZVecPlatformRequirementsTests
     }
 
     [Fact]
-    public void ThrowIfUnsupported_DiskAnn_ThrowsOnNonLinux()
+    public void ThrowIfUnsupported_DiskAnn_ThrowsOnUnsupportedPlatform()
     {
         if (OperatingSystem.IsLinux())
         {
-            Assert.Skip("Current OS is Linux; DiskANN non-Linux gate cannot be asserted here.");
+            Assert.Skip("Current OS is Linux; DiskANN unsupported-platform gate cannot be asserted here.");
+        }
+
+        if (OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        {
+            Assert.Skip("Current OS is macOS ARM64; DiskANN is supported here.");
         }
 
         var act = () => ZVecPlatformRequirements.ThrowIfUnsupported(new ZVecDiskAnnIndexParam());
         act.Should().Throw<PlatformNotSupportedException>()
-            .WithMessage(ZVecDefaults.Errors.DiskAnnRequiresLinux);
+            .WithMessage(ZVecDefaults.Errors.DiskAnnRequiresSupportedPlatform);
     }
 
     [Fact]
@@ -80,11 +85,28 @@ public class ZVecPlatformRequirementsTests
     }
 
     [Fact]
-    public void NativeIndexParamBuilder_DiskAnn_ThrowsOnNonLinux()
+    public void ThrowIfUnsupported_DiskAnn_AllowsMacOsArm64()
+    {
+        if (!OperatingSystem.IsMacOS() || RuntimeInformation.ProcessArchitecture != Architecture.Arm64)
+        {
+            Assert.Skip("Current OS is not macOS ARM64; DiskANN macOS ARM64 allowance cannot be asserted here.");
+        }
+
+        var act = () => ZVecPlatformRequirements.ThrowIfUnsupported(new ZVecDiskAnnIndexParam());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void NativeIndexParamBuilder_DiskAnn_ThrowsOnUnsupportedPlatform()
     {
         if (OperatingSystem.IsLinux())
         {
             Assert.Skip("Current OS is Linux; DiskANN builder gate cannot be asserted here.");
+        }
+
+        if (OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        {
+            Assert.Skip("Current OS is macOS ARM64; DiskANN builder is allowed here.");
         }
 
         var act = () =>
@@ -92,6 +114,6 @@ public class ZVecPlatformRequirementsTests
             using var _ = new NativeIndexParamBuilder(new ZVecDiskAnnIndexParam());
         };
         act.Should().Throw<PlatformNotSupportedException>()
-            .WithMessage(ZVecDefaults.Errors.DiskAnnRequiresLinux);
+            .WithMessage(ZVecDefaults.Errors.DiskAnnRequiresSupportedPlatform);
     }
 }

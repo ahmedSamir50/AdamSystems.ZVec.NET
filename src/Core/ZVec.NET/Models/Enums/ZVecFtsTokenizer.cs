@@ -8,5 +8,7 @@ public enum ZVecFtsTokenizer
 {
     Standard = 0,
     Jieba = 1,
-    Whitespace = 2
+    Whitespace = 2,
+    /// <summary>Character n-gram tokenizer. Native literal <c>"ngram"</c>.</summary>
+    Ngram = 3,
 }

@@ -64,8 +64,8 @@ Write-Host "OK: $($f.FullName) size=$($f.Length) mtime=$($f.LastWriteTime)"
 
 # Do not leave version-fallback / sed dirt in the submodule pointer
 $zvec = Join-Path $RepoRoot "src/Native/ZVec.Native/external/zvec"
-Write-Host "Resetting submodule to clean v0.6.0..."
-git -C $zvec reset --hard v0.6.0 | Out-Null
+Write-Host "Resetting submodule to clean v0.7.0..."
+git -C $zvec reset --hard v0.7.0 | Out-Null
 git -C $zvec clean -ffdx | Out-Null
 # Nested thirdparties get LF-stripped / patched during configure; reset those too
 $prevEap2 = $ErrorActionPreference

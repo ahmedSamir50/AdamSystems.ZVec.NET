@@ -30,6 +30,6 @@ CI remains **soft** for `maccatalyst-arm64` until a later release promotes it to
 |------|-----|
 | **Blazor WebAssembly** | No native `zvec_c_api` RID |
 | **HNSW-RaBitQ on ARM** | Upstream ISA (x86_64 + AVX2 only); SDK throws `PlatformNotSupportedException` |
-| **DiskANN on non-Linux** | Upstream Linux-only; same SDK gate |
+| **DiskANN on unsupported OS** | Upstream: Linux (any arch) + macOS ARM64; Windows blocked — same SDK gate |
 
 See [Concepts](../concepts/index.md) for index types and [Troubleshooting](troubleshooting.md) for load failures.

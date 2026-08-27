@@ -53,6 +53,9 @@ public interface IZvecCollection<
     T? Fetch(string id, bool includeVector = false);
     ValueTask<T?> FetchAsync(string id, bool includeVector = false, CancellationToken ct = default);
 
+    /// <summary>Snapshot iterator mapped to <typeparamref name="T"/>.</summary>
+    IEnumerable<T> Iterate(ZVecIterateOptions? options = null);
+
     IReadOnlyList<ZVecHit<T>> Query(
         Expression<Func<T, ReadOnlyMemory<float>>> vectorProperty,
         ReadOnlyMemory<float> queryVector,

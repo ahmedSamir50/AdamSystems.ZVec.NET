@@ -9,8 +9,9 @@ Short **when to use** primers plus pointers to [zvec.org](https://zvec.org). Fir
 | **HNSW** | General-purpose ANN | `ZVecHnswIndexParam` | All supported RIDs |
 | **Flat** | Exact search (small datasets) | `ZVecFlatIndexParam` | All supported RIDs |
 | **IVF** | Clustered ANN | `ZVecIvfIndexParam` | All supported RIDs |
+| **IVF-RaBitQ** | Quantized IVF | `ZVecIvfRabitqIndexParam` | x86_64 + AVX2 only (zvec 0.7.0+) |
 | **HNSW-RaBitQ** | Quantized HNSW | `ZVecHnswRabitqIndexParam` | x86_64 + AVX2 only; C API create still blocked — see [coverage](../reference/native-api-coverage.md) |
-| **DiskANN** | Disk-based ANN | `ZVecDiskAnnIndexParam` | **Linux only** |
+| **DiskANN** | Disk-based ANN | `ZVecDiskAnnIndexParam` | Linux (any arch) + macOS ARM64; Windows blocked |
 | **Vamana** | Graph-based ANN | `ZVecVamanaIndexParam` | All supported RIDs |
 | **Invert** | Scalar field index | `ZVecInvertIndexParam` | All supported RIDs |
 | **FTS** | Full-text search | `ZVecFtsIndexParam` | All supported RIDs |

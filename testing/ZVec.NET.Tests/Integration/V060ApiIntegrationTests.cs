@@ -30,8 +30,9 @@ public class V060ApiIntegrationTests : IClassFixture<ZVecRealNativeFixture>, IDi
     public void Native_Version_Is_At_Least_0_6_0()
     {
         var factory = EnsureFactory();
-        factory.GetNativeVersion().Should().MatchRegex(@"^v?0\.6(\.|$)");
+        factory.GetNativeVersion().Should().MatchRegex(@"^v?0\.7(\.|$)");
         NativeMethods.zvec_get_version_major().Should().Be(0);
+        NativeMethods.zvec_get_version_minor().Should().BeGreaterThanOrEqualTo(7);
     }
 
     [Fact]

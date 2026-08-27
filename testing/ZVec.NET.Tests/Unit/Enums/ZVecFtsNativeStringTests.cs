@@ -11,6 +11,7 @@ public class ZVecFtsNativeStringTests
         ZVecNativeStrings.ToNative(ZVecFtsTokenizer.Standard).Should().Be("standard");
         ZVecNativeStrings.ToNative(ZVecFtsTokenizer.Jieba).Should().Be("jieba");
         ZVecNativeStrings.ToNative(ZVecFtsTokenizer.Whitespace).Should().Be("whitespace");
+        ZVecNativeStrings.ToNative(ZVecFtsTokenizer.Ngram).Should().Be("ngram");
     }
 
     [Fact]

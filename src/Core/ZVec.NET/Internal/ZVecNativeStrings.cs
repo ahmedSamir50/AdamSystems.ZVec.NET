@@ -11,6 +11,7 @@ internal static class ZVecNativeStrings
         ZVecFtsTokenizer.Standard => "standard",
         ZVecFtsTokenizer.Jieba => "jieba",
         ZVecFtsTokenizer.Whitespace => "whitespace",
+        ZVecFtsTokenizer.Ngram => "ngram",
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
     };
 

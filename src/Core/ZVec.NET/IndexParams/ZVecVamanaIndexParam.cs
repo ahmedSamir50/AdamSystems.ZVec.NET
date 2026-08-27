@@ -28,6 +28,11 @@ public sealed class ZVecVamanaIndexParam : ZVecIndexParam
     public ZVecQuantizeType QuantizeType { get; init; } = ZVecDefaults.Vamana.QuantizeType;
 
     /// <summary>
+    /// When true, run the optional Vamana two-pass graph construction pass (zvec 0.7+).
+    /// </summary>
+    public bool TwoPassBuild { get; init; } = ZVecDefaults.Vamana.TwoPassBuild;
+
+    /// <summary>
     /// When true and <see cref="QuantizeType"/> is Int8 or Int4, apply random rotation before quantization.
     /// </summary>
     public bool EnableRotate { get; init; } = ZVecDefaults.Quantizer.EnableRotate;

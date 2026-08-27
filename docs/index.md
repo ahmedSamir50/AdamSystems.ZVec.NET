@@ -4,7 +4,7 @@
 
 **Production .NET SDK for [Alibaba ZVec](https://github.com/alibaba/zvec)** — DI, typed ODM, async APIs, SafeHandles, full indexes/FTS, and mobile RIDs.
 
-> **Beta** — `1.0.0-beta.5+zvec.0.6.0`. Native AOT compatible. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (distinct from the unrelated NuGet package [`Zvec`](https://www.nuget.org/packages/Zvec)).
+> **Beta** — `1.0.0-beta.6+zvec.0.7.0`. Native AOT compatible. APIs may still evolve. PackageId **`ZVec.NET`** on nuget.org (distinct from the unrelated NuGet package [`Zvec`](https://www.nuget.org/packages/Zvec)).
 
 ## Why ZVec.NET?
 

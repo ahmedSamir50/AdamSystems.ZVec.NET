@@ -63,8 +63,8 @@ jobs:
           submodules: recursive
 
       # Shallow submodule checkouts often lack tags; git_version then becomes g<sha> and
-      # c_api CMake falls back to 0.2.1 — breaking ZVec.NET's 0.6.0 ABI gate.
-      # Upstream: https://github.com/alibaba/zvec/issues/621
+      # c_api CMake falls back to 0.0.0 — breaking ZVec.NET's 0.7.0 ABI gate.
+      # OVERRIDE_GIT_DESCRIBE=v0.7.0 is the safety net (see CMakeLists.txt).
       - name: Fetch zvec tags for version header
         shell: bash
         run: |
@@ -120,15 +120,6 @@ jobs:
           Write-Host "HOST_PROTOC=$protoc"
 
       # Cannot commit into alibaba/zvec; apply local workaround patches before configure.
-      - name: Patch zvec version fallback (all RIDs)
-        shell: bash
-        run: |
-          set -euo pipefail
-          zvec="src/Native/ZVec.Native/external/zvec"
-          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.6.0.patch"
-          git -C "$zvec" apply --check "$patch"
-          git -C "$zvec" apply "$patch"
-
       - name: Patch zvec CI workarounds (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -154,6 +145,7 @@ jobs:
         run: |
           cmake -B "build-${{ matrix.rid }}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DOVERRIDE_GIT_DESCRIBE=v0.7.0 \
             ${{ matrix.cmake_extra }} \
             -DBUILD_TESTING=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF \
             -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_C_BINDINGS=ON \
@@ -188,6 +180,7 @@ jobs:
             "-G", "Ninja",
             "-DCMAKE_BUILD_TYPE=Release",
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+            "-DOVERRIDE_GIT_DESCRIBE=v0.7.0",
             "-DBUILD_TESTING=OFF",
             "-DBUILD_TOOLS=OFF",
             "-DBUILD_EXAMPLES=OFF",

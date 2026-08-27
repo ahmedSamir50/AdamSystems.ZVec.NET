@@ -67,15 +67,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Fetch zvec tags + version fallback patch
+      - name: Fetch zvec tags
         run: |
           set -euo pipefail
           zvec="src/Native/ZVec.Native/external/zvec"
           git -C "$zvec" fetch --tags --force origin || true
           git -C "$zvec" fetch --deepen=200 origin || true
-          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.6.0.patch"
-          git -C "$zvec" apply --check "$patch"
-          git -C "$zvec" apply "$patch"
 
       - name: Install build tools
         run: |
@@ -119,15 +116,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Fetch zvec tags + version fallback patch
+      - name: Fetch zvec tags
         run: |
           set -euo pipefail
           zvec="src/Native/ZVec.Native/external/zvec"
           git -C "$zvec" fetch --tags --force origin || true
           git -C "$zvec" fetch --deepen=200 origin || true
-          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.6.0.patch"
-          git -C "$zvec" apply --check "$patch"
-          git -C "$zvec" apply "$patch"
 
       - name: Install Ninja
         run: brew install ninja
@@ -161,15 +155,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Fetch zvec tags + version fallback patch
+      - name: Fetch zvec tags
         run: |
           set -euo pipefail
           zvec="src/Native/ZVec.Native/external/zvec"
           git -C "$zvec" fetch --tags --force origin || true
           git -C "$zvec" fetch --deepen=200 origin || true
-          patch="$GITHUB_WORKSPACE/build/ci/patches/zvec-version-fallback-0.6.0.patch"
-          git -C "$zvec" apply --check "$patch"
-          git -C "$zvec" apply "$patch"
 
       - name: Install Ninja
         run: brew install ninja

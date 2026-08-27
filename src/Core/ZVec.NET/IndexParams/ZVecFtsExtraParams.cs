@@ -31,6 +31,15 @@ public sealed class ZVecFtsExtraParams
 
         /// <summary>JSON key for stemmer_lang.</summary>
         public const string StemmerLang = "stemmer_lang";
+
+        /// <summary>JSON key for ngram_min.</summary>
+        public const string NgramMin = "ngram_min";
+
+        /// <summary>JSON key for ngram_max.</summary>
+        public const string NgramMax = "ngram_max";
+
+        /// <summary>JSON key for token_chars.</summary>
+        public const string TokenChars = "token_chars";
     }
 
     /// <summary>standard only. Positive int; native default 255, range [1, 1048576].</summary>
@@ -50,6 +59,18 @@ public sealed class ZVecFtsExtraParams
     /// e.g. "porter" for ES-like behaviour). Kept as string — Snowball set is large/open.
     /// </summary>
     public string? StemmerLang { get; init; }
+
+    /// <summary>ngram tokenizer only. Minimum n-gram length (native default 2).</summary>
+    public int? NgramMin { get; init; }
+
+    /// <summary>ngram tokenizer only. Maximum n-gram length (native default 2).</summary>
+    public int? NgramMax { get; init; }
+
+    /// <summary>
+    /// ngram tokenizer only. Allowed character classes:
+    /// letter, digit, whitespace, punctuation, symbol.
+    /// </summary>
+    public IReadOnlyList<string>? TokenChars { get; init; }
 
     /// <summary>
     /// Builds the native JSON object string for <c>zvec_index_params_set_fts_params</c>,
@@ -83,6 +104,24 @@ public sealed class ZVecFtsExtraParams
         if (StemmerLang is not null)
         {
             parts.Add($"\"{ZVecFtsExtraParamsJsonDefaults.StemmerLang}\":{QuoteJsonString(StemmerLang)}");
+        }
+
+        if (NgramMin is { } ngramMin)
+        {
+            parts.Add(FormattableString.Invariant(
+                $"\"{ZVecFtsExtraParamsJsonDefaults.NgramMin}\":{ngramMin.ToString(CultureInfo.InvariantCulture)}"));
+        }
+
+        if (NgramMax is { } ngramMax)
+        {
+            parts.Add(FormattableString.Invariant(
+                $"\"{ZVecFtsExtraParamsJsonDefaults.NgramMax}\":{ngramMax.ToString(CultureInfo.InvariantCulture)}"));
+        }
+
+        if (TokenChars is { Count: > 0 })
+        {
+            var tokens = TokenChars.Select(QuoteJsonString);
+            parts.Add($"\"{ZVecFtsExtraParamsJsonDefaults.TokenChars}\":[{string.Join(",", tokens)}]");
         }
 
         if (parts.Count == 0)

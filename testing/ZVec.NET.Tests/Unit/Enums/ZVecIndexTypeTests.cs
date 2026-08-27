@@ -14,6 +14,7 @@ public class ZVecIndexTypeTests
         ((int)ZVecIndexType.HnswRabitq).Should().Be(4);
         ((int)ZVecIndexType.DiskAnn).Should().Be(5);
         ((int)ZVecIndexType.Vamana).Should().Be(6);
+        ((int)ZVecIndexType.IvfRabitq).Should().Be(7);
         ((int)ZVecIndexType.Invert).Should().Be(10);
         ((int)ZVecIndexType.Fts).Should().Be(11);
     }

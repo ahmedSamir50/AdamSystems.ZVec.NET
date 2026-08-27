@@ -1,7 +1,7 @@
 # Install
 
 ```bash
-dotnet add package ZVec.NET --version 1.0.0-beta.5
+dotnet add package ZVec.NET --version 1.0.0-beta.6
 ```
 
 ## Requirements
@@ -14,7 +14,7 @@ dotnet add package ZVec.NET --version 1.0.0-beta.5
 | **Samples** | [.NET 10 SDK](https://dotnet.microsoft.com/download) only; not shipped in the NuGet package |
 | **Out of scope** | Blazor WebAssembly (no native RID) |
 
-Version scheme: `1.0.0-beta.5+zvec.0.6.0` (SDK SemVer + pinned native). TFMs live under `lib/` — **not** in the version string.
+Version scheme: `1.0.0-beta.6+zvec.0.7.0` (SDK SemVer + pinned native). TFMs live under `lib/` — **not** in the version string.
 
 See [Native RIDs](../guides/rids.md) for the pack-required matrix and feature limits (RaBitQ, DiskANN).
 

@@ -165,6 +165,13 @@ public sealed class ZVecCollection<
     }
 
     /// <inheritdoc/>
+    public IEnumerable<T> Iterate(ZVecIterateOptions? options = null)
+    {
+        foreach (var doc in Untyped.Iterate(options))
+            yield return ZVecMapper.FromDoc<T>(doc, _model);
+    }
+
+    /// <inheritdoc/>
     public IReadOnlyList<ZVecHit<T>> Query(
         Expression<Func<T, ReadOnlyMemory<float>>> vectorProperty,
         ReadOnlyMemory<float> queryVector,

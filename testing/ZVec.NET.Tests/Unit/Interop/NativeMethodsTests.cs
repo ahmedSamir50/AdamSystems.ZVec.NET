@@ -18,9 +18,9 @@ public class NativeMethodsTests
     public void NativeMethods_Constants_ArePinned()
     {
         ZVecNativeAbi.MinimumMajor.Should().Be(0);
-        ZVecNativeAbi.MinimumMinor.Should().Be(6);
+        ZVecNativeAbi.MinimumMinor.Should().Be(7);
         ZVecNativeAbi.MinimumPatch.Should().Be(0);
-        ZVecNativeAbi.MinimumVersionString.Should().Be("0.6.0");
+        ZVecNativeAbi.MinimumVersionString.Should().Be("0.7.0");
         ZVecDefaults.Version.ExpectedMajor.Should().Be(ZVecNativeAbi.MinimumMajor);
         ZVecDefaults.Version.ExpectedMinor.Should().Be(ZVecNativeAbi.MinimumMinor);
         ZVecDefaults.Version.ExpectedPatch.Should().Be(ZVecNativeAbi.MinimumPatch);

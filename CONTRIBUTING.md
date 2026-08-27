@@ -75,21 +75,21 @@ There is **no** git branch `release/1.0.0-beta.4+zvec.0.6.0`. Contributors never
 | Concept | Example | Where it lives |
 |---------|---------|----------------|
 | Git branch (train) | `release/1.0` | Git |
-| Git tag (one ship) | `v1.0.0-beta.4` | Git (**no** `+` metadata in the tag name) |
-| NuGet / csproj Version | `1.0.0-beta.4+zvec.0.6.0` | `ZVec.NET.csproj` + README |
+| Git tag (one ship) | `v1.0.0-beta.6` | Git (**no** `+` metadata in the tag name) |
+| NuGet / csproj Version | `1.0.0-beta.6+zvec.0.7.0` | `ZVec.NET.csproj` + README |
 
-`+zvec.0.6.0` is **build metadata** (native pin), not a branch name. Do **not** put TFM or branch names into the version string.
+`+zvec.0.7.0` is **build metadata** (native pin), not a branch name. Do **not** put TFM or branch names into the version string.
 
 ### Versions (current 1.0 train)
 
 | Piece | Value |
 |-------|--------|
-| ZVec C++ pin | `0.6.0` |
-| SDK SemVer | `1.0.0-beta.4` |
-| NuGet package | `1.0.0-beta.4+zvec.0.6.0` |
-| Current git tag | `v1.0.0-beta.4` |
+| ZVec C++ pin | `0.7.0` |
+| SDK SemVer | `1.0.0-beta.6` |
+| NuGet package | `1.0.0-beta.6+zvec.0.7.0` |
+| Current git tag | `v1.0.0-beta.6` (when published) |
 
-**Upgrade:** consumers on ≤`1.0.0-beta.3.x` must move to beta.4 (ABI floor `0.6.0`). After publish, maintainers may optionally unlist or mark deprecated older betas on nuget.org — advise upgrade first; do not yank without notice.
+**Upgrade:** consumers on ≤`1.0.0-beta.5.x` must move to beta.6 (ABI floor `0.7.0`). After publish, maintainers may optionally unlist or mark deprecated older betas on nuget.org — advise upgrade first; do not yank without notice.
 
 ### Daily work vs ship/maintain
 
@@ -138,7 +138,7 @@ Bug in a published alpha/RTM on the 1.0 line:
 1. git fetch && git checkout release/1.0 && git pull
 2. git checkout -b hotfix/1.0-null-filter
 3. PR → release/1.0   (not → development)
-4. On release/1.0: bump Version in csproj (e.g. 1.0.0-beta.4+zvec.0.6.0)
+4. On release/1.0: bump Version in csproj (e.g. 1.0.0-beta.6+zvec.0.7.0)
 5. **Local:** run `build/ci/simulate-pack.ps1` to green (Pack-parity; do not discover failures on remote Pack)
 6. Tag `v1.0.0-beta.4` on release/1.0 → **Publish NuGet** (reuses same-SHA green Pack, or Packs inline)
 7. Merge release/1.0 → main, then main → development (so the fix is not lost)

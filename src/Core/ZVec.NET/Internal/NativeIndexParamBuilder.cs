@@ -23,6 +23,7 @@ internal sealed class NativeIndexParamBuilder : IDisposable
         {
             ZVecHnswIndexParam => ZVecIndexType.Hnsw,
             ZVecIvfIndexParam => ZVecIndexType.Ivf,
+            ZVecIvfRabitqIndexParam => ZVecIndexType.IvfRabitq,
             ZVecFlatIndexParam => ZVecIndexType.Flat,
             ZVecVamanaIndexParam => ZVecIndexType.Vamana,
             ZVecDiskAnnIndexParam => ZVecIndexType.DiskAnn,
@@ -76,6 +77,16 @@ internal sealed class NativeIndexParamBuilder : IDisposable
                     nameof(NativeMethods.zvec_index_params_set_ivf_params));
                 break;
 
+            case ZVecIvfRabitqIndexParam ivfRq:
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_index_params_set_metric_type(_handle, (int)ivfRq.MetricType),
+                    nameof(NativeMethods.zvec_index_params_set_metric_type));
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_index_params_set_ivf_rabitq_params(
+                        _handle, ivfRq.Nlist, ivfRq.TotalBits, ivfRq.SampleCount),
+                    nameof(NativeMethods.zvec_index_params_set_ivf_rabitq_params));
+                break;
+
             case ZVecFlatIndexParam flat:
                 ZVecError.ThrowIfFailed(
                     (ZVecErrorCode)NativeMethods.zvec_index_params_set_metric_type(_handle, (int)flat.MetricType), 
@@ -103,6 +114,10 @@ internal sealed class NativeIndexParamBuilder : IDisposable
                         vamana.SaturateGraph, 
                         vamana.UseContiguousMemory), 
                     nameof(NativeMethods.zvec_index_params_set_vamana_params));
+                ZVecError.ThrowIfFailed(
+                    (ZVecErrorCode)NativeMethods.zvec_index_params_set_vamana_two_pass_build(
+                        _handle, vamana.TwoPassBuild),
+                    nameof(NativeMethods.zvec_index_params_set_vamana_two_pass_build));
                 break;
 
             case ZVecDiskAnnIndexParam diskann:

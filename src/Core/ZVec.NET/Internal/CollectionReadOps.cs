@@ -36,6 +36,29 @@ internal sealed class CollectionReadOps
         return list.Count > 0 ? list[0] : null;
     }
 
+    /// <summary>
+    /// Creates a snapshot iterator over all documents. The caller must dispose the iterator
+    /// (which releases the read gate) before closing the collection.
+    /// </summary>
+    public ZVecDocIterator Iterate(ZVecIterateOptions? options = null)
+    {
+        _ctx.ThrowIfDisposed();
+        _ctx.Gate.EnterRead();
+        try
+        {
+            return ZVecDocIterator.Create(
+                _ctx,
+                _ctx.DangerousHandle,
+                options ?? new ZVecIterateOptions(),
+                gateHeld: true);
+        }
+        catch
+        {
+            _ctx.Gate.ExitRead();
+            throw;
+        }
+    }
+
     public IReadOnlyList<ZVecDoc> Fetch(ReadOnlySpan<string> pks, bool includeVector = false)
     {
         _ctx.ThrowIfDisposed();
