@@ -68,3 +68,7 @@ __pycache__/
 githubActions.pipline.log
 _sim_pack*.log
 _sim_pack_run.log
+
+# Local-only; may contain machine-absolute paths — never commit
+/build/ci/_push.json
+/build/ci/push-api-commit.ps1

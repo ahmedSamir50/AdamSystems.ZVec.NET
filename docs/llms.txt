@@ -40,4 +40,5 @@
 
 - HNSW-RaBitQ index create blocked; managed throws NotSupportedException.
 - Group-by execution blocked (no zvec_collection_group_by_query in c_api.h).
-- See docs/reference/native-api-coverage.md
+- Next-release candidates (not bound): `zvec_collection_flush`, DiskANN `zvec_get_io_backend_*`. C++-only 0.7.0 (Turbo/uint7/uint8/HNSW original-vector) has no C API — do not invent bindings.
+- See docs/reference/native-api-coverage.md and CHANGELOG `[Unreleased]` Planned.
