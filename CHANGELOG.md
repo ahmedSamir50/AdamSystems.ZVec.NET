@@ -7,6 +7,10 @@ All notable changes to ZVec.NET are documented in this file.
 ### Planned
 
 - Promote `maccatalyst-arm64` from soft CI (included in Pack [30311588652](https://github.com/ahmedSamir50/AdamSystems.ZVec.NET/actions/runs/30311588652)) to pack-required HARD
+- Bind `zvec_collection_flush` as `Flush` / `FlushAsync` next to `Optimize`
+- Bind DiskANN I/O-backend diagnostics (`zvec_get_io_backend_type` / `_name` / `_description`) on `IZvecFactory`
+- Restrict `V070ApiIntegrationTests` IVF-RaBitQ skip to **Linux x64** (Linux ARM64 currently can run then hit the RaBitQ Arm gate)
+- Optional CI minutes: Pack-only native workflows **only if** `workflow_dispatch` (or `try_*` inputs) stay usable, and `docs.yml` still deploys on `v*` so mike `latest` follows the tag
 
 ### Changed
 

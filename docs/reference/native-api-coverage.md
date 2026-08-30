@@ -26,6 +26,28 @@ Regenerate after each submodule bump by comparing `ZVEC_EXPORT` / `ZVEC_CALL` na
 - **IVF-RaBitQ** index/query params and attach helpers are bound. Native RaBitQ runtime is built on **Linux x86_64** only upstream; Windows/macOS/mobile builds set `RABITQ_SUPPORTED=OFF` but C API symbols remain in the DLL.
 - **DocIterator** — `zvec_iterator_options_*`, `zvec_collection_create_iterator`, `zvec_doc_iterator_next`, `zvec_doc_iterator_close` bound; managed `ZVecDocIterator` / `Iterate()`.
 - **Vamana two-pass** — `zvec_index_params_set_vamana_two_pass_build` bound.
+- **FTS ngram** — tokenizer string `"ngram"` plus extra-param keys; not a new C export.
+
+IVF-RaBitQ per-field query **setters** (`set_nprobe`, `set_radius`, `set_is_linear`, `set_is_using_refiner`) appear in the missing list below. That is **not** a functional gap: `zvec_query_params_ivf_rabitq_create` already takes those four arguments; managed code only needs `set_scale_factor` after create.
+
+## Upstream 0.7.0 — C++-only or inherited (not missing C bindings)
+
+These look large in the [zvec v0.7.0 notes](https://github.com/alibaba/zvec/releases/tag/v0.7.0) but have **no new official C API** (or are native rebuilds):
+
+- C++ public API PascalCase → snake_case — C export names unchanged
+- Turbo preprocessor / PQ-INT8 / FHT; uniform uint7/uint8 (`QuantizerType` 8/9) — `c_api.h` `ZVEC_QUANTIZE_TYPE_*` is still 0–4
+- HNSW graph build from original-vector provider — no C export
+- Thread-pool CPU affinity opt-in — C++ default; no C toggle
+- RaBitQ AVX2/AVX512 dispatch, DiskANN ARM64 I/O, smaller dylibs, storage/FTS/Vamana fixes — inherited by pinning `v0.7.0`
+
+## Next release candidates (not bound yet)
+
+C APIs that exist today and are worth a managed wrapper when we choose to:
+
+- `zvec_collection_flush` — collection `Flush` / `FlushAsync` beside `Optimize`
+- `zvec_get_io_backend_type` / `zvec_get_io_backend_type_name` / `zvec_get_io_backend_description` — process-level DiskANN I/O diagnostics on `IZvecFactory`
+
+The remaining ~190 missing symbols are mostly getters, schema mutators, and doc helpers that predate 0.7.0 — a separate coverage push, not a 0.7.0 completeness gap. See also CHANGELOG `[Unreleased]` Planned.
 
 ## Blocker — group-by execution (C API gap, not “Python-only mystery”)
 
